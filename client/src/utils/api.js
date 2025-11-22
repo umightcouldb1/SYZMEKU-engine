@@ -1,50 +1,35 @@
-// client/src/utils/api.js
+// File: client/src/utils/api.js
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-// Determine the base URL: "/" in production (current host) or localhost in dev.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+export async function apiClient(endpoint, method = 'GET', data = null) {
+    const url = `${BASE_URL}/api/${endpoint}`;
+    
+    const config = {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    };
 
-/**
- * Generic fetch wrapper for API calls.
- * @param {string} endpoint - The path (e.g., '/projects', '/users')
- * @param {object} options - Fetch options (method, body, headers, etc.)
- * @returns {Promise<object>} The parsed JSON data.
- */
-export async function apiFetch(endpoint, options = {}) {
-  // Always prefix the endpoint with /api/
-  // The endpoint argument should start with a slash, e.g., '/projects'
-  const url = `${API_BASE_URL}/api${endpoint}`;
-
-  const defaultHeaders = {
-    'Content-Type': 'application/json',
-    // 'Authorization': `Bearer ${localStorage.getItem('token')}`, // Add this when auth is implemented
-  };
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers,
-    },
-    // Convert body object to JSON string if it exists
-    body: options.body && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body,
-  });
-
-  // Throw an error if the response is not OK
-  if (!response.ok) {
-    let errorBody = {};
-    try {
-        errorBody = await response.json();
-    } catch (e) {
-        // If response can't be parsed as JSON
-        errorBody.message = response.statusText || 'Unknown Network or Server Error';
+    if (data) {
+        config.body = JSON.stringify(data);
     }
-    throw new Error(errorBody.message || `HTTP error! status: ${response.status}`);
-  }
 
-  // Handle successful response with no content (e.g., a DELETE request)
-  if (response.status === 204 || response.headers.get('content-length') === '0') {
-    return null;
-  }
+    try {
+        const response = await fetch(url, config);
 
-  return response.json();
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Request failed (could not parse error body)' }));
+            throw new Error(`API Error (${response.status} ${response.statusText}): ${errorData.message || 'Request failed'}`);
+        }
+
+        if (response.status === 204 || response.headers.get('content-length') === '0') {
+            return {};
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('API Client Error:', error);
+        throw error;
+    }
 }
