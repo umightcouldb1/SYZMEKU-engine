@@ -1,7 +1,7 @@
 import React from 'react';
 import useProjects from './hooks/useProjects';
-// FINAL FIX: Assuming the component is now in the root src/ directory, not /components
-import AddProjectForm from './AddProjectForm.jsx'; 
+// FIX: Using the component path that matches the file system screenshot.
+import AddProjectForm from './components/AddProjectForm.jsx'; 
 
 const App = () => {
     // Custom hook to fetch projects and manage state
