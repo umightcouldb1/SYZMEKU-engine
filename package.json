@@ -1,23 +1,15 @@
 {
-  "name": "syzmeku-server",
+  "name": "syzmeku-engine",
   "version": "1.0.0",
-  "description": "SYZMEKU Engine Server",
-  "main": "server.cjs",
+  "description": "",
+  "main": "server/server.cjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "seed": "node seed/seed.cjs",
-    "watch": "nodemon server.cjs"
+    "start": "node server/server.cjs",
+    "setup": "cd server && npm install && cd ../client && npm install",
+    "build": "cd client && npm run build",
+    "render-build": "npm install && npm run setup && npm run build"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "dotenv": "^16.4.5",
-    "express": "^4.18.2",
-    "mongoose": "^8.0.3"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
-  }
+  "license": "ISC"
 }
