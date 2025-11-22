@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { apiClient } from './utils/api.js'; 
 
 // IMPORTANT: This ID must match the testOwnerId used in your backend's projectRoutes.js
-// Based on image_897ace.png, this ID is correct.
 const TEMP_OWNER_ID = '66c7ed02f9f102c0818d0f6b'; 
 
 const AddProjectForm = ({ onProjectAdded }) => {
