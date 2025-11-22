@@ -1,82 +1,65 @@
 // File: server/routes/API/projectRoutes.js
-
 const router = require('express').Router();
-// FIX: Changed { Project } to Project. 
-// This correctly imports the whole module export, whether it's the model itself or an object containing models.
-const Project = require('../../models/Project'); 
+// FIX: Ensure BOTH Project and User models are required to register User schema
+const { Project, User } = require('../../models'); 
 
-// --- Routes prefixed with /api/projects ---
+// ... Routes prefixed with /api/projects
 
 // GET all projects and POST a new project
 router.route('/')
-  .get(async (req, res) => {
+.get(async (req, res) => {
     try {
-      // If the model is exported as Project, this is correct. 
-      // If the model is exported as { Project }, we'll need Project.Project, which is messy.
-      const projects = await Project.find().populate('owner'); 
-      res.status(200).json(projects);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json(err);
+        // Now populating 'owner' should work since the User model is registered
+        const projects = await Project.find().populate('owner');
+        res.status(200).json(projects);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json(error);
     }
-  })
-  .post(async (req, res) => {
+})
+.post(async (req, res) => {
     try {
-      // NOTE: You must manually insert a test User into MongoDB first.
-      const testOwnerId = '60c72b2f9f1b2c0015a9b7a0'; // Placeholder ID
-      const newProject = await Project.create({ 
-          ...req.body, 
-          owner: testOwnerId 
-      });
+        // NOTE: You must manually enter a test User into MongoDB
+        // const testOwnerId = '66c7ed02f9f102c0818d0f6b'; // Placeholder ID
+        
+        // This relies on the client (AddProjectForm.jsx) sending the 'owner' field
+        const newProject = await Project.create({
+            ...req.body,
+        });
 
-      res.status(200).json(newProject);
-    } catch (err) {
-      console.error(err);
-      res.status(400).json(err);
+        res.status(200).json(newProject);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json(error);
     }
-  });
+});
 
-// GET one project, PUT/Update one, and DELETE one
-router.route('/:id')
-  .get(async (req, res) => {
+// GET a single project by id
+router.route('/:id').get(async (req, res) => {
     try {
-      const project = await Project.findById(req.params.id).populate('owner');
-      if (!project) {
-        return res.status(404).json({ message: 'No project found with this id!' });
-      }
-      res.status(200).json(project);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json(err);
+        const project = await Project.findById(req.params.id).populate('owner');
+        if (!project) {
+            return res.status(404).json({ message: 'No project found with this id!' });
+        }
+        res.status(200).json(project);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json(error);
     }
-  })
-  .put(async (req, res) => {
+});
+
+// DELETE a project by id
+router.route('/:id').delete(async (req, res) => {
     try {
-      const updatedProject = await Project.findByIdAndUpdate(
-        req.params.id,
-        req.body,
-        { new: true, runValidators: true }
-      );
-      if (!updatedProject) {
-        return res.status(404).json({ message: 'No project found with this id!' });
-      }
-      res.status(200).json(updatedProject);
-    } catch (err) {
-      console.error(err);
-      res.status(400).json(err);
+        const project = await Project.findByIdAndDelete(req.params.id);
+        if (!project) {
+            return res.status(404).json({ message: 'No project found with this id!' });
+        }
+        res.status(200).json({ message: 'Project successfully deleted!' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json(error);
     }
-  })
-  .delete(async (req, res) => {
-    try {
-      const deletedProject = await Project.findByIdAndDelete(req.params.id);
-      if (!deletedProject) {
-        return res.status(404).json({ message: 'No project found with this id!' });
-      }
-      res.status(200).json(deletedProject);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json(err);
-    }
-  });
+});
 
 module.exports = router;
