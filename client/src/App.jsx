@@ -1,8 +1,8 @@
 // File: client/src/App.jsx
 import React from 'react';
 import useProjects from './hooks/useProjects';
-// FIX: Changed import path to remove leading './' to resolve persistent error
-import AddProjectForm from 'components/AddProjectForm.jsx'; 
+// FIX: Using the explicit relative path with file extension
+import AddProjectForm from './components/AddProjectForm.jsx'; 
 
 // Define a simple list component to display the projects
 const ProjectList = ({ fetchProjects }) => {
