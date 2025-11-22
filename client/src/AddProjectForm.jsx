@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { apiClient } from './utils/api.js'; 
 
 // IMPORTANT: This ID must match the testOwnerId used in your backend's projectRoutes.js
+// Based on image_897ace.png, this ID is correct.
 const TEMP_OWNER_ID = '66c7ed02f9f102c0818d0f6b'; 
 
 const AddProjectForm = ({ onProjectAdded }) => {
@@ -25,7 +26,7 @@ const AddProjectForm = ({ onProjectAdded }) => {
         };
 
         try {
-            // Send a POST request to create a new project with the owner field
+            // Send a POST request with the required projectData (title + owner ID)
             const newProject = await apiClient('projects', 'POST', projectData);
             
             // Call the callback function to update the project list
@@ -62,6 +63,6 @@ const AddProjectForm = ({ onProjectAdded }) => {
             {error && <p style={{ color: 'red', marginTop: '10px' }}>{error}</p>}
         </div>
     );
-}; // <-- The missing brace was here
+};
 
 export default AddProjectForm;
