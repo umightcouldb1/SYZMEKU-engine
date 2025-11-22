@@ -1,5 +1,7 @@
 const router = require('express').Router();
-const { Project } = require('../../models');
+// Change this line! We need to go up one directory to 'routes', 
+// and then up another directory to 'server', then down into 'models'.
+const { Project } = require('../../../models'); 
 
 // --- Routes prefixed with /api/projects ---
 
