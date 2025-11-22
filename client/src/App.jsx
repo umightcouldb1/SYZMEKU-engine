@@ -1,10 +1,11 @@
 // File: client/src/App.jsx
 import React from 'react';
 import useProjects from './hooks/useProjects';
+import AddProjectForm from './components/AddProjectForm'; // Import the new component
 
 // Define a simple list component to display the projects
-const ProjectList = () => {
-    const { projects, isLoading, error, fetchProjects } = useProjects();
+const ProjectList = ({ fetchProjects }) => {
+    const { projects, isLoading, error } = useProjects(); // Fetching happens inside the hook
 
     if (isLoading) {
         return <p>Loading projects...</p>;
@@ -39,6 +40,10 @@ const ProjectList = () => {
 
 // Main application component
 const App = () => {
+    // We use the useProjects hook to get the fetchProjects function (renamed here to refetch)
+    // The initial call happens inside the hook, but we need the refetch for the form.
+    const { fetchProjects: refetchProjects } = useProjects(); 
+
     return (
         <div>
             <h1>SYZMEKU Engine</h1>
@@ -52,7 +57,11 @@ const App = () => {
             </ul>
             <hr />
 
-            <ProjectList />
+            {/* NEW: Add the form and pass the refetchProjects function */}
+            <AddProjectForm onProjectAdded={refetchProjects} />
+
+            {/* Pass the refetch function down to the list component */}
+            <ProjectList fetchProjects={refetchProjects} />
         </div>
     );
 };
