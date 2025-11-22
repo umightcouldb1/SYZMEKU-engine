@@ -1,8 +1,8 @@
 // File: client/src/App.jsx
 import React from 'react';
 import useProjects from './hooks/useProjects';
-// FIX: Added the .jsx file extension to resolve the build error
-import AddProjectForm from './components/AddProjectForm.jsx'; 
+// FIX: Changed import path to remove leading './' to resolve persistent error
+import AddProjectForm from 'components/AddProjectForm.jsx'; 
 
 // Define a simple list component to display the projects
 const ProjectList = ({ fetchProjects }) => {
