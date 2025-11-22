@@ -1,8 +1,8 @@
 // File: client/src/App.jsx
 import React from 'react';
 import useProjects from './hooks/useProjects';
-// FIX: Reverting to the standard relative path without file extension
-import AddProjectForm from './components/AddProjectForm'; 
+// FIX: Component is now directly in src/
+import AddProjectForm from './AddProjectForm'; 
 
 // Define a simple list component to display the projects
 const ProjectList = ({ fetchProjects }) => {
