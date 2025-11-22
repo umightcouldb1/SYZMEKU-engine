@@ -1,7 +1,7 @@
 import React from 'react';
 import useProjects from './hooks/useProjects';
-// FIX: Changing component name to all lowercase for case-sensitivity check
-import AddProjectForm from './components/addprojectform.jsx'; 
+// FIX: The component is confirmed to be in the root src/ directory, a sibling of App.jsx.
+import AddProjectForm from './AddProjectForm.jsx'; 
 
 const App = () => {
     // Custom hook to fetch projects and manage state
