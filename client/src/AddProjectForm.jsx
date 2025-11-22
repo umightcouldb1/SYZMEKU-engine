@@ -1,5 +1,6 @@
 // File: client/src/AddProjectForm.jsx
 import React, { useState } from 'react';
+// FIX: Ensure this path is correct relative to client/src/
 import apiClient from './utils/api.js'; 
 
 // IMPORTANT: This ID must match the testOwnerId used in your backend's projectRoutes.js
