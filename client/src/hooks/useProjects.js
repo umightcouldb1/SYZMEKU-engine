@@ -1,6 +1,7 @@
 // File: client/src/hooks/useProjects.js
 import { useState, useEffect, useCallback } from 'react';
-import { apiClient } from '../api/apiClient'; // Import your new API helper
+// FIX: Added the .js extension to the path to resolve the build error
+import { apiClient } from '../api/apiClient.js'; 
 
 /**
  * Custom hook to fetch and manage the list of projects.
