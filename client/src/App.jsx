@@ -1,81 +1,75 @@
-// client/src/App.jsx
 import React, { useState, useEffect } from 'react';
 
-// CRITICAL: Read the live API URL from the environment variable. 
-// This connects your client to the live Render backend service.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000';
+// The API URL is read from the VITE_API_BASE_URL set in client/.env
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 function App() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [message, setMessage] = useState('Attempting to connect to the backend API...');
+  const [status, setStatus] = useState('loading');
 
   useEffect(() => {
-    const fetchData = async () => {
+    // Function to handle the exponential backoff for retrying API calls
+    const fetchWithBackoff = async (url, retries = 5, delay = 1000) => {
       try {
-        // Use the dynamic API_BASE_URL for the fetch request
-        const response = await fetch(`${API_BASE_URL}/api/hello`); 
+        const response = await fetch(url);
         if (!response.ok) {
-          throw new Error(`Server returned HTTP error! status: ${response.status}`);
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const result = await response.json();
-        // Assuming your backend responds with { message: "..." }
-        setData(result.message);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
+        const data = await response.json();
+        setMessage(data.message);
+        setStatus('success');
+      } catch (error) {
+        console.error(`Attempt failed. Retries left: ${retries}`, error);
+        
+        if (retries > 0) {
+          // Wait for the calculated delay before retrying
+          setTimeout(() => fetchWithBackoff(url, retries - 1, delay * 2), delay);
+        } else {
+          // If all retries fail, set the final error message
+          setMessage('Failed to connect to the backend API after multiple retries. Check console for details.');
+          setStatus('error');
+        }
       }
     };
 
-    fetchData();
-  }, []); 
+    // The API endpoint that the server exposes at the root '/'
+    fetchWithBackoff(API_BASE_URL);
+  }, []);
+
+  const getStatusClasses = () => {
+    switch (status) {
+      case 'success':
+        return 'bg-green-600 text-white shadow-lg';
+      case 'error':
+        return 'bg-red-600 text-white shadow-xl';
+      case 'loading':
+      default:
+        return 'bg-blue-500 text-white animate-pulse';
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4 font-sans">
-      <div className="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg text-white border border-gray-700">
-        <h1 className="text-3xl font-bold mb-6 text-emerald-400">
-          SYZMEKU Engine Status
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className={`p-8 md:p-10 rounded-xl max-w-lg w-full transition-all duration-500 ${getStatusClasses()}`}>
+        <h1 className="text-3xl md:text-4xl font-extrabold mb-4 text-center">
+          Full Stack Deployment Status
         </h1>
-        
-        {loading && (
-          <div className="flex items-center space-x-2 text-lg text-gray-400 animate-pulse">
-            <svg className="animate-spin h-5 w-5 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p>Connecting to live API at <span className="font-mono text-yellow-400">{API_BASE_URL}</span>...</p>
-          </div>
+        <div className="text-xl font-medium text-center break-words">
+          {message}
+        </div>
+        {status === 'loading' && (
+          <p className="mt-4 text-sm text-center opacity-80">
+            Retrying connection... This may take a moment if the server is waking up.
+          </p>
         )}
-
-        {error && (
-          <div className="bg-red-900 border border-red-700 p-4 rounded-lg shadow-lg">
-            <h2 className="text-xl font-semibold text-red-300 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                Deployment Failure
-            </h2>
-            <p className="text-sm mt-2 text-red-400">
-              The frontend could not connect to the API. This usually means the Render deployment is still building or failed.
-            </p>
-            <p className="text-sm mt-3 font-mono break-all text-red-200 bg-red-800 p-2 rounded">
-                Details: {error}
-            </p>
-          </div>
-        )}
-
-        {data && (
-          <div className="bg-green-900 border border-green-700 p-4 rounded-lg shadow-lg">
-            <h2 className="text-xl font-semibold text-green-300 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                Success! Full Stack is Live!
-            </h2>
-            <p className="text-lg mt-2 text-green-100">
-              Backend Message: 
-              <span className="font-mono ml-2 p-1 bg-green-800 rounded">{data}</span>
-            </p>
-            <p className="text-sm mt-4 text-green-400">
-                Connected to live API at: <span className="font-mono text-green-200">{API_BASE_URL}</span>
-            </p>
+        {status === 'error' && (
+          <div className="mt-6 p-3 bg-red-700/50 rounded-lg text-sm">
+            <p className="font-bold mb-1">Troubleshooting Tips:</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>Confirm the server URL in `client/.env` is correct.</li>
+              <li>Check your Render service logs for startup errors.</li>
+              <li>Ensure your backend is still running.</li>
+            </ul>
           </div>
         )}
       </div>
