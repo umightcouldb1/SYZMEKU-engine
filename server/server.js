@@ -1,18 +1,36 @@
+// server/server.js
+
 // --- Dependencies ---
-// This is the starting point for your Node.js Express server.
 const express = require('express');
 const path = require('path');
-const db = require('./config/connection'); // Assuming you have a connection file
+// This line REQUIRES the connection file we are creating next (server/config/connection.js)
+const db = require('./config/connection'); 
 const app = express();
 
 // Set the port to use the environment variable (required by Render) or default to 3001
 const PORT = process.env.PORT || 3001; 
 
-…  app.listen(PORT, () => {
+// --- Middleware ---
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+// --- Serve Static Assets (for Production) ---
+// This serves the built React client files located in the 'client/dist' folder.
+if (process.env.NODE_ENV === 'production') {
+  const buildPath = path.join(__dirname, '../client/dist'); 
+  app.use(express.static(buildPath));
+
+  // Catch-all handler: serves the main index.html for all non-API routes.
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(buildPath, 'index.html'));
+  });
+}
+
+// --- Database Connection and Server Start ---
+// The Express server will only start listening once the database connection is open.
+db.once('open', () => {
+  app.listen(PORT, () => {
     console.log(`API server running on port ${PORT}!`);
-    console.log(`Use GraphQL at http://localhost:${PORT}/graphql`); 
+    console.log(`Web application served in production mode.`); 
   });
 });
-
-// NOTE: Add your API/GraphQL routes here before the 'Database Connection' block.
-// Example: app.use('/api', require('./routes/api-routes'));
