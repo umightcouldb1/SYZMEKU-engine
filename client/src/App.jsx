@@ -1,80 +1,97 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from './utils/api'; // Import the new API utility
 
-// The API URL is read from the VITE_API_BASE_URL set in client/.env or vite.config.js
-// We now explicitly add /api to the base URL for testing the connection.
-const API_URL = `${import.meta.env.VITE_API_BASE_URL || ''}/api`;
-
-function App() {
-  const [message, setMessage] = useState('Attempting to connect to the backend API...');
-  const [status, setStatus] = useState('loading');
+// Simple Projects Component to demonstrate fetching data
+const Projects = () => {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Function to handle the exponential backoff for retrying API calls
-    const fetchWithBackoff = async (url, retries = 5, delay = 1000) => {
+    const fetchProjects = async () => {
       try {
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        
-        // Success condition: We received the expected API response
-        setMessage(data.message);
-        setStatus('success');
-      } catch (error) {
-        console.error(`Attempt failed. Retries left: ${retries}`, error);
-        
-        if (retries > 0) {
-          // Wait for the calculated delay before retrying
-          setTimeout(() => fetchWithBackoff(url, retries - 1, delay * 2), delay);
-        } else {
-          // If all retries fail, set the final error message
-          setMessage('Failed to connect to the backend API after multiple retries. Check console for details.');
-          setStatus('error');
-        }
+        const data = await apiFetch('/projects'); // Fetch from /api/projects
+        setProjects(data);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch projects:', err);
+        setError('Failed to load projects. Check the console for API errors.');
+      } finally {
+        setLoading(false);
       }
     };
-
-    fetchWithBackoff(API_URL);
+    fetchProjects();
   }, []);
 
-  const getStatusClasses = () => {
-    switch (status) {
-      case 'success':
-        return 'bg-green-600 text-white shadow-lg';
-      case 'error':
-        return 'bg-red-600 text-white shadow-xl';
-      case 'loading':
-      default:
-        return 'bg-blue-500 text-white animate-pulse';
-    }
-  };
+  if (loading) return <div className="text-center text-lg text-blue-500">Loading Projects...</div>;
+  if (error) return <div className="text-center text-lg text-red-600 font-bold">{error}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className={`p-8 md:p-10 rounded-xl max-w-lg w-full transition-all duration-500 ${getStatusClasses()}`}>
-        <h1 className="text-3xl md:text-4xl font-extrabold mb-4 text-center">
-          Full Stack Deployment Status
-        </h1>
-        <div className="text-xl font-medium text-center break-words">
-          {message}
-        </div>
-        {status === 'loading' && (
-          <p className="mt-4 text-sm text-center opacity-80">
-            Retrying connection... This may take a moment if the server is waking up.
-          </p>
-        )}
-        {status === 'error' && (
-          <div className="mt-6 p-3 bg-red-700/50 rounded-lg text-sm">
-            <p className="font-bold mb-1">Troubleshooting Tips:</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>Confirm your backend Express route is running at `/api`.</li>
-              <li>Ensure the static serving logic is correct in `server/server.cjs`.</li>
-            </ul>
-          </div>
+    <div className="p-6">
+      <h2 className="text-3xl font-extrabold text-[#5B21B6] mb-6 border-b-2 border-gray-200 pb-2">
+        My Projects ({projects.length})
+      </h2>
+      <button 
+        className="mb-6 px-6 py-2 bg-[#5B21B6] text-white font-semibold rounded-lg shadow-md hover:bg-[#4d1c9e] transition duration-300"
+        onClick={() => alert('New Project Modal/Form goes here!')}
+      >
+        + Add New Project
+      </button>
+      
+      <div className="space-y-4">
+        {projects.length === 0 ? (
+            <p className="text-gray-500">No projects found. Add one to get started!</p>
+        ) : (
+            projects.map(project => (
+              <div key={project._id} className="p-4 border border-gray-200 rounded-lg shadow-sm bg-white">
+                <div className="flex justify-between items-start">
+                    <h3 className="text-xl font-bold text-[#14B8A6]">{project.title}</h3>
+                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                        project.status === 'complete' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                        {project.status}
+                    </span>
+                </div>
+                <p className="mt-2 text-gray-700">{project.description || 'No description provided.'}</p>
+                <p className="mt-1 text-xs text-gray-500">
+                    Owner: {project.owner ? project.owner.username : 'Unknown'} | Created: {new Date(project.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+            ))
         )}
       </div>
     </div>
   );
+};
+
+// Main App Component
+function App() {
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <header className="bg-white shadow-md p-4">
+        <h1 className="text-2xl font-bold text-[#5B21B6]">SYZMEKU Engine</h1>
+      </header>
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* Placeholder Sidebar Structure */}
+        <div className="lg:grid lg:grid-cols-4 lg:gap-6">
+          <aside className="lg:col-span-1 p-4 bg-white shadow rounded-lg mb-6 lg:mb-0">
+            <h3 className="text-lg font-semibold mb-3">Navigation</h3>
+            <ul className="space-y-2">
+              <li className="text-[#14B8A6] font-medium">Dashboard</li>
+              <li className="text-[#5B21B6] font-medium">Projects</li>
+              <li>Settings</li>
+            </ul>
+            <button className="mt-6 w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-300">Log Out (Future)</button>
+          </aside>
+          
+          {/* Main Content Area */}
+          <div className="lg:col-span-3 bg-white shadow rounded-lg">
+            <Projects />
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 }
+
 export default App;
