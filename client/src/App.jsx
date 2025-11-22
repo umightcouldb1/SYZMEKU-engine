@@ -1,8 +1,8 @@
 // File: client/src/App.jsx
 import React from 'react';
 import useProjects from './hooks/useProjects';
-// FIX: Use the absolute alias path ('@/' resolves to 'src/')
-import AddProjectForm from '@/components/AddProjectForm.jsx'; 
+// FIX: Reverting to the standard relative path without file extension
+import AddProjectForm from './components/AddProjectForm'; 
 
 // Define a simple list component to display the projects
 const ProjectList = ({ fetchProjects }) => {
