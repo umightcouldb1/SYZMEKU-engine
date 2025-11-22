@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server/server.cjs",
     "dev": "nodemon server/server.cjs",
-    "render-build": "npm install && cd client && npm run build" 
+    "render-build": "npm install && cd client && npm install && npm run build"
   },
   "keywords": [
     "mern",
