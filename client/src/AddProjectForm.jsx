@@ -1,39 +1,3 @@
-// File: client/src/AddProjectForm.jsx
-import React, { useState } from 'react';
-// FIX: Path adjusted since this file is now directly in 'src/'
-import { apiClient } from './utils/api.js'; 
-
-const AddProjectForm = ({ onProjectAdded }) => {
-    const [title, setTitle] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState(null);
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!title.trim()) return;
-
-        setIsSubmitting(true);
-        setError(null);
-
-        try {
-            // Send a POST request to create a new project
-            const newProject = await apiClient('projects', 'POST', { title });
-            
-            // Call the callback function passed from the parent component (App.jsx)
-            if (onProjectAdded) {
-                onProjectAdded(newProject);
-            }
-            setTitle(''); // Clear the form input
-        } catch (err) {
-            console.error('Error creating project:', err);
-            // Display an error message to the user
-            setError('Failed to create project. Check console for details.');
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    return (
         <div style={{ padding: '20px', border: '1px solid #ccc', margin: '20px 0' }}>
             <h3>➕ Add a New Project</h3>
             <form onSubmit={handleSubmit}>
