@@ -7,7 +7,6 @@ const { Project } = require('../../models');
 router.route('/')
   .get(async (req, res) => {
     try {
-      // NOTE: In a real app, you would filter by the current authenticated user's ID
       const projects = await Project.find().populate('owner');
       res.status(200).json(projects);
     } catch (err) {
@@ -17,8 +16,7 @@ router.route('/')
   })
   .post(async (req, res) => {
     try {
-      // NOTE: For testing, we hardcode an owner ID. Replace this with req.user._id after auth.
-      // You must manually insert a test User into MongoDB first to prevent failure.
+      // NOTE: You must manually insert a test User into MongoDB first.
       const testOwnerId = '60c72b2f9f1b2c0015a9b7a0'; // Placeholder ID
       const newProject = await Project.create({ 
           ...req.body, 
