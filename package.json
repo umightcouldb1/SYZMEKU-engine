@@ -6,10 +6,10 @@
   "scripts": {
     "start": "node server/server.cjs",
     "develop": "concurrently \"cd server && npm run watch\" \"cd client && npm run dev\"",
-    "install": "cd server && npm install && cd ../client && npm install",
+    "setup": "cd server && npm install && cd ../client && npm install",  
     "seed": "cd server && npm run seed",
     "build": "cd client && npm run build",
-    "render-build": "npm install && cd client && npm install && npm run build"
+    "render-build": "npm install && npm run setup && npm run build"
   },
   "keywords": [],
   "author": "",
