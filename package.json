@@ -1,25 +1,28 @@
 {
   "name": "syzmeku-engine",
   "version": "1.0.0",
-  "description": "",
-  "main": "server.js",
-  "type": "module",
+  "description": "Full-stack MERN application boilerplate.",
+  "main": "server/server.cjs",
   "scripts": {
-    "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server/server.cjs",
+    "dev": "nodemon server/server.cjs",
+    "build": "npm install --prefix client && npm run build --prefix client"
   },
-  "keywords": [],
+  "keywords": [
+    "mern",
+    "mongodb",
+    "express",
+    "react",
+    "node"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "bcrypt": "^5.1.1",
+    "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "jsonwebtoken": "^9.0.2",
-    "mongodb": "^6.8.0",
-    "mongoose": "^8.4.4",
-    "nodemon": "^3.1.4",
-    "socket.io": "^4.7.5"
+    "mongoose": "^8.3.4",
+    "nodemon": "^3.1.0"
   }
 }
