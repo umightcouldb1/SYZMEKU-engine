@@ -1,7 +1,6 @@
 const router = require('express').Router();
-// Change this line! We need to go up one directory to 'routes', 
-// and then up another directory to 'server', then down into 'models'.
-const { Project } = require('../../../models'); 
+// CORRECT PATH: '../../models' to go up from API/ and up from routes/ to land in server/models/
+const { Project } = require('../../models'); 
 
 // --- Routes prefixed with /api/projects ---
 
