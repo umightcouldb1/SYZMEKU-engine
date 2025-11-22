@@ -1,48 +1,42 @@
-// server/server.cjs
+// File: server/server.cjs
 const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
 const path = require('path');
-require('dotenv').config(); // Load environment variables from .env
+const cors = require('cors');
 
-const routes = require('./routes'); // <<<-- Import API routes
-const { User, Project } = require('./models'); // <<<-- Import Models for initial setup (if needed)
+// FIX: Changed './config/connection' to './configure/connection'
+const db = require('./configure/connection');
 
+// CRITICAL FIX: IMPORT THE ROUTES (This file will load server/routes/index.js)
+const routes = require('./routes'); 
+
+// CRITICAL CONFIGURATION
+const PORT = process.env.PORT || 3001;
 const app = express();
-const PORT = process.env.PORT || 10000;
 
 // Middleware
 app.use(cors());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// MongoDB connection string from environment variable or default
-const dbURI = process.env.MONGODB_URI;
+// Apply all imported routes
+app.use(routes);
 
-mongoose.connect(dbURI)
-    .then(() => {
-        console.log('MongoDB connection successful');
+// PRODUCTION BUILD STEP
+// Serve up static assets only in production
+if (process.env.NODE_ENV === 'production') {
+  // Point to the built client folder
+  app.use(express.static(path.join(__dirname, '../client/dist')));
+  
+  // For any non-API request, serve the index.html from the built client
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  });
+}
 
-        // --- API ROUTES ---
-        // Use the imported routes. All routes defined in server/routes/index.js
-        // will be accessible. The /api prefix is set inside server/routes/index.js.
-        app.use(routes);
-        
-        // --- STATIC FILE SERVING (CRITICAL FOR MERN DEPLOYMENT) ---
-        if (process.env.NODE_ENV === 'production') {
-            // 1. Serve any static files from the client/dist folder (where the React build is)
-            app.use(express.static(path.join(__dirname, '..', 'client', 'dist')));
-
-            // 2. All remaining requests (not caught by API routes) return the React app's index.html
-            app.get('*', (req, res) => {
-                res.sendFile(path.resolve(__dirname, '..', 'client', 'dist', 'index.html'));
-            });
-        }
-        
-        // Start the server ONLY after the database connection is open
-        app.listen(PORT, () => {
-            console.log(`API server running on port ${PORT}!`);
-            console.log(`Using environment: ${process.env.NODE_ENV || 'development'}`);
-        });
-
-    })
-    .catch(err => console.error('MongoDB connection error:', err));
+// Start the server ONLY when the database connection is open
+db.once('open', () => {
+  app.listen(PORT, () => {
+    console.log(`API server running on port ${PORT}!`);
+    console.log(`Using environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+});
