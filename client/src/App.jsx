@@ -1,7 +1,7 @@
 import React from 'react';
 import useProjects from './hooks/useProjects';
-// FIX: Using the component path that matches the file system screenshot.
-import AddProjectForm from './components/AddProjectForm.jsx'; 
+// FIX: Changing component name to all lowercase for case-sensitivity check
+import AddProjectForm from './components/addprojectform.jsx'; 
 
 const App = () => {
     // Custom hook to fetch projects and manage state
