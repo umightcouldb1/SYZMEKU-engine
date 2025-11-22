@@ -1,13 +1,12 @@
 const express = require('express');
-const path = require('path');
-const cors = require('cors');
-// ----------------------------------------------------------------------
-// FIX: Changed './config/connection' to './configure/connection'
-// ----------------------------------------------------------------------
-const db = require('./configure/connection'); 
+const path = require('path'); // <<<-- ADDED: Required for express.static and path.join
+const cors = require('require')('cors');
 
-// CRITICAL CONFIGURATION 
-const PORT = process.env.PORT || 3001; 
+// FIX: Changed './configure/connection' to './configure/connection'
+const db = require('./configure/connection');
+
+// CRITICAL CONFIGURATION
+const PORT = process.env.PORT || 3001;
 const app = express();
 
 // Middleware
