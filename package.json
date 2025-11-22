@@ -2,9 +2,9 @@
   "name": "syzmeku-engine",
   "version": "1.0.0",
   "description": "Simplified MERN backend for deployment",
-  "main": "server/server.cjs", // <--- CHANGED FROM server.js
+  "main": "server/server.cjs",
   "scripts": {
-    "start": "node server/server.cjs", // <--- CHANGED FROM server.js
+    "start": "node server/server.cjs",
     "develop": "concurrently \"cd server && npm run watch\" \"cd client && npm run dev\"",
     "build": "cd client && npm run build"
   },
