@@ -1,68 +1,60 @@
-// File: client/src/App.jsx
 import React from 'react';
 import useProjects from './hooks/useProjects';
-// FIX: Component is now directly in src/
+// FIX: Update import path based on component location in the repository.
 import AddProjectForm from './AddProjectForm'; 
+// If AddProjectForm is in a 'components' folder, change the above line to:
+// import AddProjectForm from './components/AddProjectForm';
 
-// Define a simple list component to display the projects
-const ProjectList = ({ fetchProjects }) => {
-    // The useProjects hook is called here to access the data and loading state
-    const { projects, isLoading, error } = useProjects(); 
+const App = () => {
+    // Custom hook to fetch projects and manage state
+    const { projects, loading, error, refetchProjects, addProject } = useProjects();
 
-    if (isLoading) {
-        return <p>Loading projects...</p>;
-    }
+    const renderProjectList = () => {
+        if (loading) {
+            return <p>Loading projects...</p>;
+        }
+        if (error) {
+            return <p style={{ color: 'red' }}>Error: {error}</p>;
+        }
+        if (projects.length === 0) {
+            return <p>No projects found. Add one to get started!</p>;
+        }
 
-    if (error) {
         return (
-            <div>
-                <p style={{ color: 'red' }}>Error: {error}</p>
-                <button onClick={fetchProjects}>Try Again</button>
-            </div>
-        );
-    }
-
-    if (projects.length === 0) {
-        return <p>No projects found. Add one to get started!</p>;
-    }
-
-    return (
-        <div>
-            <h2>My Projects ({projects.length})</h2>
             <ul>
                 {projects.map(project => (
-                    <li key={project._id}>
-                        <strong>{project.title}</strong> - Managed by {project.owner?.username || 'Unknown'}
-                    </li>
+                    <li key={project._id}>{project.title}</li>
                 ))}
             </ul>
-        </div>
-    );
-};
-
-// Main application component
-const App = () => {
-    // Call useProjects once here to get the refetch function
-    const { fetchProjects: refetchProjects } = useProjects(); 
+        );
+    };
 
     return (
-        <div>
+        <div className="container">
             <h1>SYZMEKU Engine</h1>
 
-            <h2>Navigation</h2>
-            <ul>
-                <li>Dashboard</li>
-                <li>Projects</li>
-                <li>Settings</li>
-                <li><button>Log Out (Future)</button></li>
-            </ul>
+            {/* Navigation (Placeholder) */}
+            <div className="navigation">
+                <h4>Navigation</h4>
+                <ul>
+                    <li>Dashboard</li>
+                    <li>Projects</li>
+                    <li>Settings</li>
+                    <li><button>Log Out (Future)</button></li>
+                </ul>
+            </div>
+            
             <hr />
 
-            {/* Add the form and pass the refetchProjects function */}
-            <AddProjectForm onProjectAdded={refetchProjects} />
+            {/* Component to add new projects */}
+            <AddProjectForm onProjectAdded={addProject} />
+            
+            <hr />
 
-            {/* Pass the refetch function down to the list component */}
-            <ProjectList fetchProjects={refetchProjects} />
+            {/* Display projects */}
+            <h2>My Projects ({projects.length})</h2>
+            {renderProjectList()}
+            
         </div>
     );
 };
