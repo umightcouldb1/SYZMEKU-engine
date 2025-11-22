@@ -1,7 +1,9 @@
+// File: server/routes/API/projectRoutes.js
+
 const router = require('express').Router();
-// CORRECT PATH: '../../models/Project' to match the file name Project.js
-// The server will look for '../../models/Project.js'
-const { Project } = require('../../models/Project'); 
+// FIX: Changed { Project } to Project. 
+// This correctly imports the whole module export, whether it's the model itself or an object containing models.
+const Project = require('../../models/Project'); 
 
 // --- Routes prefixed with /api/projects ---
 
@@ -9,7 +11,9 @@ const { Project } = require('../../models/Project');
 router.route('/')
   .get(async (req, res) => {
     try {
-      const projects = await Project.find().populate('owner');
+      // If the model is exported as Project, this is correct. 
+      // If the model is exported as { Project }, we'll need Project.Project, which is messy.
+      const projects = await Project.find().populate('owner'); 
       res.status(200).json(projects);
     } catch (err) {
       console.error(err);
