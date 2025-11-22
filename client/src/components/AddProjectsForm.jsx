@@ -1,6 +1,6 @@
 // File: client/src/components/AddProjectForm.jsx
 import React, { useState } from 'react';
-import { apiClient } from '../utils/api.js'; // Use the working utility path
+import { apiClient } from '../utils/api.js'; 
 
 const AddProjectForm = ({ onProjectAdded }) => {
     const [title, setTitle] = useState('');
