@@ -5,7 +5,7 @@
   "main": "server/server.cjs",
   "scripts": {
     "start": "node server/server.cjs",
-    "setup": "cd server && npm install && cd ../client && npm install",
+    "setup": "npm cache clean --force && cd server && npm install && cd ../client && npm install",
     "build": "cd client && npm run build",
     "render-build": "npm install && npm run setup && npm run build"
   },
