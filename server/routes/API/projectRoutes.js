@@ -9,7 +9,6 @@ const { Project, User } = require('../../models');
 router.route('/')
 .get(async (req, res) => {
     try {
-        // Now populating 'owner' should work since the User model is registered
         const projects = await Project.find().populate('owner');
         res.status(200).json(projects);
     } catch (error) {
@@ -19,9 +18,6 @@ router.route('/')
 })
 .post(async (req, res) => {
     try {
-        // NOTE: You must manually enter a test User into MongoDB
-        // const testOwnerId = '66c7ed02f9f102c0818d0f6b'; // Placeholder ID
-        
         // This relies on the client (AddProjectForm.jsx) sending the 'owner' field
         const newProject = await Project.create({
             ...req.body,
