@@ -1,5 +1,6 @@
 const router = require('express').Router();
 // CORRECT PATH: '../../models' to go up from API/ and up from routes/ to land in server/models/
+// The issue is likely the capitalization of the 'models' directory itself.
 const { Project } = require('../../models'); 
 
 // --- Routes prefixed with /api/projects ---
