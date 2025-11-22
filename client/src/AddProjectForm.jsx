@@ -1,3 +1,48 @@
+// File: client/src/AddProjectForm.jsx
+import React, { useState } from 'react';
+import { apiClient } from './utils/api.js'; 
+
+// IMPORTANT: This ID must match the testOwnerId used in your backend's projectRoutes.js
+const TEMP_OWNER_ID = '66c7ed02f9f102c0818d0f6b'; 
+
+const AddProjectForm = ({ onProjectAdded }) => {
+    const [title, setTitle] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState(null);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!title.trim()) return;
+
+        setIsSubmitting(true);
+        setError(null);
+
+        // Prepare the data to send, including the required owner ID
+        const projectData = {
+            title: title,
+            // FIX: Inject the temporary owner ID to satisfy the backend
+            owner: TEMP_OWNER_ID 
+        };
+
+        try {
+            // Send a POST request to create a new project with the owner field
+            const newProject = await apiClient('projects', 'POST', projectData);
+            
+            // Call the callback function to update the project list
+            if (onProjectAdded) {
+                onProjectAdded(newProject);
+            }
+            setTitle(''); // Clear the form input
+        } catch (err) {
+            console.error('Error creating project:', err);
+            // Display an error message to the user
+            setError('Failed to create project. Check console for details.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
         <div style={{ padding: '20px', border: '1px solid #ccc', margin: '20px 0' }}>
             <h3>➕ Add a New Project</h3>
             <form onSubmit={handleSubmit}>
@@ -17,6 +62,6 @@
             {error && <p style={{ color: 'red', marginTop: '10px' }}>{error}</p>}
         </div>
     );
-};
+}; // <-- The missing brace was here
 
 export default AddProjectForm;
