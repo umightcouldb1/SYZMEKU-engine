@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
-// The API URL is read from the VITE_API_BASE_URL set in client/.env
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+// The API URL is read from the VITE_API_BASE_URL set in client/.env or vite.config.js
+// We now explicitly add /api to the base URL for testing the connection.
+const API_URL = `${import.meta.env.VITE_API_BASE_URL || ''}/api`;
 
 function App() {
   const [message, setMessage] = useState('Attempting to connect to the backend API...');
@@ -16,6 +17,8 @@ function App() {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
+        
+        // Success condition: We received the expected API response
         setMessage(data.message);
         setStatus('success');
       } catch (error) {
@@ -32,8 +35,7 @@ function App() {
       }
     };
 
-    // The API endpoint that the server exposes at the root '/'
-    fetchWithBackoff(API_BASE_URL);
+    fetchWithBackoff(API_URL);
   }, []);
 
   const getStatusClasses = () => {
@@ -66,9 +68,8 @@ function App() {
           <div className="mt-6 p-3 bg-red-700/50 rounded-lg text-sm">
             <p className="font-bold mb-1">Troubleshooting Tips:</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Confirm the server URL in `client/.env` is correct.</li>
-              <li>Check your Render service logs for startup errors.</li>
-              <li>Ensure your backend is still running.</li>
+              <li>Confirm your backend Express route is running at `/api`.</li>
+              <li>Ensure the static serving logic is correct in `server/server.cjs`.</li>
             </ul>
           </div>
         )}
@@ -76,5 +77,4 @@ function App() {
     </div>
   );
 }
-
 export default App;
