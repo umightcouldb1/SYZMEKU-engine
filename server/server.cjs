@@ -1,6 +1,6 @@
 const express = require('express');
-const path = require('path'); // <<<-- ADDED: Required for express.static and path.join
-const cors = require('require')('cors');
+const path = require('path');
+const cors = require('cors'); // <<<-- FIX: Changed 'require('require')('cors')' to 'require('cors')'
 
 // FIX: Changed './configure/connection' to './configure/connection'
 const db = require('./configure/connection');
