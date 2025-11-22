@@ -1,11 +1,13 @@
 // File: client/src/App.jsx
 import React from 'react';
 import useProjects from './hooks/useProjects';
-import AddProjectForm from './components/AddProjectForm'; // Import the new component
+// FIX: Added the .jsx file extension to resolve the build error
+import AddProjectForm from './components/AddProjectForm.jsx'; 
 
 // Define a simple list component to display the projects
 const ProjectList = ({ fetchProjects }) => {
-    const { projects, isLoading, error } = useProjects(); // Fetching happens inside the hook
+    // The useProjects hook is called here to access the data and loading state
+    const { projects, isLoading, error } = useProjects(); 
 
     if (isLoading) {
         return <p>Loading projects...</p>;
@@ -30,7 +32,7 @@ const ProjectList = ({ fetchProjects }) => {
             <ul>
                 {projects.map(project => (
                     <li key={project._id}>
-                        <strong>{project.title}</strong> - Managed by {project.owner.username || 'Unknown'}
+                        <strong>{project.title}</strong> - Managed by {project.owner?.username || 'Unknown'}
                     </li>
                 ))}
             </ul>
@@ -40,8 +42,7 @@ const ProjectList = ({ fetchProjects }) => {
 
 // Main application component
 const App = () => {
-    // We use the useProjects hook to get the fetchProjects function (renamed here to refetch)
-    // The initial call happens inside the hook, but we need the refetch for the form.
+    // Call useProjects once here to get the refetch function
     const { fetchProjects: refetchProjects } = useProjects(); 
 
     return (
@@ -57,7 +58,7 @@ const App = () => {
             </ul>
             <hr />
 
-            {/* NEW: Add the form and pass the refetchProjects function */}
+            {/* Add the form and pass the refetchProjects function */}
             <AddProjectForm onProjectAdded={refetchProjects} />
 
             {/* Pass the refetch function down to the list component */}
