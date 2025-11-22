@@ -5,6 +5,9 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config(); // Load environment variables from .env
 
+const routes = require('./routes'); // <<<-- Import API routes
+const { User, Project } = require('./models'); // <<<-- Import Models for initial setup (if needed)
+
 const app = express();
 const PORT = process.env.PORT || 10000;
 
@@ -13,32 +16,23 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB connection string from environment variable or default
-// Assuming your connection logic uses MONGODB_URI or a direct connection
 const dbURI = process.env.MONGODB_URI;
-
-// NOTE: You must ensure your actual MongoDB connection logic is here.
-// Based on previous files, your logic was structured differently (db.once('open')).
-// I'm providing a common Mongoose connect structure for completeness.
 
 mongoose.connect(dbURI)
     .then(() => {
         console.log('MongoDB connection successful');
-        
-        // --- API ROUTES ---
-        // Dedicated API test route that the client will now call.
-        app.get('/api', (req, res) => {
-            res.json({ message: "Full Stack is Live! API and Client are connected." });
-        });
 
+        // --- API ROUTES ---
+        // Use the imported routes. All routes defined in server/routes/index.js
+        // will be accessible. The /api prefix is set inside server/routes/index.js.
+        app.use(routes);
+        
         // --- STATIC FILE SERVING (CRITICAL FOR MERN DEPLOYMENT) ---
         if (process.env.NODE_ENV === 'production') {
             // 1. Serve any static files from the client/dist folder (where the React build is)
-            // path.join resolves the absolute path to /server/../client/dist
             app.use(express.static(path.join(__dirname, '..', 'client', 'dist')));
 
-            // 2. All remaining requests (like user refresh, /about, /dashboard) return the React app's index.html
-            // This allows React Router to handle the client-side routing.
-            // NOTE: Using path.resolve here for robustness on various systems.
+            // 2. All remaining requests (not caught by API routes) return the React app's index.html
             app.get('*', (req, res) => {
                 res.sendFile(path.resolve(__dirname, '..', 'client', 'dist', 'index.html'));
             });
