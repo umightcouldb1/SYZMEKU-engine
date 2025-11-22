@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server/server.cjs",
     "dev": "nodemon server/server.cjs",
-    "build": "npm run build --prefix client"
+    "build": "npm run build"
   },
   "keywords": [
     "mern",
@@ -21,7 +21,7 @@
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.19.1",
+    "express": "^4.19.2",
     "mongoose": "^8.3.4",
     "nodemon": "^3.1.0"
   }
