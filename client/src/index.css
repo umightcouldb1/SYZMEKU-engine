@@ -1,40 +1,24 @@
 /*
- * SYZMEKU Engine Styling - FINAL VISUAL PROTOCOL
- * Aesthetic: Deep Black/Purple Base, Matrix Green Glow, Metallic Accents, Structured Layout.
- * Features: 
- * 1. Invisible-to-Glow Text Effect (Ring Inscription Feel).
- * 2. Custom Alien Font ('AlienAncient' via CDN to bypass file issues).
- * 3. Fancy, Futuristic Buttons.
+ * SYZMEKU Engine Styling - FINAL VISUAL PROTOCOL (Mobile-Optimized)
+ * FIXES: Removed problematic hover effects on text. Replaced custom font with robust web-safe encoding.
  */
 
-/* ------------------- CUSTOM FONT IMPLEMENTATION (FINAL FIX) ------------------- */
-/* Using a public URL (Star Jedi font) for the AlienAncient text, which is the most reliable way 
-   to load the font given local file permission issues. */
-@font-face {
-    font-family: 'AlienAncient';
-    src: url('https://syzmeku-engine.s3.us-west-1.amazonaws.com/fonts/StarJedi-Regular.woff') format('woff'); 
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap; 
-}
-/* ----------------------------------------------------------------------------- */
-
 :root {
-  /* Base Colors (The Matrix / Iron Heart Dark Base) */
-  --color-base-dark: #000000;       /* Primary Black Background */
-  --color-surface-dark: #100a18;    /* Deep Black/Purple Surface */
-  --color-text-light: #f0f0f0;      /* Light Text Color */
+  /* Base Colors */
+  --color-base-dark: #000000;       
+  --color-surface-dark: #100a18;    
+  --color-text-light: #f0f0f0;      
   
-  /* Sci-Fi Accents (Star Trek / Matrix Glow) */
-  --color-glow-green: #00ff41;      /* Matrix Neon Green */
-  --color-glow-blue: #00bfff;       /* Deep Sky Blue for secondary glow */
-  --color-accent-gold: #FFD700;     /* Metallic Gold */
-  --color-accent-silver: #C0C0C0;   /* Metallic Silver */
-  --color-accent-copper: #B87333;   /* Metallic Copper/Bronze */
-  --color-border-grid: #333333;     /* Dark grid line color */
+  /* Sci-Fi Accents */
+  --color-glow-green: #00ff41;      
+  --color-glow-blue: #00bfff;       
+  --color-accent-gold: #FFD700;     
+  --color-accent-silver: #C0C0C0;   
+  --color-accent-copper: #B87333;   
+  --color-border-grid: #333333;     
   
-  /* Typography */
-  --font-family-alien-primary: 'AlienAncient', 'Arial Black', sans-serif; 
+  /* Typography - Using Monospace/Consolas for guaranteed, encoded look on all devices */
+  --font-family-alien-primary: 'Consolas', 'Monospace', sans-serif; 
   --font-family-alien-secondary: 'Monospace', 'Consolas', sans-serif; 
   --font-family-system: 'Arial', sans-serif; 
 }
@@ -47,7 +31,7 @@ body {
   background-color: var(--color-base-dark);
   color: var(--color-text-light);
   line-height: 1.5;
-  text-shadow: 0 0 2px rgba(0, 255, 65, 0.5); /* Subtle global glow */
+  text-shadow: 0 0 2px rgba(0, 255, 65, 0.5); 
 }
 
 #root {
@@ -75,30 +59,24 @@ body {
     box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
 }
 
-/* H1: INVISIBLE-TO-GLOW (Lord of the Rings Ring Effect) */
+/* H1: CONSTANT GLOW (Fixed for Mobile) */
 h1 {
-  font-family: var(--font-family-alien-primary);
+  font-family: var(--font-family-alien-primary); /* Encoded Monospace Font */
   font-size: 1.8em;
-  color: #000000; /* Text color is black (invisible on black background) */
+  color: var(--color-accent-gold); /* Always visible */
   background: transparent;
   text-align: center;
   margin: 0;
-  letter-spacing: 5px; 
+  letter-spacing: 5px; /* Wide spacing for alien/cryptic look */
   text-transform: uppercase;
   font-weight: bold;
-  /* Initial state: Subtle, barely visible etching/glimmer */
-  text-shadow: 0 0 1px rgba(255, 215, 0, 0.1); 
-  transition: text-shadow 1.0s ease-in-out, color 1.0s ease-in-out;
-  cursor: default; /* Hint to the user */
+  /* Constant, reliable glow */
+  text-shadow: 0 0 8px var(--color-glow-green), 0 0 16px var(--color-accent-gold); 
+  transition: none; /* Remove transitions */
+  cursor: default; 
 }
 
-h1:hover {
-    color: var(--color-accent-gold); /* Text color becomes visible on hover */
-    /* Intense golden glow on hover */
-    text-shadow: 0 0 10px var(--color-glow-green), 0 0 30px var(--color-accent-gold), 0 0 50px rgba(255, 215, 0, 0.8);
-}
-
-/* Panel Titles use the Alien Font but remain visible */
+/* Panel Titles */
 .panel-title {
     font-family: var(--font-family-alien-primary); 
     color: var(--color-glow-green);
@@ -173,7 +151,7 @@ nav button {
     padding: 12px 10px;
     border-radius: 6px;
     transition: all 0.3s ease-in-out;
-    font-family: var(--font-family-alien-primary); 
+    font-family: var(--font-family-alien-primary); /* Encoded Monospace Font */
     letter-spacing: 1.5px;
     text-transform: uppercase;
     box-shadow: 0 0 5px var(--color-accent-silver); 
@@ -276,18 +254,17 @@ button:disabled {
     font-size: 1.1em;
 }
 
-/* PROJECT TITLE: INVISIBLE-TO-GLOW (Ring Inscription Effect) */
+/* PROJECT TITLE: CONSTANT GLOW (Fixed for Mobile) */
 .project-title {
-    color: #000000; /* Text color is black (invisible) */
-    font-family: var(--font-family-alien-primary); /* Use Alien font via URL */
-    text-shadow: 0 0 1px rgba(0, 255, 65, 0.05); /* Faint green etching glow */
-    transition: text-shadow 0.8s ease-in-out, color 0.8s ease-in-out;
+    color: var(--color-text-light); /* Always visible */
+    font-family: var(--font-family-alien-primary); /* Encoded Monospace Font */
+    text-shadow: 0 0 5px var(--color-glow-green); /* Constant green glow */
+    transition: none;
 }
 
 .project-list li:hover .project-title {
-    color: var(--color-text-light); /* Text becomes visible on list item hover */
-    /* Intense green/blue glow on list item hover */
-    text-shadow: 0 0 5px var(--color-glow-green), 0 0 15px var(--color-glow-blue);
+    /* Subtle change on hover to maintain visual feedback */
+    text-shadow: 0 0 8px var(--color-glow-blue), 0 0 5px var(--color-glow-green); 
 }
 
 .project-status {
