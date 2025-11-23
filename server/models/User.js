@@ -21,7 +21,6 @@ const UserSchema = new mongoose.Schema({
         required: true,
         minlength: 6
     },
-    // Optional: Link to a Project model instance to show user ownership
     projects: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Project'
@@ -30,7 +29,6 @@ const UserSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Hash the password before saving the user
 UserSchema.pre('save', async function (next) {
     if (this.isModified('password')) {
         const salt = await bcrypt.genSalt(10);
@@ -39,7 +37,6 @@ UserSchema.pre('save', async function (next) {
     next();
 });
 
-// Method to compare password
 UserSchema.methods.comparePassword = function (candidatePassword) {
     return bcrypt.compare(candidatePassword, this.password);
 };
