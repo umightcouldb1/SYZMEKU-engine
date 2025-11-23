@@ -1,65 +1,58 @@
-// File: client/src/addprojectform.jsx (ALL LOWERCASE FILENAME)
-
 import React, { useState } from 'react';
+import useApi from './utils/api';
+import useProjects from './hooks/useProjects'; // To refresh list after adding
 
-const AddProjectForm = ({ onProjectAdded }) => {
+const AddProjectForm = () => {
     const [title, setTitle] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const [status, setStatus] = useState('');
+    const [message, setMessage] = useState('');
+    const { authorizedFetch } = useApi();
+    const { fetchProjects } = useProjects(); // Use the hook to trigger list refresh
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError(null);
-        setLoading(true);
-
-        if (!title.trim()) {
-            setError('Project title cannot be empty.');
-            setLoading(false);
-            return;
-        }
+        setMessage('Processing...');
 
         try {
-            const response = await fetch('/api/projects', {
+            const response = await authorizedFetch('/api/projects', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    // This is still a temporary bypass until Part 3 is completed
-                    'Authorization': `Bearer ${localStorage.getItem('token') || 'DUMMY_TOKEN'}` 
-                },
-                body: JSON.stringify({ title })
+                body: JSON.stringify({ title, status: status || 'ACTIVE' }),
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to add project. Check API server logs.');
+                throw new Error(errorData.error || 'Failed to create project.');
             }
 
             setTitle('');
-            if (onProjectAdded) {
-                onProjectAdded(); 
-            }
+            setStatus('');
+            setMessage('Project successfully added to the log.');
+            
+            // Trigger a refresh of the project list immediately
+            fetchProjects();
+
         } catch (err) {
-            console.error('Project submission error:', err);
-            setError(err.message);
-        } finally {
-            setLoading(false);
+            setMessage(`ERROR: ${err.message}`);
         }
     };
 
     return (
-        <form onSubmit={handleSubmit}>
-            <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter new project title..."
-                disabled={loading}
-            />
-            <button type="submit" disabled={loading || !title.trim()}>
-                {loading ? 'Transmitting...' : 'EXECUTE INPUT'}
-            </button>
-            {error && <p className="error-message">{error}</p>}
-        </form>
+        <div className="add-project-form-container">
+            <form onSubmit={handleSubmit}>
+                <input
+                    type="text"
+                    placeholder="ENTER PROJECT TITLE / CODE"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                />
+                
+                <button type="submit">
+                    COMMIT PROJECT
+                </button>
+            </form>
+            {message && <div className="form-message">{message}</div>}
+        </div>
     );
 };
 
