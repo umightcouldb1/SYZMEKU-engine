@@ -1,4 +1,4 @@
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuth.jsx'; // FIXED: Changed .js to .jsx
 
 // Base URL from your Render environment variable
 const BASE_URL = import.meta.env.VITE_API_URL;
