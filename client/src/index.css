@@ -1,39 +1,50 @@
 /*
  * SYZMEKU Engine Styling - Ultra-Futuristic Alien UI Theme
  * Aesthetic: Deep Black/Purple Base, Matrix Green Glow, Metallic Accents, Structured Layout.
- * Enhanced: Fancy Buttons & Simulated Alien Ancient Language Text.
+ * Features: Invisible-to-Glow Text effect (Ring inscription feel) and Aurabesh Font.
  */
 
+/* ------------------- CUSTOM FONT IMPLEMENTATION (AURABESH) ------------------- */
+/* FINAL FIX: Using a public URL to bypass local file permission issues */
+@font-face {
+    font-family: 'AlienAncient';
+    /* Source: Star Jedi Font as a reliable alternative that looks alien/encoded. */
+    src: url('https://syzmeku-engine.s3.us-west-1.amazonaws.com/fonts/StarJedi-Regular.woff') format('woff'); 
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap; 
+}
+/* ----------------------------------------------------------------------------- */
+
 :root {
-  /* Base Colors (The Matrix / Iron Heart Dark Base) */
-  --color-base-dark: #000000;       /* Primary Black Background */
-  --color-surface-dark: #100a18;    /* Deep Black/Purple Surface */
-  --color-text-light: #f0f0f0;      /* Light Text Color */
+  /* Base Colors */
+  --color-base-dark: #000000;       
+  --color-surface-dark: #100a18;    
+  --color-text-light: #f0f0f0;      
   
-  /* Sci-Fi Accents (Star Trek / Matrix Glow) */
+  /* Sci-Fi Accents */
   --color-glow-green: #00ff41;      /* Matrix Neon Green */
   --color-glow-blue: #00bfff;       /* Deep Sky Blue for secondary glow */
   --color-accent-gold: #FFD700;     /* Metallic Gold */
-  --color-accent-silver: #C0C0C0;   /* Metallic Silver */
-  --color-accent-copper: #B87333;   /* Metallic Copper/Bronze */
-  --color-border-grid: #333333;     /* Dark grid line color */
+  --color-accent-silver: #C0C0C0;   
+  --color-accent-copper: #B87333;   
+  --color-border-grid: #333333;     
   
-  /* Typography - Simulating Alien Ancient Language */
-  /* Using a combination of monospace for structure, and a bold/wide sans-serif for "alien" feel */
-  --font-family-alien-primary: 'Arial Black', 'Impact', sans-serif; 
+  /* Typography - AlienAncient now points to a public Star Wars font */
+  --font-family-alien-primary: 'AlienAncient', 'Arial Black', sans-serif; 
   --font-family-alien-secondary: 'Monospace', 'Consolas', sans-serif; 
-  --font-family-system: 'Arial', sans-serif; /* For less critical info */
+  --font-family-system: 'Arial', sans-serif; 
 }
 
 /* ------------------- GLOBAL RESET AND BASE ------------------- */
 body {
   margin: 0;
   padding: 0;
-  font-family: var(--font-family-system); /* Default to a clean font */
+  font-family: var(--font-family-system); 
   background-color: var(--color-base-dark);
   color: var(--color-text-light);
   line-height: 1.5;
-  text-shadow: 0 0 2px rgba(0, 255, 65, 0.5); /* Subtle green glow on all text */
+  text-shadow: 0 0 2px rgba(0, 255, 65, 0.5); /* Subtle global glow */
 }
 
 #root {
@@ -48,7 +59,7 @@ body {
   max-width: 1400px;
   background-color: var(--color-surface-dark);
   border: 1px solid var(--color-glow-green);
-  box-shadow: 0 0 20px rgba(0, 255, 65, 0.3), 0 0 40px rgba(0, 191, 255, 0.2); /* Dual glow */
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.3), 0 0 40px rgba(0, 191, 255, 0.2); 
   border-radius: 12px;
   padding: 0;
   overflow: hidden; 
@@ -61,23 +72,47 @@ body {
     box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
 }
 
+/* H1: INVISIBLE-TO-GLOW (Lord of the Rings Ring Effect) */
 h1 {
-  font-family: var(--font-family-alien-primary); /* Alien primary font for main title */
+  font-family: var(--font-family-alien-primary);
   font-size: 1.8em;
-  color: var(--color-accent-gold);
+  color: #000000; /* Text color is black (invisible on black background) */
+  background: transparent;
   text-align: center;
   margin: 0;
-  letter-spacing: 5px; /* Wider spacing for cryptic look */
+  letter-spacing: 5px; 
   text-transform: uppercase;
   font-weight: bold;
-  text-shadow: 0 0 10px var(--color-glow-green), 0 0 20px rgba(255, 215, 0, 0.6); /* Green and gold glow */
+  /* Initial state: Subtle, barely visible etching/glimmer */
+  text-shadow: 0 0 1px rgba(255, 215, 0, 0.1); 
+  transition: text-shadow 1.0s ease-in-out, color 1.0s ease-in-out;
+  cursor: default; /* Hint to the user */
 }
 
-/* ------------------- GRID LAYOUT ------------------- */
+h1:hover {
+    color: var(--color-accent-gold); /* Text color becomes visible on hover */
+    /* Intense golden glow on hover */
+    text-shadow: 0 0 10px var(--color-glow-green), 0 0 30px var(--color-accent-gold), 0 0 50px rgba(255, 215, 0, 0.8);
+}
+
+/* Panel Titles use the Alien Font but remain visible */
+.panel-title {
+    font-family: var(--font-family-alien-primary); 
+    color: var(--color-glow-green);
+    border-bottom: 1px solid var(--color-glow-blue); 
+    padding-bottom: 8px;
+    margin-top: 25px;
+    font-size: 1.3em;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-shadow: 0 0 8px var(--color-glow-green);
+}
+
+/* ------------------- GRID LAYOUT & NAVIGATION ------------------- */
 .ui-grid {
     display: grid;
-    grid-template-columns: 350px 1fr; /* Left panel wider for navigation */
-    height: calc(100vh - 140px); /* Adjust height for larger header */
+    grid-template-columns: 350px 1fr; 
+    height: calc(100vh - 140px); 
 }
 
 .ui-panel {
@@ -88,26 +123,13 @@ h1 {
 .nav-panel {
     background-color: #050505;
     border-right: 1px solid var(--color-border-grid);
-    box-shadow: inset -5px 0 15px rgba(0, 255, 65, 0.1); /* Inner shadow for depth */
+    box-shadow: inset -5px 0 15px rgba(0, 255, 65, 0.1); 
 }
 
 .data-panel {
     background-color: var(--color-surface-dark);
 }
 
-.panel-title {
-    font-family: var(--font-family-alien-primary); /* Alien primary for panel titles */
-    color: var(--color-glow-green);
-    border-bottom: 1px solid var(--color-glow-blue); /* Blue border for futuristic feel */
-    padding-bottom: 8px;
-    margin-top: 25px;
-    font-size: 1.3em;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    text-shadow: 0 0 8px var(--color-glow-green);
-}
-
-/* ------------------- NAVIGATION & STATUS ------------------- */
 .status-indicator-box {
     border: 1px solid var(--color-accent-silver);
     padding: 15px;
@@ -117,7 +139,7 @@ h1 {
 }
 
 .system-status {
-    font-family: var(--font-family-alien-secondary); /* Monospace for status codes */
+    font-family: var(--font-family-alien-secondary); 
     color: var(--color-accent-copper);
     margin: 8px 0;
 }
@@ -138,28 +160,27 @@ nav ul li {
     margin-bottom: 12px;
 }
 
-/* Fancy, Futuristic Buttons for Navigation */
 nav button {
     width: 100%;
-    text-align: center; /* Centered text for bolder look */
-    background: linear-gradient(45deg, #0a0a0a, #1a0033); /* Dark gradient */
+    text-align: center; 
+    background: linear-gradient(45deg, #0a0a0a, #1a0033); 
     border: 2px solid var(--color-accent-silver);
     color: var(--color-text-light);
     padding: 12px 10px;
     border-radius: 6px;
     transition: all 0.3s ease-in-out;
-    font-family: var(--font-family-alien-primary); /* Bold font for buttons */
+    font-family: var(--font-family-alien-primary); 
     letter-spacing: 1.5px;
     text-transform: uppercase;
-    box-shadow: 0 0 5px var(--color-accent-silver); /* Subtle silver glow */
+    box-shadow: 0 0 5px var(--color-accent-silver); 
 }
 
 nav button:hover {
-    background: linear-gradient(45deg, var(--color-glow-green), var(--color-glow-blue)); /* Green/blue gradient on hover */
+    background: linear-gradient(45deg, var(--color-glow-green), var(--color-glow-blue)); 
     border-color: var(--color-glow-green);
-    color: var(--color-base-dark); /* Dark text on bright button */
-    box-shadow: 0 0 15px var(--color-glow-green), 0 0 25px var(--color-glow-blue); /* Intense glow */
-    text-shadow: none; /* Remove text glow on hover for contrast */
+    color: var(--color-base-dark); 
+    box-shadow: 0 0 15px var(--color-glow-green), 0 0 25px var(--color-glow-blue); 
+    text-shadow: none; 
 }
 
 .logout-button {
@@ -168,7 +189,7 @@ nav button:hover {
     margin-top: 20px;
 }
 .logout-button:hover {
-    background: linear-gradient(45deg, #8b0000, #ff4500); /* Red gradient for logout */
+    background: linear-gradient(45deg, #8b0000, #ff4500); 
     border-color: #ff4500;
     box-shadow: 0 0 15px #ff4500;
 }
@@ -179,7 +200,7 @@ nav button:hover {
     border: 1px solid var(--color-border-grid);
     padding: 20px;
     background-color: #080808;
-    box-shadow: inset 0 0 15px rgba(0, 255, 65, 0.05); /* Inner green glow */
+    box-shadow: inset 0 0 15px rgba(0, 255, 65, 0.05); 
 }
 
 form {
@@ -195,7 +216,7 @@ input[type="text"] {
     border-radius: 6px;
     font-size: 1.1em;
     background-color: #050505;
-    color: var(--color-glow-green); /* Matrix green input text */
+    color: var(--color-glow-green); 
     outline: none;
     text-shadow: 0 0 6px var(--color-glow-green);
     transition: border-color 0.3s, box-shadow 0.3s;
@@ -203,12 +224,11 @@ input[type="text"] {
 
 input[type="text"]:focus {
     border-color: var(--color-glow-blue);
-    box-shadow: 0 0 12px var(--color-glow-blue), inset 0 0 8px var(--color-glow-green); /* Blue outer, green inner glow */
+    box-shadow: 0 0 12px var(--color-glow-blue), inset 0 0 8px var(--color-glow-green); 
 }
 
-/* Fancy, Futuristic Button for Submit */
 button[type="submit"] {
-    background: linear-gradient(90deg, var(--color-glow-green), var(--color-accent-gold)); /* Green to gold gradient */
+    background: linear-gradient(90deg, var(--color-glow-green), var(--color-accent-gold)); 
     color: var(--color-base-dark);
     font-weight: bold;
     text-transform: uppercase;
@@ -216,14 +236,14 @@ button[type="submit"] {
     border: none;
     border-radius: 6px;
     letter-spacing: 1.5px;
-    box-shadow: 0 4px 15px rgba(0, 255, 65, 0.4); /* Green shadow */
+    box-shadow: 0 4px 15px rgba(0, 255, 65, 0.4); 
     transition: all 0.3s ease-in-out;
 }
 
 button[type="submit"]:hover:not(:disabled) {
-    background: linear-gradient(90deg, var(--color-accent-gold), var(--color-glow-green)); /* Gradient direction change on hover */
-    box-shadow: 0 0 20px var(--color-glow-green), 0 0 30px var(--color-accent-gold); /* More intense dual glow */
-    transform: translateY(-2px); /* Slight lift */
+    background: linear-gradient(90deg, var(--color-accent-gold), var(--color-glow-green)); 
+    box-shadow: 0 0 20px var(--color-glow-green), 0 0 30px var(--color-accent-gold); 
+    transform: translateY(-2px); 
 }
 
 button:disabled {
@@ -234,7 +254,7 @@ button:disabled {
     box-shadow: none;
 }
 
-/* Project List Output (Matrix/Code Scroll) */
+/* Project List Output */
 .project-list {
     list-style: none;
     padding: 0;
@@ -247,12 +267,22 @@ button:disabled {
     border-bottom: 1px dashed rgba(0, 255, 65, 0.3);
     display: flex;
     justify-content: space-between;
-    font-family: var(--font-family-alien-secondary); /* Monospace for list items */
+    font-family: var(--font-family-alien-secondary); 
     font-size: 1.1em;
 }
 
+/* PROJECT TITLE: INVISIBLE-TO-GLOW (Ring Inscription Effect) */
 .project-title {
-    color: var(--color-text-light);
+    color: #000000; /* Text color is black (invisible) */
+    font-family: var(--font-family-alien-primary); /* Use Alien font via URL */
+    text-shadow: 0 0 1px rgba(0, 255, 65, 0.05); /* Faint green etching glow */
+    transition: text-shadow 0.8s ease-in-out, color 0.8s ease-in-out;
+}
+
+.project-list li:hover .project-title {
+    color: var(--color-text-light); /* Text becomes visible on list item hover */
+    /* Intense green/blue glow on list item hover */
+    text-shadow: 0 0 5px var(--color-glow-green), 0 0 15px var(--color-glow-blue);
 }
 
 .project-status {
@@ -270,7 +300,7 @@ hr {
 
 .divider {
     border-top: 2px solid var(--color-accent-copper);
-    box-shadow: 0 0 10px var(--color-accent-copper); /* Copper glow divider */
+    box-shadow: 0 0 10px var(--color-accent-copper); 
 }
 
 .error-message, .status-message, .loading-indicator {
@@ -279,8 +309,8 @@ hr {
     color: var(--color-accent-copper);
     background-color: rgba(184, 115, 51, 0.1);
     text-align: center;
-    font-family: var(--font-family-system); /* Keep these readable */
-    text-shadow: none; /* Remove alien glow for readability on errors */
+    font-family: var(--font-family-system); 
+    text-shadow: none; 
 }
 
 .loading-indicator {
