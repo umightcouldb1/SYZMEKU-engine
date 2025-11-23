@@ -1,12 +1,10 @@
 // File: client/src/utils/api.js
 import axios from 'axios';
 
-// FIX: Hardcode the absolute Render URL for API requests in production 
-// to bypass potential path resolution issues.
-const RENDER_API_URL = 'https://syzmeku-api.onrender.com';
-
+// FIX: Set the baseURL to the API route prefix used in server/server.cjs.
+// This works for both local development and Render deployment (same domain).
 const apiClient = axios.create({
-    baseURL: RENDER_API_URL,
+    baseURL: '/api', // Correct prefix to hit the Express API routes
     headers: {
         'Content-Type': 'application/json',
     },
