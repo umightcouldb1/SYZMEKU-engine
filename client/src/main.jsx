@@ -2,8 +2,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx'; 
-// FIX: Change path to look one directory up (client/index.css)
-import '../index.css'; 
+// FIX: Using the Vite base public path, assuming index.css is in the public folder.
+import '/index.css'; 
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
