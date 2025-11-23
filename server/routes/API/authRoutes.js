@@ -3,7 +3,6 @@ const jwt = require('jsonwebtoken');
 const User = require('../../models/User'); 
 
 const generateToken = (id) => {
-    // NOTE: Must match the secret key used in authMiddleware.js
     return jwt.sign({ id }, 'SYZMEKU_SECRET_KEY', {
         expiresIn: '30d',
     });
