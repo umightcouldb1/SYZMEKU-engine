@@ -6,8 +6,6 @@ const ProjectList = () => {
 
     useEffect(() => {
         fetchProjects();
-        // NOTE: The ProjectList component needs to be re-rendered when a project is added/deleted
-        // For now, it fetches on mount. Real-time updates handled later.
     }, [fetchProjects]);
 
     if (loading) {
@@ -18,7 +16,7 @@ const ProjectList = () => {
         return <div className="error-message">ERROR RETRIEVING PROJECTS: {error.message}</div>;
     }
 
-    if (projects.length === 0) {
+    if (!projects || projects.length === 0) {
         return <div className="status-message">PROJECT LOG (0): No active projects found.</div>;
     }
 
