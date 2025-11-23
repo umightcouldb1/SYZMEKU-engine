@@ -1,17 +1,15 @@
-// --- FILE: server/server.cjs (With Error Handler) ---
-JavaScript
-
+// --- FILE: server/server.cjs (CLEANED) ---
 const express = require('express');
 const app = express();
 const path = require('path');
 const dotenv = require('dotenv').config(); 
 const connectDB = require('./config/db'); 
-const { notFound, errorHandler } = require('./middleware/errorMiddleware'); // 1. IMPORT ERROR HANDLERS
+const { notFound, errorHandler } = require('./middleware/errorMiddleware'); 
 
 // --- CONFIGURATION ---
 const PORT = process.env.PORT || 5000;
 
-// 2. CONNECT TO DATABASE
+// CONNECT TO DATABASE
 connectDB(); 
 
 // --- A. MIDDLEWARE & API ROUTES (CRITICAL ORDER) ---
