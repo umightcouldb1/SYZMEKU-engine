@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 
-// NOTE: The 'SYZMEKU_SECRET_KEY' is still required to generate a valid token.
+// NOTE: Uses the hardcoded secret key to generate a valid-format JWT.
 const generateToken = (id) => {
     return jwt.sign({ id }, 'SYZMEKU_SECRET_KEY', {
         expiresIn: '30d',
@@ -10,7 +10,7 @@ const generateToken = (id) => {
 
 // @route POST /api/auth/signup
 router.post('/signup', async (req, res) => {
-    // MOCK RESPONSE: Pretend registration worked and return a token
+    // MOCK RESPONSE: Returns a dummy token without touching the database.
     const { username, email } = req.body;
     res.status(201).json({
         _id: 'MOCKED_ID_123',
@@ -23,7 +23,7 @@ router.post('/signup', async (req, res) => {
 
 // @route POST /api/auth/login
 router.post('/login', async (req, res) => {
-    // MOCK RESPONSE: Pretend login worked and return a token
+    // MOCK RESPONSE: Returns a dummy token without touching the database.
     const { email } = req.body;
     res.json({
         _id: 'MOCKED_ID_456',
