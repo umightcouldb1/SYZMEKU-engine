@@ -1,9 +1,9 @@
-import { useState, useContext, createContext, useEffect } from 'react';
+import React, { useState, useContext, createContext, useEffect } from 'react';
 
 // 1. Create Auth Context
 const AuthContext = createContext(null);
 
-// 2. Auth Provider Component
+// 2. Auth Provider Component (Contains JSX, thus requires .jsx extension)
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
