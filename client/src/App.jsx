@@ -2,9 +2,8 @@
 
 import React from 'react';
 import useProjects from "./hooks/useProjects";
-// FIX: The import casing MUST be AddProjectForm.jsx (Capital A, P, F)
+// **FIXED**: The import casing MUST be exactly AddProjectForm.jsx 
 import AddProjectForm from "./components/AddProjectForm.jsx"; 
-// Note: Authentication is needed, but we focus on UI now.
 
 export default function App() {
     const { projects, loading, error, refetch } = useProjects();
@@ -12,7 +11,6 @@ export default function App() {
 
     const renderProjectList = () => {
         if (loading) {
-            // Using a simple loading indicator
             return <p className="loading-indicator">Processing data protocols...</p>;
         }
 
@@ -25,7 +23,6 @@ export default function App() {
         }
 
         return (
-            // Using the new classes from the Sci-Fi UI CSS
             <ul className="project-list data-output">
                 {projects.map((project) => (
                     <li key={project._id}>
