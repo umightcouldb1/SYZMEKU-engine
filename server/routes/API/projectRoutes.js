@@ -1,11 +1,9 @@
 const router = require('express').Router();
-const protect = require('../../middleware/authMiddleware');
+const protect = require('../../middleware/authMiddleware'); // Requires the mocked middleware
 
 // @route GET /api/projects
-// @desc Get all projects for the authenticated user
-// @access Private (Uses mocked protect middleware)
 router.get('/', protect, (req, res) => {
-    // CRITICAL FIX: Returning a valid JSON object to prevent the client from crashing on load.
+    // Returns mock project data, matching the structure the client expects.
     res.status(200).json([
         {
             _id: 'mock_project_id_1',
@@ -23,8 +21,6 @@ router.get('/', protect, (req, res) => {
 });
 
 // @route POST /api/projects
-// @desc Create a new project
-// @access Private
 router.post('/', protect, (req, res) => {
     // MOCK RESPONSE: Pretends a project was created.
     const { title } = req.body;
