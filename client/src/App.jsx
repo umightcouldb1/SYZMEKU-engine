@@ -2,9 +2,9 @@
 
 import React from 'react';
 import useProjects from "./hooks/useProjects";
+// FIX: The import casing MUST be AddProjectForm.jsx (Capital A, P, F)
 import AddProjectForm from "./components/AddProjectForm.jsx"; 
 // Note: Authentication is needed, but we focus on UI now.
-// For now, we assume a user is logged in to show the layout.
 
 export default function App() {
     const { projects, loading, error, refetch } = useProjects();
@@ -25,6 +25,7 @@ export default function App() {
         }
 
         return (
+            // Using the new classes from the Sci-Fi UI CSS
             <ul className="project-list data-output">
                 {projects.map((project) => (
                     <li key={project._id}>
