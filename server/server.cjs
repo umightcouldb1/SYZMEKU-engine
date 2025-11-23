@@ -3,7 +3,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const projectRoutes = require('./routes/projectRoutes');
+// FIX: Ensure file extension is specified, assuming file is server/routes/projectRoutes.cjs
+const projectRoutes = require('./routes/projectRoutes.cjs'); 
 
 const app = express();
 const PORT = process.env.PORT || 10000;
