@@ -2,13 +2,10 @@ const express = require('express');
 const app = express();
 const path = require('path');
 const dotenv = require('dotenv');
-// const connectDB = require('./config/db'); // COMMENTED OUT: Removed the line that was causing the crash
+// ALL database-related code has been removed to prevent the crash.
 
 // Load environment variables (if used)
 dotenv.config();
-
-// Connect to Database
-// connectDB(); // COMMENTED OUT: Removed the call that was causing the crash
 
 // Define the port, use environment variable or default to 5000
 const PORT = process.env.PORT || 5000;
@@ -18,7 +15,9 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: false })); 
 
-// Register API routes BEFORE static file serving
+// 💡 Register API routes BEFORE static file serving
+// NOTE: authRoutes and projectRoutes will now crash when trying to access the database.
+// This is expected. The goal is to get the server running to identify the next exact error.
 app.use('/api/auth', require('./routes/API/authRoutes')); 
 app.use('/api/projects', require('./routes/API/projectRoutes')); 
 
@@ -35,7 +34,6 @@ if (process.env.NODE_ENV === 'production') {
 
 // Catch-all: For any client-side route, serve the index.html file
 app.get('*', (req, res) => {
-    // path.resolve is crucial for production environment pathing
     res.sendFile(path.resolve(CLIENT_BUILD_PATH, 'index.html'));
 });
 
