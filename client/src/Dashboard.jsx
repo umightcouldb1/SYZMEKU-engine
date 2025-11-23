@@ -17,17 +17,6 @@ const Dashboard = () => {
                 <p className="system-status">PROJECT INTERFACE: READY</p>
                 <p className="system-status">NEXT PROTOCOL: SECURITY HARDENING (Required)</p>
             </div>
-
-            <style jsx>{`
-                .dashboard-content {
-                    padding: 10px 0;
-                }
-                .system-status {
-                    margin: 15px 0;
-                    font-size: 1.2em;
-                    letter-spacing: 1px;
-                }
-            `}</style>
         </div>
     );
 };
