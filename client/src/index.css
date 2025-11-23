@@ -1,22 +1,22 @@
 /* --- CRITICAL: BASE STYLES --- */
 
 :root {
+  /* Font remains monospace for the interface feel, but colors are updated */
   font-family: monospace, sans-serif; 
   line-height: 1.5;
   font-weight: 400;
-  color-scheme: light dark;
-  color: #00ff00; /* Neon green text */
+  color-scheme: dark;
+  color: #C0C0C0; /* Default Silver text */
   background-color: #000000; /* Pure black background */
   font-size: 16px;
   
-  /* Neon theme variables */
-  --neon-green: #00ff00;
-  --neon-yellow: #ffff00;
-  --neon-purple: #8a2be2;
-  --neon-cyan: #00ffff; /* The desired blue/cyan for borders/text */
-  --neon-red: #ff0000;
-  --border-glow: 0 0 5px var(--neon-cyan), 0 0 10px var(--neon-cyan);
-  --text-glow: 0 0 5px var(--neon-yellow);
+  /* Requested Color Scheme Variables */
+  --emerald-green: #00A040; /* Emerald Forest Green */
+  --royal-purple: #7851A9; /* Royal Purple (Used for frame, main theme) */
+  --gold: #FFD700; /* Gold (Used for main headers) */
+  --copper: #B87333; /* Copper (Used for dividers) */
+  --silver: #C0C0C0; /* Silver (Used for general text, input text) */
+  --red-warning: #FF0000; /* Standard Red for security risks */
 }
 
 body {
@@ -26,7 +26,7 @@ body {
   min-width: 100vw;
   min-height: 100vh;
   background-color: #000000; 
-  color: var(--neon-green); 
+  color: var(--silver); /* Global text color is Silver */
   overflow-x: hidden;
   padding: 20px;
 }
@@ -42,8 +42,9 @@ body {
     margin: 0 auto;
     width: 100%;
     padding: 20px;
-    border: 2px solid var(--neon-cyan);
-    box-shadow: 0 0 15px var(--neon-cyan);
+    border: 2px solid var(--royal-purple); /* Royal Purple Frame */
+    box-shadow: 0 0 15px var(--royal-purple);
+    background-color: #0a0a0a;
 }
 
 .main-header {
@@ -52,9 +53,9 @@ body {
 }
 
 .main-header h1 {
-    color: var(--neon-yellow);
-    text-shadow: 0 0 8px var(--neon-yellow);
-    border: 1px solid var(--neon-yellow);
+    color: var(--gold); /* Gold Header Title */
+    text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+    border: 1px solid var(--gold);
     padding: 10px 20px;
     display: inline-block;
     letter-spacing: 3px;
@@ -71,27 +72,27 @@ body {
 
 .ui-panel {
     padding: 15px;
-    border: 1px solid var(--neon-green);
-    box-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
-    background-color: #0a0a0a;
+    border: 1px solid var(--emerald-green); /* Emerald Green Panel Border */
+    box-shadow: 0 0 5px rgba(0, 160, 64, 0.5);
+    background-color: #1a1a1a;
     min-height: 70vh;
 }
 
 .panel-title {
     font-weight: bold;
-    color: var(--neon-cyan);
-    text-shadow: 0 0 3px var(--neon-cyan);
+    color: var(--royal-purple); /* Royal Purple Panel Title */
+    text-shadow: 0 0 3px rgba(120, 81, 169, 0.5);
     margin-bottom: 15px;
-    border-bottom: 1px dashed var(--neon-cyan);
+    border-bottom: 1px dashed var(--royal-purple);
     padding-bottom: 5px;
     letter-spacing: 2px;
 }
 
 .divider {
     border: none;
-    border-top: 1px solid var(--neon-purple);
+    border-top: 1px solid var(--copper); /* Copper Divider */
     margin: 20px 0;
-    box-shadow: 0 1px 3px var(--neon-purple);
+    box-shadow: 0 1px 3px var(--copper);
 }
 
 /* --- AUTH SCREEN & FORMS --- */
@@ -100,8 +101,8 @@ body {
     max-width: 500px;
     margin: 40px auto;
     padding: 30px;
-    border: 2px solid var(--neon-red);
-    box-shadow: 0 0 15px var(--neon-red);
+    border: 2px solid var(--red-warning); /* Red Warning Border */
+    box-shadow: 0 0 15px var(--red-warning);
     background-color: #100505;
 }
 
@@ -111,23 +112,22 @@ body {
     gap: 15px;
 }
 
-/* CRITICAL FIX: Input field styling corrected to use Cyan */
 input {
     background: #000;
-    color: var(--neon-cyan); 
-    border: 1px solid var(--neon-cyan); 
+    color: var(--silver); /* Silver Input Text */
+    border: 1px solid var(--royal-purple); /* Royal Purple Input Border */
     padding: 10px;
     font-size: 1em;
     letter-spacing: 1px;
-    box-shadow: inset 0 0 3px var(--neon-cyan);
+    box-shadow: inset 0 0 3px var(--royal-purple);
 }
 
 /* --- BUTTONS & NAVIGATION --- */
 
 button {
-    background: #111;
-    color: var(--neon-green);
-    border: 1px solid var(--neon-green);
+    background: #2a2a2a;
+    color: var(--emerald-green); /* Emerald Green Button Text */
+    border: 1px solid var(--emerald-green);
     padding: 10px 15px;
     cursor: pointer;
     transition: background-color 0.2s, color 0.2s;
@@ -137,7 +137,7 @@ button {
 }
 
 button:hover {
-    background-color: var(--neon-green);
+    background-color: var(--emerald-green);
     color: #000;
 }
 
@@ -154,39 +154,39 @@ button:hover {
     width: 100%;
     text-align: left;
     background: #000;
-    border-color: var(--neon-cyan);
-    color: var(--neon-cyan);
+    border-color: var(--royal-purple); /* Royal Purple Nav Button Border */
+    color: var(--silver); /* Silver Nav Button Text */
 }
 
 .nav-button:hover {
-    background-color: var(--neon-cyan);
-    color: #000;
+    background-color: var(--royal-purple);
+    color: var(--gold); /* Gold hover text */
 }
 
 /* Red Logout Button */
 .logout-button {
     background-color: #300; 
-    border-color: var(--neon-red); 
-    color: var(--neon-red);
+    border-color: var(--red-warning); 
+    color: var(--red-warning);
     margin-top: 20px;
 }
 
 .logout-button:hover {
-    background-color: var(--neon-red);
+    background-color: var(--red-warning);
     color: #fff;
 }
 
 .toggle-auth-button {
     background: none;
     border: none;
-    color: var(--neon-purple);
+    color: var(--gold); /* Gold Link Text */
     text-decoration: underline;
     text-transform: none;
     padding: 0;
 }
 
 .toggle-auth-button:hover {
-    color: var(--neon-cyan);
+    color: var(--emerald-green);
     background: none;
 }
 
@@ -201,7 +201,7 @@ button:hover {
 }
 
 .project-title {
-    color: var(--neon-cyan);
+    color: var(--royal-purple);
 }
 
 .project-status {
@@ -209,25 +209,25 @@ button:hover {
 }
 
 .active {
-    color: var(--neon-green);
+    color: var(--emerald-green);
 }
 
 .status-online {
-    color: var(--neon-green);
+    color: var(--emerald-green);
 }
 .status-offline {
-    color: var(--neon-red);
+    color: var(--red-warning);
     font-weight: bold;
 }
 
 .error-message {
-    color: var(--neon-red);
+    color: var(--red-warning);
     margin-top: 15px;
     padding: 10px;
-    border: 1px solid var(--neon-red);
+    border: 1px solid var(--red-warning);
 }
 
 .status-message, .loading-message {
-    color: var(--neon-yellow);
+    color: var(--gold);
     margin-top: 15px;
 }
