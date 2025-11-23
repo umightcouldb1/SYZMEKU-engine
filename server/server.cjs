@@ -1,9 +1,9 @@
-// --- FILE: server/server.cjs (CLEANED) ---
+// --- FILE: server/server.cjs (Final Path Guaranteed) ---
 const express = require('express');
 const app = express();
 const path = require('path');
 const dotenv = require('dotenv').config(); 
-const connectDB = require('./config/db'); 
+const connectDB = require('./configure/db'); // <-- CORRECTED PATH: 'configure'
 const { notFound, errorHandler } = require('./middleware/errorMiddleware'); 
 
 // --- CONFIGURATION ---
@@ -39,7 +39,6 @@ app.use(express.static(CLIENT_BUILD_PATH));
 app.get('*', (req, res, next) => {
     // Check if the request is for an API route or a client route
     if (req.originalUrl.startsWith('/api')) {
-        // If it looks like an API route but wasn't caught, pass to notFound
         return next(); 
     }
     
@@ -53,8 +52,8 @@ app.get('*', (req, res, next) => {
 });
 
 // --- C. ERROR HANDLERS (MUST BE LAST) ---
-app.use(notFound); // Catches 404s (requests that didn't match any route)
-app.use(errorHandler); // Formats and sends the final error response
+app.use(notFound); 
+app.use(errorHandler); 
 
 // Start the server
 app.listen(PORT, () => {
