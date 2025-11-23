@@ -9,7 +9,7 @@ const generateToken = (id) => {
 };
 
 // @route POST /api/auth/signup
-router.post('/signup', async (req, res) => {
+router.post('/signup', (req, res) => {
     // MOCK RESPONSE: Returns a dummy token without touching the database.
     const { username, email } = req.body;
     res.status(201).json({
@@ -22,7 +22,7 @@ router.post('/signup', async (req, res) => {
 });
 
 // @route POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', (req, res) => {
     // MOCK RESPONSE: Returns a dummy token without touching the database.
     const { email } = req.body;
     res.json({
