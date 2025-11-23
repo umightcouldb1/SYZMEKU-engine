@@ -1,23 +1,18 @@
-// client/src/utils/api.js - Replace the entire file contents
+// File: client/src/utils/api.js
 import axios from 'axios';
 
-// Determine the base URL dynamically
-let baseURL = 'http://localhost:3001'; // Default for local development
+// FIX: Change baseURL to connect to the rendered API service, 
+// using the VITE_APP_API_URL environment variable for development/testing,
+// and a simple relative path for production (Render).
+const isProduction = process.env.NODE_ENV === 'production';
+const baseURL = isProduction ? '/' : (import.meta.env.VITE_APP_API_URL || 'http://localhost:10000');
 
-if (process.env.NODE_ENV === 'production') {
-  // Use the deployed Render URL for production.
-  // NOTE: This URL should match the 'Available at your primary URL' log entry.
-  baseURL = 'https://syzmeku-api.onrender.com';
-}
 
 const apiClient = axios.create({
-  baseURL: baseURL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  // If you are sending cookies or session info, include:
-  // withCredentials: true,
+    baseURL: baseURL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
 });
 
 export default apiClient;
