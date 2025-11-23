@@ -3,8 +3,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-// FIX: Ensure file extension is specified, assuming file is server/routes/projectRoutes.cjs
-const projectRoutes = require('./routes/projectRoutes.cjs'); 
+// FIX: Corrected the path to match the actual file location and case (server/routes/API/ProjectRoutes.js)
+const projectRoutes = require('./routes/API/ProjectRoutes.js'); 
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -20,6 +20,7 @@ app.use(express.json());
 app.use(cors()); 
 
 // --- API Routes ---
+// The Express route is still correct, as long as the file exports the router object.
 app.use('/api/projects', projectRoutes); 
 
 // --- Static File Serving ---
