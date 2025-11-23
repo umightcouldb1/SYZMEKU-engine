@@ -1,80 +1,66 @@
-// File: client/src/AddProjectForm.jsx
+// File: client/src/addprojectform.jsx (ALL LOWERCASE FILENAME)
 
 import React, { useState } from 'react';
-// Assuming you have an api.js or similar utility for the fetch logic
-// If you don't have api.js, the fetch will be inline here.
 
-// Define the base URL using the environment variable for production
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:10000';
-const API_URL = `${BASE_URL}/api/projects`; // The full, absolute URL for POSTing a new project
-
-// IMPORTANT: This ID must match the testOwnerId used in your backend's projectRoutes.js
-// If your authentication logic changes, you must update how you get the owner ID.
-const testOwnerId = "66c7f020c9a0a00d5ff04fcs"; 
-
-export default function AddProjectForm({ onProjectAdded }) {
-    const [title, setTitle] = useState("");
-    const [isSubmitting, setIsSubmitting] = useState(false);
+const AddProjectForm = ({ onProjectAdded }) => {
+    const [title, setTitle] = useState('');
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        if (title.trim() === "") return;
-
-        setIsSubmitting(true);
         setError(null);
+        setLoading(true);
+
+        if (!title.trim()) {
+            setError('Project title cannot be empty.');
+            setLoading(false);
+            return;
+        }
 
         try {
-            // Send a POST request to create a new project
-            const response = await fetch(API_URL, {
+            const response = await fetch('/api/projects', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    // This is still a temporary bypass until Part 3 is completed
+                    'Authorization': `Bearer ${localStorage.getItem('token') || 'DUMMY_TOKEN'}` 
                 },
-                body: JSON.stringify({
-                    title: title,
-                    // Temporarily hardcode the owner for testing/initial setup
-                    owner: testOwnerId
-                }),
+                body: JSON.stringify({ title })
             });
 
             if (!response.ok) {
-                // Attempt to get specific error details from the response
                 const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to create project on the server.');
+                throw new Error(errorData.message || 'Failed to add project. Check API server logs.');
             }
 
-            // Clear the input and trigger a project list refresh
-            setTitle("");
+            setTitle('');
             if (onProjectAdded) {
-                onProjectAdded();
+                onProjectAdded(); 
             }
-
         } catch (err) {
-            console.error("Error creating project:", err);
-            setError(`Error: ${err.message || 'Could not connect to the API.'}`);
+            console.error('Project submission error:', err);
+            setError(err.message);
         } finally {
-            setIsSubmitting(false);
+            setLoading(false);
         }
     };
 
     return (
-        <div>
-            <h3>+ Add a New Project</h3>
-            <form onSubmit={handleSubmit}>
-                <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Enter project title"
-                    disabled={isSubmitting}
-                />
-                <button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Creating..." : "Create Project"}
-                </button>
-            </form>
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-        </div>
+        <form onSubmit={handleSubmit}>
+            <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter new project title..."
+                disabled={loading}
+            />
+            <button type="submit" disabled={loading || !title.trim()}>
+                {loading ? 'Transmitting...' : 'EXECUTE INPUT'}
+            </button>
+            {error && <p className="error-message">{error}</p>}
+        </form>
     );
-}
+};
+
+export default AddProjectForm;
