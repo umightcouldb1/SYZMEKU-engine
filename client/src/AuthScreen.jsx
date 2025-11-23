@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { useAuth } from './hooks/useAuth'; 
+import { useAuth } from './hooks/useAuth.jsx'; 
 
 const AuthScreen = () => {
-  const [isLogin, setIsLogin] = useState(true); // Toggle between Login and Signup
+  const [isLogin, setIsLogin] = useState(true); 
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [status, setStatus] = useState('');
 
-  const { login, signup } = useAuth(); // Custom hook for authentication logic
+  const { login, signup } = useAuth(); 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,15 +18,12 @@ const AuthScreen = () => {
 
     try {
       if (isLogin) {
-        // Login Logic
         await login(email, password);
         setStatus('LOGIN SUCCESS');
       } else {
-        // Signup Logic
         await signup(username, email, password);
         setStatus('REGISTRATION SUCCESS');
       }
-      // Success: useAuth should handle redirect/state update, so the component unmounts
     } catch (err) {
       console.error(err);
       setError(err.message || 'Authentication Failed. Check credentials/server.');
