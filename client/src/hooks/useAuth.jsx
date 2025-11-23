@@ -1,14 +1,11 @@
 import React, { useState, useContext, createContext, useEffect } from 'react';
 
-// 1. Create Auth Context
 const AuthContext = createContext(null);
 
-// 2. Auth Provider Component (Contains JSX, thus requires .jsx extension)
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user data from localStorage on initial load
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
@@ -30,7 +27,6 @@ export const AuthProvider = ({ children }) => {
       throw new Error(data.msg || 'Login failed');
     }
 
-    // Success
     localStorage.setItem('user', JSON.stringify(data));
     setUser(data);
   };
@@ -48,7 +44,6 @@ export const AuthProvider = ({ children }) => {
       throw new Error(data.msg || 'Signup failed');
     }
 
-    // Success (automatically logs in the new user)
     localStorage.setItem('user', JSON.stringify(data));
     setUser(data);
   };
@@ -78,7 +73,6 @@ export const AuthProvider = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// 3. Custom Hook to use the Auth Context
 export const useAuth = () => {
   return useContext(AuthContext);
 };
