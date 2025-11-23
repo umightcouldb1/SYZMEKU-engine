@@ -2,8 +2,8 @@
 
 import React from 'react';
 import useProjects from "./hooks/useProjects";
-// **FIXED**: The import casing MUST be exactly AddProjectForm.jsx 
-import AddProjectForm from "./components/AddProjectForm.jsx"; 
+// **FIXED**: Import is now lowercase and points directly to the file in the current directory (./)
+import AddProjectForm from "./addprojectform.jsx"; 
 
 export default function App() {
     const { projects, loading, error, refetch } = useProjects();
@@ -35,7 +35,6 @@ export default function App() {
     };
 
     return (
-        // New top-level container for the structured layout
         <div className="app-container">
             
             <header className="main-header">
