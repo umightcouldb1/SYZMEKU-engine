@@ -1,9 +1,7 @@
-import { useAuth } from '../hooks/useAuth.jsx'; // FIXED: Changed .js to .jsx
+import { useAuth } from '../hooks/useAuth.jsx';
 
-// Base URL from your Render environment variable
 const BASE_URL = import.meta.env.VITE_API_URL;
 
-// Custom fetch wrapper to attach JWT token for authenticated requests
 const useApi = () => {
     const { getToken, logout } = useAuth();
 
@@ -24,10 +22,8 @@ const useApi = () => {
             headers,
         });
 
-        // Handle 401 Unauthorized (Token expired or invalid)
         if (response.status === 401) {
-            logout(); // Force log out
-            // You could throw an error here to stop the component logic
+            logout(); 
         }
 
         return response;
