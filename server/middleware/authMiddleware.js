@@ -8,7 +8,6 @@ const protect = async (req, res, next) => {
         try {
             token = req.headers.authorization.split(' ')[1];
 
-            // NOTE: Must match the secret key used in authRoutes.js
             const decoded = jwt.verify(token, 'SYZMEKU_SECRET_KEY'); 
 
             req.user = await User.findById(decoded.id).select('-password');
