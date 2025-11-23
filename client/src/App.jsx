@@ -2,17 +2,20 @@ import React, { useState } from 'react';
 import Dashboard from './Dashboard';
 import AddProjectForm from './addprojectform.jsx'; 
 import ProjectList from './ProjectList';
-import StatusIndicator from './StatusIndicator';
 import { useAuth } from './hooks/useAuth.jsx'; 
 import AuthScreen from './AuthScreen'; 
 
 const App = () => {
   const [currentView, setCurrentView] = useState('DASHBOARD');
   const { isAuthenticated, user, logout } = useAuth(); 
-
+  
+  // NOTE: If isAuthenticated is false, render AuthScreen
   if (!isAuthenticated) {
     return <AuthScreen />;
   }
+
+  // Ensure user object is present before trying to access username
+  const username = user?.username || 'UNKNOWN';
 
   return (
     <div className="app-container">
@@ -22,7 +25,9 @@ const App = () => {
       <div className="ui-grid">
         <div className="ui-panel nav-panel">
           
-          <StatusIndicator username={user.username} isAuthenticated={isAuthenticated} /> 
+          {/* StatusIndicator now uses the user state directly */}
+          {/* NOTE: If isAuthenticated is true, user MUST exist, but we pass the derived value */}
+          <StatusIndicator username={username} isAuthenticated={isAuthenticated} /> 
           
           <nav>
             <div className="panel-title">NAVIGATION</div>
@@ -42,8 +47,9 @@ const App = () => {
                   CONFIG: SETTINGS 
                 </button>
               </li>
+              {/* Logout button is now styled via index.css classes for visibility */}
               <li>
-                <button className="logout-button" onClick={logout}>
+                <button className="nav-button logout-button" onClick={logout}>
                   LOGOUT: TERMINATE SESSION
                 </button>
               </li>
