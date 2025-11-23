@@ -10,13 +10,7 @@
     "dev-client": "cd client && npm run dev",
     "install-all": "npm install && cd client && npm install",
     "setup": "npm install && cd client && npm install",
-    
-    // FIX: Removed the original "build" script that caused recursive failures.
-    
-    // NEW SCRIPT: Use a unique name for the final client build step inside render-build
     "client-build": "cd client && npm run build",
-
-    // RENDER ENTRY POINT: This runs the sequential commands without recursion.
     "render-build": "npm install && npm run setup && npm run client-build"
   },
   "keywords": [],
