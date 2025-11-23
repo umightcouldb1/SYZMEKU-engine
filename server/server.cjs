@@ -1,41 +1,33 @@
-// File: server/server.cjs
 const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const path = require('path');
-// FIX: Corrected the filename case to match the file tree (projectRoutes.js)
-const projectRoutes = require('./routes/API/projectRoutes.js'); 
-
 const app = express();
-const PORT = process.env.PORT || 10000;
+const path = require('path');
+// ... other imports (database connection, port definition, etc.)
 
-// --- Database Connection ---
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost/syzmeku';
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('MongoDB connection successful'))
-  .catch(err => console.error('MongoDB connection error:', err));
+// --- A. MIDDLEWARE & API ROUTES (MUST COME FIRST) ---
+app.use(express.json()); // For parsing application/json
+app.use(express.urlencoded({ extended: false })); // For parsing application/x-www-form-urlencoded
 
-// --- Middleware ---
-app.use(express.json());
-app.use(cors()); 
+// 💡 Ensure these API routes are registered BEFORE the static file serving
+app.use('/api/auth', require('./routes/API/authRoutes')); 
+app.use('/api/projects', require('./routes/API/projectRoutes')); 
 
-// --- API Routes ---
-app.use('/api/projects', projectRoutes); 
+// ... (Your error handler middleware might go here) ...
 
-// --- Static File Serving ---
-const clientPath = path.join(__dirname, '..', 'client', 'dist');
-app.use(express.static(clientPath));
 
-// Catch-all handler for client-side routing
+// --- B. SERVE CLIENT/FRONTEND (MUST COME AFTER API ROUTES) ---
+
+// Define the path to the built frontend (assuming client/dist)
+const CLIENT_BUILD_PATH = path.join(__dirname, '..', 'client', 'dist');
+
+// If in production mode, serve the static client build
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(CLIENT_BUILD_PATH));
+}
+
+// Catch-all: For any client-side route, serve the index.html file
 app.get('*', (req, res) => {
-    if (req.originalUrl.startsWith('/api')) {
-        return res.status(404).json({ message: 'API route not found' });
-    }
-    res.sendFile(path.join(clientPath, 'index.html'));
+    res.sendFile(path.resolve(CLIENT_BUILD_PATH, 'index.html'));
 });
 
 
-// --- Start Server ---
-app.listen(PORT, () => {
-    console.log(`API server running on port ${PORT}!`);
-});
+// ... (Bottom of file: app.listen, port definition, etc.) ...
