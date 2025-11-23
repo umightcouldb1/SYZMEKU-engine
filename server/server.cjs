@@ -2,13 +2,13 @@ const express = require('express');
 const app = express();
 const path = require('path');
 const dotenv = require('dotenv');
-const connectDB = require('./config/db'); // Assuming you have a database config file
+// const connectDB = require('./config/db'); // COMMENTED OUT: This file is causing the "Cannot find module" error
 
 // Load environment variables (if used)
 dotenv.config();
 
 // Connect to Database
-connectDB(); // Execute your database connection function
+// connectDB(); // COMMENTED OUT: Removing the call to the missing file
 
 // Define the port, use environment variable or default to 5000
 const PORT = process.env.PORT || 5000;
@@ -18,9 +18,8 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: false })); 
 
-// 💡 Register API routes BEFORE static file serving
+// Register API routes BEFORE static file serving
 app.use('/api/auth', require('./routes/API/authRoutes')); 
-// Assuming a projects route exists, if this causes a crash, temporarily comment it out:
 app.use('/api/projects', require('./routes/API/projectRoutes')); 
 
 
@@ -36,7 +35,7 @@ if (process.env.NODE_ENV === 'production') {
 
 // Catch-all: For any client-side route, serve the index.html file
 app.get('*', (req, res) => {
-    // Note: path.resolve is crucial for production environment pathing
+    // path.resolve is crucial for production environment pathing
     res.sendFile(path.resolve(CLIENT_BUILD_PATH, 'index.html'));
 });
 
