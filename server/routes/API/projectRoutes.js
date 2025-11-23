@@ -1,5 +1,10 @@
 const router = require('express').Router();
-const protect = require('../../middleware/authMiddleware'); // Requires the mocked middleware
+
+// Mock Protection function to prevent crashes
+const protect = (req, res, next) => {
+    req.user = { id: 'MOCKED_ID', username: 'MOCKED_USER' };
+    next();
+};
 
 // @route GET /api/projects
 router.get('/', protect, (req, res) => {
