@@ -1,31 +1,232 @@
-/* --- Add this block to the end of index.css --- */
+/* --- CRITICAL: BASE STYLES --- */
 
-.nav-button {
-    background: #000;
-    color: #00ff00;
-    border: 1px solid #00ff00;
-    padding: 10px 15px;
-    margin: 5px 0;
-    text-align: left;
-    cursor: pointer;
-    font-size: 1em;
-    width: 100%;
-    transition: background-color 0.2s, color 0.2s;
+:root {
+  font-family: monospace, sans-serif; 
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light dark;
+  color: #00ff00; /* Neon green text */
+  background-color: #000000; /* Pure black background */
+  font-size: 16px;
+  
+  /* Neon theme variables */
+  --neon-green: #00ff00;
+  --neon-yellow: #ffff00;
+  --neon-purple: #8a2be2;
+  --neon-cyan: #00ffff;
+  --neon-red: #ff0000;
+  --border-glow: 0 0 5px var(--neon-green), 0 0 10px var(--neon-green);
+  --text-glow: 0 0 5px var(--neon-yellow);
 }
 
-.nav-button:hover {
-    background-color: #00ff00;
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 100vw;
+  min-height: 100vh;
+  background-color: #000000; 
+  color: var(--neon-green); 
+  overflow-x: hidden;
+  padding: 20px;
+}
+
+#root {
+  width: 100%;
+}
+
+/* --- GLOBAL CONTAINERS & HEADERS --- */
+
+.app-container, .auth-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 20px;
+    border: 2px solid var(--neon-cyan);
+    box-shadow: 0 0 15px var(--neon-cyan);
+}
+
+.main-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.main-header h1 {
+    color: var(--neon-yellow);
+    text-shadow: 0 0 8px var(--neon-yellow);
+    border: 1px solid var(--neon-yellow);
+    padding: 10px 20px;
+    display: inline-block;
+    letter-spacing: 3px;
+    font-size: 1.5em;
+}
+
+/* --- PANEL STYLING --- */
+
+.ui-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+}
+
+.ui-panel {
+    padding: 15px;
+    border: 1px solid var(--neon-green);
+    box-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+    background-color: #0a0a0a;
+    min-height: 70vh;
+}
+
+.panel-title {
+    font-weight: bold;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 3px var(--neon-cyan);
+    margin-bottom: 15px;
+    border-bottom: 1px dashed var(--neon-cyan);
+    padding-bottom: 5px;
+    letter-spacing: 2px;
+}
+
+.divider {
+    border: none;
+    border-top: 1px solid var(--neon-purple);
+    margin: 20px 0;
+    box-shadow: 0 1px 3px var(--neon-purple);
+}
+
+/* --- AUTH SCREEN & FORMS --- */
+
+.auth-form-panel {
+    max-width: 500px;
+    margin: 40px auto;
+    padding: 30px;
+    border: 2px solid var(--neon-red);
+    box-shadow: 0 0 15px var(--neon-red);
+    background-color: #100505;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+input {
+    background: #000;
+    color: var(--neon-green);
+    border: 1px solid var(--neon-green);
+    padding: 10px;
+    font-size: 1em;
+    letter-spacing: 1px;
+    box-shadow: inset 0 0 3px var(--neon-green);
+}
+
+/* --- BUTTONS & NAVIGATION --- */
+
+button {
+    background: #111;
+    color: var(--neon-green);
+    border: 1px solid var(--neon-green);
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+    text-transform: uppercase;
+    font-size: 1em;
+    letter-spacing: 1px;
+}
+
+button:hover {
+    background-color: var(--neon-green);
     color: #000;
 }
 
+.nav-panel ul {
+    list-style: none;
+    padding: 0;
+}
+
+.nav-panel li {
+    margin-bottom: 10px;
+}
+
+.nav-button {
+    width: 100%;
+    text-align: left;
+    background: #000;
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+}
+
+.nav-button:hover {
+    background-color: var(--neon-cyan);
+    color: #000;
+}
+
+/* FIX: Red Logout Button */
 .logout-button {
     background-color: #300; 
-    border-color: #ff0000; 
-    color: #ff0000;
+    border-color: var(--neon-red); 
+    color: var(--neon-red);
     margin-top: 20px;
 }
 
 .logout-button:hover {
-    background-color: #ff0000;
+    background-color: var(--neon-red);
     color: #fff;
+}
+
+.toggle-auth-button {
+    background: none;
+    border: none;
+    color: var(--neon-purple);
+    text-decoration: underline;
+    text-transform: none;
+    padding: 0;
+}
+
+.toggle-auth-button:hover {
+    color: var(--neon-cyan);
+    background: none;
+}
+
+/* --- PROJECT LIST & STATUS INDICATORS --- */
+
+.project-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px dotted #333;
+    margin-bottom: 5px;
+}
+
+.project-title {
+    color: var(--neon-cyan);
+}
+
+.project-status {
+    font-weight: bold;
+}
+
+.active {
+    color: var(--neon-green);
+}
+
+.status-online {
+    color: var(--neon-green);
+}
+.status-offline {
+    color: var(--neon-red);
+    font-weight: bold;
+}
+
+.error-message {
+    color: var(--neon-red);
+    margin-top: 15px;
+    padding: 10px;
+    border: 1px solid var(--neon-red);
+}
+
+.status-message, .loading-message {
+    color: var(--neon-yellow);
+    margin-top: 15px;
 }
