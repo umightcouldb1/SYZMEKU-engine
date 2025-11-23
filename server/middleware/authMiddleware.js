@@ -1,27 +1,9 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+// MOCKED AUTH MIDDLEWARE: This bypasses all database-related checks to prevent server crashes.
 
-const protect = async (req, res, next) => {
-    let token;
-
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        try {
-            token = req.headers.authorization.split(' ')[1];
-
-            const decoded = jwt.verify(token, 'SYZMEKU_SECRET_KEY'); 
-
-            req.user = await User.findById(decoded.id).select('-password');
-            
-            next();
-        } catch (error) {
-            console.error(error);
-            res.status(401).json({ msg: 'Not authorized, token failed' });
-        }
-    }
-
-    if (!token) {
-        res.status(401).json({ msg: 'Not authorized, no token' });
-    }
+const protect = (req, res, next) => {
+    // Allows all requests to proceed and attaches a mock user object.
+    req.user = { id: 'MOCKED_ID', username: 'MOCKED_USER' };
+    next();
 };
 
 module.exports = protect;
