@@ -1,17 +1,15 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
-const User = require('../../models/User'); // Assuming path is correct
+const User = require('../../models/User'); 
 
-// Utility function to generate JWT
 const generateToken = (id) => {
-    // NOTE: Replace 'YOUR_SECRET_KEY' with a strong key in a .env file later.
+    // NOTE: Must match the secret key used in authMiddleware.js
     return jwt.sign({ id }, 'SYZMEKU_SECRET_KEY', {
         expiresIn: '30d',
     });
 };
 
 // @route POST /api/auth/signup
-// @desc Register new user
 router.post('/signup', async (req, res) => {
     const { username, email, password } = req.body;
 
@@ -20,7 +18,6 @@ router.post('/signup', async (req, res) => {
             return res.status(400).json({ msg: 'Please enter all fields' });
         }
 
-        // Check for existing user
         let user = await User.findOne({ email });
         if (user) {
             return res.status(400).json({ msg: 'User already exists' });
@@ -46,12 +43,10 @@ router.post('/signup', async (req, res) => {
 });
 
 // @route POST /api/auth/login
-// @desc Authenticate user and get token
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        // Check for user email
         const user = await User.findOne({ email });
 
         if (user && (await user.comparePassword(password))) {
