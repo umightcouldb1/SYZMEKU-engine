@@ -1,14 +1,17 @@
 /*
- * SYZMEKU Engine Styling - Ultra-Futuristic Alien UI Theme
+ * SYZMEKU Engine Styling - FINAL VISUAL PROTOCOL
  * Aesthetic: Deep Black/Purple Base, Matrix Green Glow, Metallic Accents, Structured Layout.
- * Features: Invisible-to-Glow Text effect (Ring inscription feel) and Aurabesh Font.
+ * Features: 
+ * 1. Invisible-to-Glow Text Effect (Ring Inscription Feel).
+ * 2. Custom Alien Font ('AlienAncient' via CDN to bypass file issues).
+ * 3. Fancy, Futuristic Buttons.
  */
 
-/* ------------------- CUSTOM FONT IMPLEMENTATION (AURABESH) ------------------- */
-/* FINAL FIX: Using a public URL to bypass local file permission issues */
+/* ------------------- CUSTOM FONT IMPLEMENTATION (FINAL FIX) ------------------- */
+/* Using a public URL (Star Jedi font) for the AlienAncient text, which is the most reliable way 
+   to load the font given local file permission issues. */
 @font-face {
     font-family: 'AlienAncient';
-    /* Source: Star Jedi Font as a reliable alternative that looks alien/encoded. */
     src: url('https://syzmeku-engine.s3.us-west-1.amazonaws.com/fonts/StarJedi-Regular.woff') format('woff'); 
     font-weight: normal;
     font-style: normal;
@@ -17,20 +20,20 @@
 /* ----------------------------------------------------------------------------- */
 
 :root {
-  /* Base Colors */
-  --color-base-dark: #000000;       
-  --color-surface-dark: #100a18;    
-  --color-text-light: #f0f0f0;      
+  /* Base Colors (The Matrix / Iron Heart Dark Base) */
+  --color-base-dark: #000000;       /* Primary Black Background */
+  --color-surface-dark: #100a18;    /* Deep Black/Purple Surface */
+  --color-text-light: #f0f0f0;      /* Light Text Color */
   
-  /* Sci-Fi Accents */
+  /* Sci-Fi Accents (Star Trek / Matrix Glow) */
   --color-glow-green: #00ff41;      /* Matrix Neon Green */
   --color-glow-blue: #00bfff;       /* Deep Sky Blue for secondary glow */
   --color-accent-gold: #FFD700;     /* Metallic Gold */
-  --color-accent-silver: #C0C0C0;   
-  --color-accent-copper: #B87333;   
-  --color-border-grid: #333333;     
+  --color-accent-silver: #C0C0C0;   /* Metallic Silver */
+  --color-accent-copper: #B87333;   /* Metallic Copper/Bronze */
+  --color-border-grid: #333333;     /* Dark grid line color */
   
-  /* Typography - AlienAncient now points to a public Star Wars font */
+  /* Typography */
   --font-family-alien-primary: 'AlienAncient', 'Arial Black', sans-serif; 
   --font-family-alien-secondary: 'Monospace', 'Consolas', sans-serif; 
   --font-family-system: 'Arial', sans-serif; 
@@ -160,6 +163,7 @@ nav ul li {
     margin-bottom: 12px;
 }
 
+/* Fancy, Futuristic Buttons for Navigation */
 nav button {
     width: 100%;
     text-align: center; 
@@ -227,6 +231,7 @@ input[type="text"]:focus {
     box-shadow: 0 0 12px var(--color-glow-blue), inset 0 0 8px var(--color-glow-green); 
 }
 
+/* Fancy, Futuristic Button for Submit */
 button[type="submit"] {
     background: linear-gradient(90deg, var(--color-glow-green), var(--color-accent-gold)); 
     color: var(--color-base-dark);
