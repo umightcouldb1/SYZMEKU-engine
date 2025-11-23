@@ -1,60 +1,38 @@
-// File: server/routes/API/projectRoutes.js
 const router = require('express').Router();
-// FIX: Ensure BOTH Project and User models are required to register User schema
-const { Project, User } = require('../../models'); 
+const Project = require('../../models/Project');
+const User = require('../../models/User'); 
+const auth = require('../../middleware/authMiddleware'); 
 
-// ... Routes prefixed with /api/projects
-
-// GET all projects and POST a new project
-router.route('/')
-.get(async (req, res) => {
+// @route GET /api/projects
+// @access Private 
+router.get('/', auth, async (req, res) => {
     try {
-        const projects = await Project.find().populate('owner');
+        const projects = await Project.find({ owner: req.user.id }).populate('owner', 'username email');
         res.status(200).json(projects);
     } catch (error) {
         console.error(error);
-        res.status(500).json(error);
+        res.status(500).json({ error: 'Server error retrieving projects' });
     }
-})
-.post(async (req, res) => {
+});
+
+// @route POST /api/projects
+// @access Private
+router.post('/', auth, async (req, res) => {
+    const { title } = req.body;
+    const owner = req.user.id; 
+
     try {
-        // This relies on the client (AddProjectForm.jsx) sending the 'owner' field
         const newProject = await Project.create({
-            ...req.body,
+            title,
+            owner
         });
+        
+        await User.findByIdAndUpdate(owner, { $push: { projects: newProject._id } });
 
-        res.status(200).json(newProject);
+        res.status(201).json(newProject);
     } catch (error) {
         console.error(error);
-        res.status(500).json(error);
-    }
-});
-
-// GET a single project by id
-router.route('/:id').get(async (req, res) => {
-    try {
-        const project = await Project.findById(req.params.id).populate('owner');
-        if (!project) {
-            return res.status(404).json({ message: 'No project found with this id!' });
-        }
-        res.status(200).json(project);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json(error);
-    }
-});
-
-// DELETE a project by id
-router.route('/:id').delete(async (req, res) => {
-    try {
-        const project = await Project.findByIdAndDelete(req.params.id);
-        if (!project) {
-            return res.status(404).json({ message: 'No project found with this id!' });
-        }
-        res.status(200).json({ message: 'Project successfully deleted!' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json(error);
+        res.status(500).json({ error: 'Server error creating project' });
     }
 });
 
