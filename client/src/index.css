@@ -1,123 +1,233 @@
 /*
- * SYZMEKU Engine Styling - Toi Souljah Academy FINAL Theme
- * Deep Purple/Black base with Gold, Silver, Copper, and Emerald Green accents.
+ * SYZMEKU Engine Styling - FINAL Sci-Fi UI Theme
+ * Aesthetic: Deep Black/Purple Base, Matrix Green Glow, Metallic Accents, Structured Layout.
  */
 
 :root {
-  /* Base Colors (Deep, Dark, Branded) */
-  --color-base-dark: #000000;       /* Primary Dark Background */
-  --color-surface-dark: #1a0033;    /* Deep Purple/Black Surface (Main App Box) */
+  /* Base Colors (The Matrix / Iron Heart Dark Base) */
+  --color-base-dark: #000000;       /* Primary Black Background */
+  --color-surface-dark: #100a18;    /* Deep Black/Purple Surface */
   --color-text-light: #f0f0f0;      /* Light Text Color */
-  --color-border-subtle: #444444;   /* Subtle Dark Border */
   
-  /* Metallic Accents */
-  --color-accent-gold: #FFD700;     /* Gold for H1 and Primary Buttons */
-  --color-accent-silver: #C0C0C0;   /* Silver for H3 and Borders */
-  --color-accent-copper: #B87333;   /* Copper/Bronze for H2 and Dividers */
-  
-  /* Emerald Forest Green (New Accent) */
-  --color-accent-emerald: #048C4D;  /* Deep Emerald Green */
-  --color-accent-emerald-light: #00CC66; /* Lighter Green for "Glitter" effects */
+  /* Sci-Fi Accents (Star Trek / Matrix Glow) */
+  --color-glow-green: #00ff41;      /* Matrix Neon Green */
+  --color-accent-gold: #FFD700;     /* Metallic Gold */
+  --color-accent-silver: #C0C0C0;   /* Metallic Silver */
+  --color-accent-copper: #B87333;   /* Metallic Copper/Bronze */
+  --color-border-grid: #333333;     /* Dark grid line color */
   
   /* Typography */
-  --font-family-primary: 'Arial Black', sans-serif; 
-  --font-family-secondary: 'Arial', sans-serif;
+  --font-family-scifi: 'Monospace', 'Consolas', sans-serif; 
 }
 
-/* Base Styles */
+/* ------------------- GLOBAL RESET AND BASE ------------------- */
 body {
   margin: 0;
   padding: 0;
-  font-family: var(--font-family-secondary);
+  font-family: var(--font-family-scifi);
   background-color: var(--color-base-dark);
   color: var(--color-text-light);
-  line-height: 1.6;
+  line-height: 1.5;
+  text-shadow: 0 0 2px rgba(0, 255, 65, 0.5); /* Subtle green glow on all text */
 }
 
 #root {
-  max-width: 1100px;
-  margin: 40px auto;
-  padding: 30px 40px;
-  background-color: var(--color-surface-dark);
-  /* Use Emerald Green and Gold for the subtle "glitter" box shadow */
-  box-shadow: 0 0 10px var(--color-accent-emerald), 0 0 20px var(--color-accent-gold); 
-  border-radius: 15px;
-  border: 2px solid var(--color-accent-silver); 
+  display: flex;
+  justify-content: center;
+  padding: 20px;
 }
 
-/* Headings */
+/* ------------------- MAIN APP CONTAINER & HEADER ------------------- */
+.app-container {
+  width: 95%;
+  max-width: 1400px;
+  background-color: var(--color-surface-dark);
+  border: 1px solid var(--color-glow-green);
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.3); /* Main Matrix glow */
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden; /* Contains the grid children */
+}
+
+.main-header {
+    background-color: #000;
+    padding: 15px 30px;
+    border-bottom: 2px solid var(--color-accent-gold);
+    box-shadow: 0 4px 10px rgba(255, 215, 0, 0.2);
+}
+
 h1 {
-  font-family: var(--font-family-primary); 
+  font-size: 1.5em;
   color: var(--color-accent-gold);
-  border-bottom: 3px double var(--color-accent-emerald); /* Emerald border */
-  padding-bottom: 15px;
-  margin-bottom: 30px;
+  text-align: center;
+  margin: 0;
+  letter-spacing: 4px;
   text-transform: uppercase;
-  letter-spacing: 2px;
+  font-weight: bold;
 }
 
-h2 {
-  font-family: var(--font-family-primary); 
-  color: var(--color-accent-copper);
-  font-size: 1.8em;
-  margin-top: 40px;
-  margin-bottom: 20px;
+/* ------------------- GRID LAYOUT ------------------- */
+.ui-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr; /* Left panel fixed width, right panel takes rest */
+    height: calc(100vh - 120px); /* Fill remaining viewport space */
 }
 
-h3 {
-  color: var(--color-accent-silver);
-  font-size: 1.3em;
-  margin-top: 25px;
-  /* Use a combination of colors for border shimmer */
-  border-bottom: 1px dashed var(--color-accent-emerald-light);
-  padding-bottom: 8px;
+.ui-panel {
+    padding: 20px;
+    overflow-y: auto; /* Allow content to scroll if too long */
 }
 
-/* Navigation & Buttons */
-ul li button, ul li a {
-  background-color: var(--color-surface-dark);
-  border: 1px solid var(--color-accent-silver);
-  color: var(--color-text-light);
-  /* ... existing styles ... */
+.nav-panel {
+    background-color: #050505;
+    border-right: 1px solid var(--color-border-grid);
 }
 
-ul li button:hover, ul li a:hover {
-  background-color: var(--color-accent-emerald);
-  color: var(--color-base-dark);
-  box-shadow: 0 0 10px var(--color-accent-emerald-light); /* Emerald "Shimmer" */
+.data-panel {
+    background-color: var(--color-surface-dark);
 }
 
-/* Forms (Input and Submit) */
+.panel-title {
+    color: var(--color-glow-green);
+    border-bottom: 1px dashed var(--color-glow-green);
+    padding-bottom: 5px;
+    margin-top: 20px;
+    font-size: 1.2em;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* ------------------- NAVIGATION & STATUS ------------------- */
+.status-indicator-box {
+    border: 1px solid var(--color-accent-silver);
+    padding: 10px;
+    margin-bottom: 20px;
+    background-color: #080808;
+}
+
+.system-status {
+    color: var(--color-accent-copper);
+    margin: 5px 0;
+}
+
+.system-status.active {
+    color: var(--color-glow-green);
+    text-shadow: 0 0 5px var(--color-glow-green);
+}
+
+nav ul {
+    list-style: none;
+    padding: 0;
+}
+
+nav ul li {
+    display: block; /* Stack navigation links vertically */
+    margin-bottom: 8px;
+}
+
+nav button {
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 1px solid transparent;
+    color: var(--color-text-light);
+    padding: 8px 10px;
+    border-radius: 0;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+nav button:hover {
+    background-color: rgba(0, 255, 65, 0.1);
+    border-color: var(--color-glow-green);
+    color: var(--color-glow-green);
+}
+
+.logout-button {
+    color: var(--color-accent-copper);
+}
+
+/* ------------------- DATA INPUT & OUTPUT ------------------- */
+.action-module {
+    margin-bottom: 30px;
+    border: 1px solid var(--color-border-grid);
+    padding: 15px;
+}
+
+form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
 input[type="text"] {
-  /* ... existing styles ... */
+    flex-grow: 1;
+    padding: 12px;
+    border: 1px solid var(--color-accent-silver);
+    border-radius: 4px;
+    font-size: 1em;
+    background-color: #050505;
+    color: var(--color-glow-green); /* Matrix green input text */
+    outline: none;
+    text-shadow: 0 0 4px var(--color-glow-green);
 }
 
 input[type="text"]:focus {
-  border-color: var(--color-accent-emerald);
-  box-shadow: 0 0 8px var(--color-accent-emerald-light); /* Emerald focus glow */
+    border-color: var(--color-accent-gold);
+    box-shadow: 0 0 10px var(--color-accent-gold);
 }
 
 button[type="submit"] {
-  /* ... existing styles ... */
-  background-color: var(--color-accent-gold);
-  color: var(--color-base-dark);
+    background-color: var(--color-glow-green);
+    color: var(--color-base-dark);
+    font-weight: bold;
+    text-transform: uppercase;
+    padding: 12px 20px;
+    transition: box-shadow 0.3s;
 }
 
 button[type="submit"]:hover:not(:disabled) {
-  background-color: var(--color-accent-gold);
-  box-shadow: 0 0 15px var(--color-accent-emerald-light); /* Emerald/Gold Shimmer */
+    box-shadow: 0 0 15px var(--color-glow-green);
 }
 
-/* Project List */
+/* Project List Output (Matrix/Code Scroll) */
+.project-list {
+    list-style: none;
+    padding: 0;
+    border-top: 1px solid var(--color-border-grid);
+}
+
 .project-list li {
-  /* ... existing styles ... */
-  border: 1px solid var(--color-accent-copper);
-  box-shadow: 0 0 10px rgba(4, 140, 77, 0.15); /* Subtle Emerald glow */
+    padding: 10px 0;
+    border-bottom: 1px dashed rgba(0, 255, 65, 0.3);
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.1em;
 }
 
-/* Utility Classes */
+.project-title {
+    color: var(--color-text-light);
+}
+
+.project-status {
+    color: var(--color-glow-green);
+    font-weight: bold;
+}
+
+/* Utility */
 hr {
-  border: none;
-  border-top: 2px dashed var(--color-accent-copper);
-  margin: 40px 0;
+    border: none;
+    border-top: 1px solid var(--color-border-grid);
+    margin: 15px 0;
+}
+
+.divider {
+    border-top: 2px solid var(--color-accent-copper);
+}
+
+.error-message, .status-message {
+    padding: 15px;
+    border: 1px solid var(--color-accent-copper);
+    color: var(--color-accent-copper);
+    background-color: rgba(184, 115, 51, 0.1);
+    text-align: center;
 }
