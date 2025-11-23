@@ -2,13 +2,13 @@ const express = require('express');
 const app = express();
 const path = require('path');
 const dotenv = require('dotenv');
-// const connectDB = require('./config/db'); // COMMENTED OUT: This file is causing the "Cannot find module" error
+// const connectDB = require('./config/db'); // COMMENTED OUT: Removed the line that was causing the crash
 
 // Load environment variables (if used)
 dotenv.config();
 
 // Connect to Database
-// connectDB(); // COMMENTED OUT: Removing the call to the missing file
+// connectDB(); // COMMENTED OUT: Removed the call that was causing the crash
 
 // Define the port, use environment variable or default to 5000
 const PORT = process.env.PORT || 5000;
