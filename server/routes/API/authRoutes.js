@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
-const User = require('../../models/User'); 
 
+// NOTE: The 'SYZMEKU_SECRET_KEY' is still required to generate a valid token.
 const generateToken = (id) => {
     return jwt.sign({ id }, 'SYZMEKU_SECRET_KEY', {
         expiresIn: '30d',
@@ -10,59 +10,28 @@ const generateToken = (id) => {
 
 // @route POST /api/auth/signup
 router.post('/signup', async (req, res) => {
-    const { username, email, password } = req.body;
-
-    try {
-        if (!username || !email || !password) {
-            return res.status(400).json({ msg: 'Please enter all fields' });
-        }
-
-        let user = await User.findOne({ email });
-        if (user) {
-            return res.status(400).json({ msg: 'User already exists' });
-        }
-
-        user = await User.create({ username, email, password });
-
-        if (user) {
-            res.status(201).json({
-                _id: user.id,
-                username: user.username,
-                email: user.email,
-                token: generateToken(user._id),
-                message: 'Registration successful'
-            });
-        } else {
-            res.status(400).json({ msg: 'Invalid user data' });
-        }
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ msg: 'Server error during signup' });
-    }
+    // MOCK RESPONSE: Pretend registration worked and return a token
+    const { username, email } = req.body;
+    res.status(201).json({
+        _id: 'MOCKED_ID_123',
+        username: username || 'MOCKED_USER',
+        email: email,
+        token: generateToken('MOCKED_ID_123'),
+        message: 'MOCKED Registration successful'
+    });
 });
 
 // @route POST /api/auth/login
 router.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-
-    try {
-        const user = await User.findOne({ email });
-
-        if (user && (await user.comparePassword(password))) {
-            res.json({
-                _id: user.id,
-                username: user.username,
-                email: user.email,
-                token: generateToken(user._id),
-                message: 'Login successful'
-            });
-        } else {
-            res.status(401).json({ msg: 'Invalid credentials' });
-        }
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ msg: 'Server error during login' });
-    }
+    // MOCK RESPONSE: Pretend login worked and return a token
+    const { email } = req.body;
+    res.json({
+        _id: 'MOCKED_ID_456',
+        username: email,
+        email: email,
+        token: generateToken('MOCKED_ID_456'),
+        message: 'MOCKED Login successful'
+    });
 });
 
 module.exports = router;
