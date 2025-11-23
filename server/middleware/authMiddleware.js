@@ -1,25 +1,35 @@
-// --- FILE: server/middleware/errorMiddleware.js (CLEANED) ---
-const notFound = (req, res, next) => {
-    // This runs if no other route (API or client catch-all) handled the request
-    const error = new Error(`Not Found - ${req.originalUrl}`);
-    res.status(404);
-    next(error); // Pass the error to the errorHandler
-};
+const jwt = require('jsonwebtoken');
+const asyncHandler = require('express-async-handler');
+const User = require('../models/userModel'); 
 
-const errorHandler = (err, req, res, next) => {
-    // If the status code is 200 (OK), it means an error occurred but we didn't explicitly set a status.
-    // We default to 500 (Server Error). Otherwise, we use the status set earlier.
-    const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
-    res.status(statusCode);
+const protect = asyncHandler(async (req, res, next) => {
+    let token;
 
-    res.json({
-        message: err.message,
-        // Only include the stack trace in development for security
-        stack: process.env.NODE_ENV === 'production' ? null : err.stack,
-    });
-};
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            
+            // Get user from the token payload (excluding the password hash)
+            req.user = await User.findById(decoded.id).select('-password');
 
-module.exports = {
-    notFound,
-    errorHandler,
-};
+            if (req.user) {
+                next();
+            } else {
+                res.status(401); 
+                throw new Error('User not found');
+            }
+        } catch (error) {
+            console.error(error);
+            res.status(401); 
+            throw new Error('Not authorized, token failed');
+        }
+    }
+
+    if (!token) {
+        res.status(401); 
+        throw new Error('Not authorized, no token');
+    }
+});
+
+module.exports = { protect };
