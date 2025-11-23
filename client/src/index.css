@@ -1,6 +1,7 @@
 /*
- * SYZMEKU Engine Styling - FINAL Sci-Fi UI Theme
+ * SYZMEKU Engine Styling - Ultra-Futuristic Alien UI Theme
  * Aesthetic: Deep Black/Purple Base, Matrix Green Glow, Metallic Accents, Structured Layout.
+ * Enhanced: Fancy Buttons & Simulated Alien Ancient Language Text.
  */
 
 :root {
@@ -11,20 +12,24 @@
   
   /* Sci-Fi Accents (Star Trek / Matrix Glow) */
   --color-glow-green: #00ff41;      /* Matrix Neon Green */
+  --color-glow-blue: #00bfff;       /* Deep Sky Blue for secondary glow */
   --color-accent-gold: #FFD700;     /* Metallic Gold */
   --color-accent-silver: #C0C0C0;   /* Metallic Silver */
   --color-accent-copper: #B87333;   /* Metallic Copper/Bronze */
   --color-border-grid: #333333;     /* Dark grid line color */
   
-  /* Typography */
-  --font-family-scifi: 'Monospace', 'Consolas', sans-serif; 
+  /* Typography - Simulating Alien Ancient Language */
+  /* Using a combination of monospace for structure, and a bold/wide sans-serif for "alien" feel */
+  --font-family-alien-primary: 'Arial Black', 'Impact', sans-serif; 
+  --font-family-alien-secondary: 'Monospace', 'Consolas', sans-serif; 
+  --font-family-system: 'Arial', sans-serif; /* For less critical info */
 }
 
 /* ------------------- GLOBAL RESET AND BASE ------------------- */
 body {
   margin: 0;
   padding: 0;
-  font-family: var(--font-family-scifi);
+  font-family: var(--font-family-system); /* Default to a clean font */
   background-color: var(--color-base-dark);
   color: var(--color-text-light);
   line-height: 1.5;
@@ -43,44 +48,47 @@ body {
   max-width: 1400px;
   background-color: var(--color-surface-dark);
   border: 1px solid var(--color-glow-green);
-  box-shadow: 0 0 20px rgba(0, 255, 65, 0.3); /* Main Matrix glow */
-  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.3), 0 0 40px rgba(0, 191, 255, 0.2); /* Dual glow */
+  border-radius: 12px;
   padding: 0;
-  overflow: hidden; /* Contains the grid children */
+  overflow: hidden; 
 }
 
 .main-header {
     background-color: #000;
-    padding: 15px 30px;
+    padding: 20px 30px;
     border-bottom: 2px solid var(--color-accent-gold);
-    box-shadow: 0 4px 10px rgba(255, 215, 0, 0.2);
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
 }
 
 h1 {
-  font-size: 1.5em;
+  font-family: var(--font-family-alien-primary); /* Alien primary font for main title */
+  font-size: 1.8em;
   color: var(--color-accent-gold);
   text-align: center;
   margin: 0;
-  letter-spacing: 4px;
+  letter-spacing: 5px; /* Wider spacing for cryptic look */
   text-transform: uppercase;
   font-weight: bold;
+  text-shadow: 0 0 10px var(--color-glow-green), 0 0 20px rgba(255, 215, 0, 0.6); /* Green and gold glow */
 }
 
 /* ------------------- GRID LAYOUT ------------------- */
 .ui-grid {
     display: grid;
-    grid-template-columns: 300px 1fr; /* Left panel fixed width, right panel takes rest */
-    height: calc(100vh - 120px); /* Fill remaining viewport space */
+    grid-template-columns: 350px 1fr; /* Left panel wider for navigation */
+    height: calc(100vh - 140px); /* Adjust height for larger header */
 }
 
 .ui-panel {
-    padding: 20px;
-    overflow-y: auto; /* Allow content to scroll if too long */
+    padding: 25px;
+    overflow-y: auto; 
 }
 
 .nav-panel {
     background-color: #050505;
     border-right: 1px solid var(--color-border-grid);
+    box-shadow: inset -5px 0 15px rgba(0, 255, 65, 0.1); /* Inner shadow for depth */
 }
 
 .data-panel {
@@ -88,105 +96,142 @@ h1 {
 }
 
 .panel-title {
+    font-family: var(--font-family-alien-primary); /* Alien primary for panel titles */
     color: var(--color-glow-green);
-    border-bottom: 1px dashed var(--color-glow-green);
-    padding-bottom: 5px;
-    margin-top: 20px;
-    font-size: 1.2em;
-    letter-spacing: 1px;
+    border-bottom: 1px solid var(--color-glow-blue); /* Blue border for futuristic feel */
+    padding-bottom: 8px;
+    margin-top: 25px;
+    font-size: 1.3em;
+    letter-spacing: 2px;
     text-transform: uppercase;
+    text-shadow: 0 0 8px var(--color-glow-green);
 }
 
 /* ------------------- NAVIGATION & STATUS ------------------- */
 .status-indicator-box {
     border: 1px solid var(--color-accent-silver);
-    padding: 10px;
-    margin-bottom: 20px;
+    padding: 15px;
+    margin-bottom: 25px;
     background-color: #080808;
+    box-shadow: 0 0 10px rgba(192, 192, 192, 0.1);
 }
 
 .system-status {
+    font-family: var(--font-family-alien-secondary); /* Monospace for status codes */
     color: var(--color-accent-copper);
-    margin: 5px 0;
+    margin: 8px 0;
 }
 
 .system-status.active {
     color: var(--color-glow-green);
-    text-shadow: 0 0 5px var(--color-glow-green);
+    text-shadow: 0 0 8px var(--color-glow-green);
 }
 
 nav ul {
     list-style: none;
     padding: 0;
+    margin-top: 30px;
 }
 
 nav ul li {
-    display: block; /* Stack navigation links vertically */
-    margin-bottom: 8px;
+    display: block; 
+    margin-bottom: 12px;
 }
 
+/* Fancy, Futuristic Buttons for Navigation */
 nav button {
     width: 100%;
-    text-align: left;
-    background: none;
-    border: 1px solid transparent;
+    text-align: center; /* Centered text for bolder look */
+    background: linear-gradient(45deg, #0a0a0a, #1a0033); /* Dark gradient */
+    border: 2px solid var(--color-accent-silver);
     color: var(--color-text-light);
-    padding: 8px 10px;
-    border-radius: 0;
-    transition: background-color 0.2s, border-color 0.2s;
+    padding: 12px 10px;
+    border-radius: 6px;
+    transition: all 0.3s ease-in-out;
+    font-family: var(--font-family-alien-primary); /* Bold font for buttons */
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    box-shadow: 0 0 5px var(--color-accent-silver); /* Subtle silver glow */
 }
 
 nav button:hover {
-    background-color: rgba(0, 255, 65, 0.1);
+    background: linear-gradient(45deg, var(--color-glow-green), var(--color-glow-blue)); /* Green/blue gradient on hover */
     border-color: var(--color-glow-green);
-    color: var(--color-glow-green);
+    color: var(--color-base-dark); /* Dark text on bright button */
+    box-shadow: 0 0 15px var(--color-glow-green), 0 0 25px var(--color-glow-blue); /* Intense glow */
+    text-shadow: none; /* Remove text glow on hover for contrast */
 }
 
 .logout-button {
     color: var(--color-accent-copper);
+    border-color: var(--color-accent-copper);
+    margin-top: 20px;
+}
+.logout-button:hover {
+    background: linear-gradient(45deg, #8b0000, #ff4500); /* Red gradient for logout */
+    border-color: #ff4500;
+    box-shadow: 0 0 15px #ff4500;
 }
 
 /* ------------------- DATA INPUT & OUTPUT ------------------- */
 .action-module {
-    margin-bottom: 30px;
+    margin-bottom: 35px;
     border: 1px solid var(--color-border-grid);
-    padding: 15px;
+    padding: 20px;
+    background-color: #080808;
+    box-shadow: inset 0 0 15px rgba(0, 255, 65, 0.05); /* Inner green glow */
 }
 
 form {
     display: flex;
-    gap: 10px;
+    gap: 15px;
     align-items: center;
 }
 
 input[type="text"] {
     flex-grow: 1;
-    padding: 12px;
-    border: 1px solid var(--color-accent-silver);
-    border-radius: 4px;
-    font-size: 1em;
+    padding: 14px;
+    border: 2px solid var(--color-accent-silver);
+    border-radius: 6px;
+    font-size: 1.1em;
     background-color: #050505;
     color: var(--color-glow-green); /* Matrix green input text */
     outline: none;
-    text-shadow: 0 0 4px var(--color-glow-green);
+    text-shadow: 0 0 6px var(--color-glow-green);
+    transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 input[type="text"]:focus {
-    border-color: var(--color-accent-gold);
-    box-shadow: 0 0 10px var(--color-accent-gold);
+    border-color: var(--color-glow-blue);
+    box-shadow: 0 0 12px var(--color-glow-blue), inset 0 0 8px var(--color-glow-green); /* Blue outer, green inner glow */
 }
 
+/* Fancy, Futuristic Button for Submit */
 button[type="submit"] {
-    background-color: var(--color-glow-green);
+    background: linear-gradient(90deg, var(--color-glow-green), var(--color-accent-gold)); /* Green to gold gradient */
     color: var(--color-base-dark);
     font-weight: bold;
     text-transform: uppercase;
-    padding: 12px 20px;
-    transition: box-shadow 0.3s;
+    padding: 14px 25px;
+    border: none;
+    border-radius: 6px;
+    letter-spacing: 1.5px;
+    box-shadow: 0 4px 15px rgba(0, 255, 65, 0.4); /* Green shadow */
+    transition: all 0.3s ease-in-out;
 }
 
 button[type="submit"]:hover:not(:disabled) {
-    box-shadow: 0 0 15px var(--color-glow-green);
+    background: linear-gradient(90deg, var(--color-accent-gold), var(--color-glow-green)); /* Gradient direction change on hover */
+    box-shadow: 0 0 20px var(--color-glow-green), 0 0 30px var(--color-accent-gold); /* More intense dual glow */
+    transform: translateY(-2px); /* Slight lift */
+}
+
+button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    background: #222;
+    color: #888;
+    box-shadow: none;
 }
 
 /* Project List Output (Matrix/Code Scroll) */
@@ -194,13 +239,15 @@ button[type="submit"]:hover:not(:disabled) {
     list-style: none;
     padding: 0;
     border-top: 1px solid var(--color-border-grid);
+    margin-top: 25px;
 }
 
 .project-list li {
-    padding: 10px 0;
+    padding: 12px 0;
     border-bottom: 1px dashed rgba(0, 255, 65, 0.3);
     display: flex;
     justify-content: space-between;
+    font-family: var(--font-family-alien-secondary); /* Monospace for list items */
     font-size: 1.1em;
 }
 
@@ -211,23 +258,34 @@ button[type="submit"]:hover:not(:disabled) {
 .project-status {
     color: var(--color-glow-green);
     font-weight: bold;
+    text-shadow: 0 0 5px var(--color-glow-green);
 }
 
 /* Utility */
 hr {
     border: none;
     border-top: 1px solid var(--color-border-grid);
-    margin: 15px 0;
+    margin: 20px 0;
 }
 
 .divider {
     border-top: 2px solid var(--color-accent-copper);
+    box-shadow: 0 0 10px var(--color-accent-copper); /* Copper glow divider */
 }
 
-.error-message, .status-message {
+.error-message, .status-message, .loading-indicator {
     padding: 15px;
     border: 1px solid var(--color-accent-copper);
     color: var(--color-accent-copper);
     background-color: rgba(184, 115, 51, 0.1);
     text-align: center;
+    font-family: var(--font-family-system); /* Keep these readable */
+    text-shadow: none; /* Remove alien glow for readability on errors */
+}
+
+.loading-indicator {
+    color: var(--color-glow-blue);
+    border-color: var(--color-glow-blue);
+    background-color: rgba(0, 191, 255, 0.1);
+    text-shadow: 0 0 8px var(--color-glow-blue);
 }
