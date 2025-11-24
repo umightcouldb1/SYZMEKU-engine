@@ -4,7 +4,7 @@
   "description": "SYZMEKU Engine",
   "main": "server/server.cjs",
   "scripts": {
-    "start": "node server/server.cjs",
+    "start": "NODE_ENV=production node server/server.cjs",
     "setup": "npm install && cd client && npm install && cd .. && cd server && npm install",
     "client-build": "cd client && npm run build",
     "render-build": "npm run setup && npm run client-build"
