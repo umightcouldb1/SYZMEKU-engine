@@ -3,9 +3,9 @@ const express = require('express');
 const colors = require('colors');
 const connectDB = require('./configure/db');
 const path = require('path');
-const { errorHandler } = require('./middleware/errorMiddleware');
+const { errorHandler } = require('C:\\Users\\umight\\SYZMEKU-engine\\server\\middleware\\errorMiddleware');
 
-connectDB(); // Connect to MongoDB
+connectDB();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -15,7 +15,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Define API routes
-// app.use('/api/users', require('./routes/userRoutes')); // Enable these once routes are created
+// app.use('/api/users', require('./routes/userRoutes')); 
 // app.use('/api/goals', require('./routes/goalRoutes'));
 
 // Serve client build folder in production
