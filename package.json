@@ -1,19 +1,15 @@
-{
-  "name": "syzmeku-engine-server",
-  "version": "1.0.0",
-  "description": "Backend API for SYZMEKU engine",
-  "main": "server.cjs",
-  "scripts": {
-    "start": "node server.cjs",
-    "server": "nodemon server.cjs"
-  },
-  "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "colors": "^1.4.0",           <-- NEWLY ADDED
-    "dotenv": "^16.4.5",
+// --- FILE: package.json (in the main project root) ---
+// ... (rest of the file content)
+
+"scripts": {
+    "start": "node server/server.cjs",
+    "setup": "npm install && cd client && npm install && cd .. && cd server && npm install",
+    "client-build": "cd client && npm run build",
+    "render-build": "npm run setup && npm run client-build"  // <-- CHANGED THIS LINE
+},
+"dependencies": {
     "express": "^4.19.2",
-    "express-async-handler": "^1.2.0",
-    "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.4.4"
-  }
-}
+    "dotenv": "^16.4.5"
+},
+
+// ... (rest of the file content)
