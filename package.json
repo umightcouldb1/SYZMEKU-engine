@@ -1,29 +1,19 @@
 {
-  "name": "syzmeku-engine",
+  "name": "syzmeku-engine-server",
   "version": "1.0.0",
-  "description": "Full Stack MERN-like application template.",
-  "main": "server/server.cjs",
+  "description": "Backend API for SYZMEKU engine",
+  "main": "server.cjs",
   "scripts": {
-    "start": "node server/server.cjs",
-    "dev": "npm run dev-server & npm run dev-client",
-    "dev-server": "cd server && npm install && nodemon server.cjs",
-    "dev-client": "cd client && npm run dev",
-    "install-all": "npm install && cd client && npm install && cd .. && cd server && npm install",
-    "setup": "npm install && cd client && npm install && cd .. && cd server && npm install",
-    "client-build": "cd client && npm run build",
-    "render-build": "cd server && npm install && cd .. && npm run setup && npm run client-build"
+    "start": "node server.cjs",
+    "server": "nodemon server.cjs"
   },
-  "keywords": [
-    "react",
-    "express",
-    "mongodb"
-  ],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "cors": "^2.8.5",
+    "bcryptjs": "^2.4.3",
+    "colors": "^1.4.0",           <-- NEWLY ADDED
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "mongoose": "^8.4.1",
-    "path": "^0.12.7"
+    "express-async-handler": "^1.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.4.4"
   }
 }
