@@ -13,6 +13,11 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// New route added to ensure the server remains active and responsive
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'API is running' });
+});
+
 // app.use('/api/users', require('./routes/userRoutes'));
 // app.use('/api/goals', require('./routes/goalRoutes'));
 
