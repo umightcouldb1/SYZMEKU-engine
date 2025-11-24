@@ -3,6 +3,7 @@ const express = require('express');
 const colors = require('colors');
 const connectDB = require('./configure/db');
 const path = require('path');
+const fs = require('fs'); // Import the file system module
 const { errorHandler } = require('./middleware/errorMiddleware');
 
 connectDB();
@@ -21,17 +22,21 @@ app.get('/api/health', (req, res) => {
 // app.use('/api/users', require('./routes/userRoutes'));
 // app.use('/api/goals', require('./routes/goalRoutes'));
 
-// Re-enabling the static file serving for production
-if (process.env.NODE_ENV === 'production') {
+// Define the path to the client build folder
+const clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
+
+// Check if the client build folder exists before serving static files
+if (process.env.NODE_ENV === 'production' && fs.existsSync(clientBuildPath)) {
     // Set static folder to client/dist
-    app.use(express.static(path.join(__dirname, '../client/dist')));
+    app.use(express.static(clientBuildPath));
 
     // For any non-API route, serve the index.html file
     app.get('*', (req, res) =>
-        res.sendFile(path.resolve(__dirname, '../', 'client', 'dist', 'index.html'))
+        res.sendFile(path.join(clientBuildPath, 'index.html'))
     );
 } else {
-    app.get('/', (req, res) => res.send('Please set to production'));
+    // Fallback route if the build files are not found or not in production
+    app.get('/', (req, res) => res.send('API is running. Client build files not found or NODE_ENV not set to production.'));
 }
 
 app.use(errorHandler);
