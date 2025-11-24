@@ -5,9 +5,9 @@
   "main": "server/server.cjs",
   "scripts": {
     "start": "cross-env NODE_ENV=production node server/server.cjs",
-    "setup": "npm install && cd client && npm install && cd .. && cd server && npm install",
-    "client-build": "cd client && npm run build",
-    "render-build": "npm run setup && npm run client-build"
+    "install-all": "npm install --prefix ./client && npm install --prefix ./server && npm install",
+    "client-build": "npm run build --prefix ./client",
+    "render-build": "npm run install-all && npm run client-build"
   },
   "dependencies": {
     "express": "^4.19.2",
