@@ -1,3 +1,4 @@
+// --- FILE: server/models/userModel.js (Verification) ---
 const mongoose = require('mongoose');
 
 const userSchema = mongoose.Schema(
