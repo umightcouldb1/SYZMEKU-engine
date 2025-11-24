@@ -4,13 +4,14 @@
   "description": "SYZMEKU Engine",
   "main": "server/server.cjs",
   "scripts": {
-    "start": "NODE_ENV=production node server/server.cjs",
+    "start": "cross-env NODE_ENV=production node server/server.cjs",
     "setup": "npm install && cd client && npm install && cd .. && cd server && npm install",
     "client-build": "cd client && npm run build",
     "render-build": "npm run setup && npm run client-build"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "cross-env": "^7.0.3"
   }
 }
