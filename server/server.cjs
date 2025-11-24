@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// New route added to ensure the server remains active and responsive
+// Health check route - this will now be the main working route
 app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'API is running' });
 });
@@ -21,19 +21,10 @@ app.get('/api/health', (req, res) => {
 // app.use('/api/users', require('./routes/userRoutes'));
 // app.use('/api/goals', require('./routes/goalRoutes'));
 
-// Serve client build folder in production
-if (process.env.NODE_ENV === 'production') {
-    const parentDir = path.resolve(__dirname, '..');
-    const clientPath = path.join(parentDir, 'client', 'dist');
+// REMOVED THE ENTIRE PRODUCTION/CLIENT SERVING LOGIC
 
-    app.use(express.static(clientPath));
-
-    app.get('*', (req, res) => {
-        res.sendFile(path.join(clientPath, 'index.html'));
-    });
-} else {
-    app.get('/', (req, res) => res.send('Please set to production'));
-}
+// Default route for non-production environments and the root route (/)
+app.get('/', (req, res) => res.send('API is running. Set to production to serve client.'));
 
 app.use(errorHandler);
 
