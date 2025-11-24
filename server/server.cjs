@@ -21,12 +21,16 @@ app.get('/api/health', (req, res) => {
 // app.use('/api/users', require('./routes/userRoutes'));
 // app.use('/api/goals', require('./routes/goalRoutes'));
 
+// Serve client build folder in production
 if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(__dirname, '../client/dist')));
+    const parentDir = path.resolve(__dirname, '..');
+    const clientPath = path.join(parentDir, 'client', 'dist');
 
-    app.get('*', (req, res) =>
-        res.sendFile(path.resolve(__dirname, '../', 'client', 'dist', 'index.html'))
-    );
+    app.use(express.static(clientPath));
+
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(clientPath, 'index.html'));
+    });
 } else {
     app.get('/', (req, res) => res.send('Please set to production'));
 }
