@@ -1,61 +1,56 @@
-// --- FILE: server/server.cjs (Final Path Guaranteed) ---
-const express = require('express');
-const app = express();
+// --- FILE: server/server.cjs (COMPLETE) ---
 const path = require('path');
-const dotenv = require('dotenv').config(); 
-const connectDB = require('./configure/db'); // <-- CORRECTED PATH: 'configure'
-const { notFound, errorHandler } = require('./middleware/errorMiddleware'); 
+const express = require('express');
+const colors = require('colors');
+const dotenv = require('dotenv').config();
 
-// --- CONFIGURATION ---
-const PORT = process.env.PORT || 5000;
+// Connect to MongoDB
+const connectDB = require('./configure/db'); // Import DB connection function
+connectDB(); // Execute DB connection
 
-// CONNECT TO DATABASE
-connectDB(); 
+const port = process.env.PORT || 5000;
 
-// --- A. MIDDLEWARE & API ROUTES (CRITICAL ORDER) ---
-app.use(express.json()); 
-app.use(express.urlencoded({ extended: false })); 
+const app = express();
 
-// SAFEGUARD: Use try...catch blocks to guarantee the server starts.
+// Middleware for body parsing
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// --- API Routes ---
+// The middleware and controller dependencies are loaded when these routes are required
 try {
-    app.use('/api/auth', require('./routes/API/authRoutes')); 
-} catch (error) {
-    console.error('CRITICAL: Failed to load authRoutes.', error.message);
-}
-
-try {
+    app.use('/api/auth', require('./routes/API/authRoutes'));
     app.use('/api/projects', require('./routes/API/projectRoutes'));
-} catch (error) {
-    console.error('CRITICAL: Failed to load projectRoutes.', error.message);
+    console.log('API Routes loaded successfully.');
+} catch (e) {
+    // This catches critical module loading errors at startup
+    console.log(`CRITICAL: Failed to load projectRoutes. ${e.message}`);
 }
 
-// --- B. SERVE CLIENT/FRONTEND ---
-const CLIENT_BUILD_PATH = path.join(__dirname, '..', 'client', 'dist');
+// --- Serve Frontend ---
+// This serves the static client files when deployed
+const clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
 
-// Serve the static client build
-app.use(express.static(CLIENT_BUILD_PATH));
+// Check if the client build exists before serving
+if (require('fs').existsSync(clientBuildPath)) {
+    // Set static folder
+    app.use(express.static(clientBuildPath));
 
-// Catch-all: For any client-side route, serve the index.html file
-app.get('*', (req, res, next) => {
-    // Check if the request is for an API route or a client route
-    if (req.originalUrl.startsWith('/api')) {
-        return next(); 
-    }
-    
-    // Serve the index.html file for client routing
-    res.sendFile(path.resolve(CLIENT_BUILD_PATH, 'index.html'), (err) => {
-        if (err) {
-            console.error("Error sending index.html:", err.message);
-            res.status(500).send('<h1>Server Running: Client Build Path Error</h1><p>Check CLIENT_BUILD_PATH and client/dist directory.</p>');
-        }
+    // For any request not matching an API route, serve the index.html (React app)
+    app.get('*', (req, res) => {
+        res.sendFile(path.resolve(clientBuildPath, 'index.html'));
     });
-});
+} else {
+    // Fallback for development/missing build
+    app.get('/', (req, res) => {
+        res.send('Backend is running, but client build is missing or not deployed.');
+    });
+}
 
-// --- C. ERROR HANDLERS (MUST BE LAST) ---
-app.use(notFound); 
-app.use(errorHandler); 
+// Fallback Error Handler (if not already defined)
+app.use(require('./middleware/errorMiddleware').errorHandler);
 
-// Start the server
-app.listen(PORT, () => {
-    console.log(`Server running and guaranteed to be listening on port ${PORT}`);
+
+app.listen(port, () => {
+    console.log(`Server running and guaranteed to be listening on port ${port}`);
 });
