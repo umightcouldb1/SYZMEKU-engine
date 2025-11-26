@@ -5,6 +5,7 @@
   "main": "server/server.cjs",
   "scripts": {
     "start": "cross-env NODE_ENV=production node server/server.cjs",
+    "test": "npm run lint --prefix ./client",
     "install-all": "npm install --prefix ./client && npm install --prefix ./server && npm install",
     "client-build": "npm run build --prefix ./client",
     "render-build": "npm run install-all && npm run client-build"
