@@ -15,7 +15,18 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.disable('x-powered-by');
-app.set('trust proxy', 1);
+
+const trustProxyConfig = process.env.TRUST_PROXY ? process.env.TRUST_PROXY.trim() : '';
+
+if (trustProxyConfig) {
+    app.set('trust proxy', trustProxyConfig);
+} else {
+    app.set('trust proxy', false);
+    console.warn(
+        'TRUST_PROXY is not set. X-Forwarded-* headers will be ignored to prevent spoofing. ' +
+            'Set TRUST_PROXY to a known proxy hop value when running behind a trusted reverse proxy.'
+    );
+}
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
