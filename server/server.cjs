@@ -16,16 +16,30 @@ const PORT = process.env.PORT || 5000;
 
 app.disable('x-powered-by');
 
-const trustProxyConfig = process.env.TRUST_PROXY ? process.env.TRUST_PROXY.trim() : '';
+const parseTrustProxy = (rawValue) => {
+    if (!rawValue) return undefined;
 
-if (trustProxyConfig) {
-    app.set('trust proxy', trustProxyConfig);
-} else {
+    const value = rawValue.trim().toLowerCase();
+
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+
+    const numeric = Number(value);
+    if (!Number.isNaN(numeric)) return numeric;
+
+    return rawValue.trim();
+};
+
+const trustProxyConfig = parseTrustProxy(process.env.TRUST_PROXY);
+
+if (trustProxyConfig === undefined) {
     app.set('trust proxy', false);
     console.warn(
         'TRUST_PROXY is not set. X-Forwarded-* headers will be ignored to prevent spoofing. ' +
             'Set TRUST_PROXY to a known proxy hop value when running behind a trusted reverse proxy.'
     );
+} else {
+    app.set('trust proxy', trustProxyConfig);
 }
 
 const limiter = rateLimit({
