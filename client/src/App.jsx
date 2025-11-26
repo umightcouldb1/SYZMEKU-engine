@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import Dashboard from './Dashboard';
-import AddProjectForm from './addprojectform.jsx'; 
+import AddProjectForm from './addprojectform.jsx';
 import ProjectList from './ProjectList';
-import { useAuth } from './hooks/useAuth.jsx'; 
-import AuthScreen from './AuthScreen'; 
+import { useAuth } from './hooks/useAuth.jsx';
+import AuthScreen from './AuthScreen';
+import StatusIndicator from './StatusIndicator.jsx';
 
 const App = () => {
   const [currentView, setCurrentView] = useState('DASHBOARD');
