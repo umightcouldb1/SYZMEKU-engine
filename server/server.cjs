@@ -27,11 +27,18 @@ const requestLimiter = rateLimit({
 const corsOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean)
     : [];
+const allowAllCors = !corsOrigins.length && process.env.NODE_ENV !== 'production';
+const corsOriginConfig = allowAllCors ? '*' : corsOrigins.length ? corsOrigins : false;
+
+if (!allowAllCors && !corsOrigins.length) {
+    console.warn('CORS is disabled because CORS_ORIGIN is not configured.');
+}
 
 app.use(helmet());
 app.use(
     cors({
-        origin: corsOrigins.length ? corsOrigins : '*',
+        origin: corsOriginConfig,
+        optionsSuccessStatus: 204,
     })
 );
 app.use(requestLimiter);
