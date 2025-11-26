@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 5000;
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
-const requestLimiter = rateLimit({
+const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
     standardHeaders: true,
@@ -41,7 +41,7 @@ app.use(
         optionsSuccessStatus: 204,
     })
 );
-app.use(requestLimiter);
+app.use(limiter);
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
