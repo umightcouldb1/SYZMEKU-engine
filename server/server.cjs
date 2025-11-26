@@ -4,6 +4,9 @@ const colors = require('colors');
 const connectDB = require('./configure/db');
 const path = require('path');
 const fs = require('fs'); // Import the file system module
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { errorHandler } = require('./middleware/errorMiddleware');
 
 connectDB();
@@ -11,8 +14,61 @@ connectDB();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.disable('x-powered-by');
+
+const parseTrustProxy = (rawValue) => {
+    if (!rawValue) return undefined;
+
+    const value = rawValue.trim().toLowerCase();
+
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+
+    const numeric = Number(value);
+    if (!Number.isNaN(numeric)) return numeric;
+
+    return rawValue.trim();
+};
+
+const trustProxyConfig = parseTrustProxy(process.env.TRUST_PROXY);
+
+if (trustProxyConfig === undefined) {
+    app.set('trust proxy', false);
+    console.warn(
+        'TRUST_PROXY is not set. X-Forwarded-* headers will be ignored to prevent spoofing. ' +
+            'Set TRUST_PROXY to a known proxy hop value when running behind a trusted reverse proxy.'
+    );
+} else {
+    app.set('trust proxy', trustProxyConfig);
+}
+
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const corsOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean)
+    : [];
+const allowAllCors = !corsOrigins.length && process.env.NODE_ENV !== 'production';
+const corsOriginConfig = allowAllCors ? '*' : corsOrigins.length ? corsOrigins : false;
+
+if (!allowAllCors && !corsOrigins.length) {
+    console.warn('CORS is disabled because CORS_ORIGIN is not configured.');
+}
+
+app.use(helmet());
+app.use(
+    cors({
+        origin: corsOriginConfig,
+        optionsSuccessStatus: 204,
+    })
+);
+app.use(limiter);
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
 // Health check route - confirm API is working
 app.get('/api/health', (req, res) => {
