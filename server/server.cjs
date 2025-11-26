@@ -4,12 +4,26 @@ const colors = require('colors');
 const connectDB = require('./configure/db');
 const path = require('path');
 const fs = require('fs'); // Import the file system module
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { errorHandler } = require('./middleware/errorMiddleware');
 
 connectDB();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+app.set('trust proxy', 1);
+
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+app.use(helmet());
+app.use(limiter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
