@@ -4,7 +4,6 @@ const colors = require('colors');
 const connectDB = require('./configure/db');
 const path = require('path');
 const fs = require('fs'); // Import the file system module
-const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { errorHandler } = require('./middleware/errorMiddleware');
@@ -55,17 +54,60 @@ const corsOrigins = process.env.CORS_ORIGIN
 const allowAllCors = !corsOrigins.length && process.env.NODE_ENV !== 'production';
 const corsOriginConfig = allowAllCors ? '*' : corsOrigins.length ? corsOrigins : false;
 
+const buildCorsMiddleware = (originConfig, allowAll) => {
+    if (originConfig === false) {
+        return (req, res, next) => {
+            if (req.method === 'OPTIONS') {
+                res.status(204).end();
+                return;
+            }
+
+            next();
+        };
+    }
+
+    const normalizeOrigin = (origin) => origin?.toLowerCase();
+
+    return (req, res, next) => {
+        const requestOrigin = req.headers.origin;
+
+        const allowedOrigin =
+            allowAll || originConfig === '*'
+                ? '*'
+                : originConfig.find((origin) => normalizeOrigin(origin) === normalizeOrigin(requestOrigin))
+                  ? requestOrigin
+                  : null;
+
+        if (allowedOrigin) {
+            res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+            res.setHeader('Vary', 'Origin');
+            res.setHeader(
+                'Access-Control-Allow-Methods',
+                'GET,HEAD,PUT,PATCH,POST,DELETE'
+            );
+            res.setHeader(
+                'Access-Control-Allow-Headers',
+                req.headers['access-control-request-headers'] || 'Content-Type, Authorization'
+            );
+            res.setHeader('Access-Control-Max-Age', '600');
+        }
+
+        if (req.method === 'OPTIONS') {
+            res.status(204).end();
+            return;
+        }
+
+        next();
+    };
+};
+
 if (!allowAllCors && !corsOrigins.length) {
     console.warn('CORS is disabled because CORS_ORIGIN is not configured.');
 }
 
 app.use(helmet());
-app.use(
-    cors({
-        origin: corsOriginConfig,
-        optionsSuccessStatus: 204,
-    })
-);
+const corsMiddleware = buildCorsMiddleware(corsOriginConfig, allowAllCors);
+app.use(corsMiddleware);
 app.use(limiter);
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
