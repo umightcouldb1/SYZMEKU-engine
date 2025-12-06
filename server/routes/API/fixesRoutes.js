@@ -2,7 +2,7 @@
 
 const express = require('express');
 const expressAsyncHandler = require('express-async-handler');
-// NOTE: Assuming axiomEnforcer.js is created at server/logic/axiomEnforcer.js (Required for this to work)
+// This relative path is correct: ../../logic/ axiomEnforcer 
 const { enforceAxiomReciprocity } = require('../../logic/axiomEnforcer'); 
 const router = express.Router();
 
@@ -10,7 +10,7 @@ const router = express.Router();
 // @route   POST /api/fixes/protocol
 // @access  Protected (Requires JWT/Auth) 
 router.post('/protocol', expressAsyncHandler(async (req, res) => {
-    // 1. Get the 4D optimized input 
+    // 1. Get the 4D optimized input (the failure point)
     const { costOptimized } = req.body; 
     const riskAssessment = '$500M'; // Hardcoded for this validation test
 
