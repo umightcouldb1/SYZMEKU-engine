@@ -1,4 +1,4 @@
-// server/server.cjs - FINAL RESOLVED, SECURED, AND AXIOM-INTEGRATED VERSION
+// server/server.cjs - FINAL RESOLVED, SECURED, AND PATH-CORRECTED VERSION
 
 const path = require('path');
 const fs = require('fs');
@@ -9,7 +9,8 @@ require('colors');
 // --- 1. CORE IMPORTS ---
 const connectDB = require('./configure/db'); 
 const { errorHandler, notFound } = require('./middleware/errorMiddleware');
-const fixesRoutes = require('./routes/fixesRoutes'); // Your new Crystalline Route
+// PATH CORRECTION: CORRECTED to point to the 'API' subfolder to fix the crash.
+const fixesRoutes = require('./routes/API/fixesRoutes'); 
 
 // --- 2. SECURITY IMPORTS ---
 const helmet = require('helmet');
@@ -26,14 +27,14 @@ const bootstrap = async () => {
 
     // SERVER CONFIGURATION AND SECURITY MIDDLEWARE SETUP
 
-    // Trust Proxy Logic (from lines 107-112)
+    // Trust Proxy Logic 
     const trustProxyConfig = process.env.NODE_ENV === 'production' ? 1 : false;
     app.set('trust proxy', trustProxyConfig);
     if (!trustProxyConfig) {
         console.warn('TRUST PROXY is not set. X-Forwarded headers will be ignored to prevent spoofing.');
     }
 
-    // Rate Limiting (from lines 114-119)
+    // Rate Limiting 
     const limiter = rateLimit({
         windowMs: 15 * 60 * 1000,
         max: 100,
@@ -42,12 +43,11 @@ const bootstrap = async () => {
         message: 'Too many requests. Crystalline integrity check enforced. Try again in 15 minutes.'
     });
 
-    // CORS Configuration (Cleaned up and using the standard 'cors' package)
+    // CORS Configuration (Uses standard middleware now)
     const corsOrigins = process.env.CORS_ORIGIN
         ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean)
         : [];
     const corsOptions = {
-        // Allows origins defined in env or, if not set, allows all in non-production for dev ease
         origin: corsOrigins.length ? corsOrigins : process.env.NODE_ENV !== 'production', 
         credentials: true,
     };
@@ -66,27 +66,28 @@ const bootstrap = async () => {
     // B. CORS Implementation
     app.use(cors(corsOptions)); 
     
-    // C. Mongo Sanitize: Prevents MongoDB Operator Injection (CRITICAL FOR DATABASE SECURITY)
+    // C. Mongo Sanitize: Prevents MongoDB Operator Injection
     app.use(mongoSanitize());
     
     // D. Rate Limiting Implementation
     app.use(limiter); 
     
-    // E. Body Parsers (from lines 135-136)
+    // E. Body Parsers 
     app.use(express.json({ limit: '1mb' }));
     app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
-    // Health check route (from lines 138-141)
+    // Health check route 
     app.get('/api/health', (req, res) => {
         res.status(200).json({ status: 'API is running' });
     });
 
     // 4. ROUTE DEFINITIONS
-    // app.use('/api/users', require('./routes/userRoutes'));
-    // app.use('/api/goals', require('./routes/goalRoutes'));
-    app.use('/api/fixes', fixesRoutes); // The Crystalline Fixes Protocol
+    // Use the API subfolder path for all routes.
+    // app.use('/api/users', require('./routes/API/userRoutes')); 
+    // app.use('/api/goals', require('./routes/API/goalRoutes')); 
+    app.use('/api/fixes', fixesRoutes); // The Crystalline Fixes Protocol is now integrated
 
-    // 5. CLIENT BUILD SERVING LOGIC (from lines 144-163)
+    // 5. CLIENT BUILD SERVING LOGIC 
     const clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
 
     if (process.env.NODE_ENV === 'production' && fs.existsSync(clientBuildPath)) {
