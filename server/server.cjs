@@ -6,10 +6,10 @@ const express = require('express');
 const dotenv = require('dotenv').config();
 require('colors'); 
 
-// --- 1. CORE IMPORTS ---
+// --- 1. CORE IMPORTS (Path corrected to routes/API) ---
 const connectDB = require('./configure/db'); 
 const { errorHandler, notFound } = require('./middleware/errorMiddleware');
-// PATH CORRECTION: CORRECTED to point to the 'API' subfolder to fix the crash.
+// CRITICAL FIX: The path is now corrected to the 'API' subfolder.
 const fixesRoutes = require('./routes/API/fixesRoutes'); 
 
 // --- 2. SECURITY IMPORTS ---
@@ -43,7 +43,7 @@ const bootstrap = async () => {
         message: 'Too many requests. Crystalline integrity check enforced. Try again in 15 minutes.'
     });
 
-    // CORS Configuration (Uses standard middleware now)
+    // CORS Configuration (Uses standard middleware)
     const corsOrigins = process.env.CORS_ORIGIN
         ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean)
         : [];
@@ -82,10 +82,8 @@ const bootstrap = async () => {
     });
 
     // 4. ROUTE DEFINITIONS
-    // Use the API subfolder path for all routes.
-    // app.use('/api/users', require('./routes/API/userRoutes')); 
-    // app.use('/api/goals', require('./routes/API/goalRoutes')); 
-    app.use('/api/fixes', fixesRoutes); // The Crystalline Fixes Protocol is now integrated
+    // All API routes now correctly referenced through the 'API' subfolder.
+    app.use('/api/fixes', fixesRoutes); // The Crystalline Fixes Protocol is integrated
 
     // 5. CLIENT BUILD SERVING LOGIC 
     const clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
