@@ -1,80 +1,113 @@
+// client/src/App.jsx - Revised to $9.88 Flash Sale Price
+
 import React, { useState } from 'react';
-import Dashboard from './Dashboard';
-import AddProjectForm from './addprojectform.jsx';
-import ProjectList from './ProjectList';
-import { useAuth } from './hooks/useAuth.jsx';
-import AuthScreen from './AuthScreen';
-import StatusIndicator from './StatusIndicator.jsx';
+import './App.css'; 
 
-const App = () => {
-  const [currentView, setCurrentView] = useState('DASHBOARD');
-  const { isAuthenticated, user, logout } = useAuth(); 
-  
-  // NOTE: If isAuthenticated is false, render AuthScreen
-  if (!isAuthenticated) {
-    return <AuthScreen />;
-  }
+function App() {
+  const [costOptimized, setCostOptimized] = useState('');
+  const [auditResult, setAuditResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Ensure user object is present before trying to access username
-  const username = user?.username || 'UNKNOWN';
+  // --- REVISED PRICING & URL ---
+  const FLASH_SALE_PRICE = '9.88'; // Energetic pricing ending in 8
+  const API_BASE_URL = 'https://syzmeku-api.onrender.com'; 
+  // -----------------------------
+
+  const handleAudit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setAuditResult(null);
+    setError(null);
+
+    const costValue = parseFloat(costOptimized);
+    if (isNaN(costValue) || costValue <= 0) {
+      setError('Please enter a positive numeric value for the 4D Cost.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Step 1: Simulated Payment Success (Pretend payment for $9.88 has been made)
+      console.log(`Payment simulation successful for $${FLASH_SALE_PRICE}. Calling Axiom Fixes Protocol...`);
+
+      // Step 2: Call the validated Axiom Fixes Protocol endpoint
+      const response = await fetch(`${API_BASE_URL}/api/fixes/protocol`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ costOptimized: costValue }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setAuditResult(data.proof);
+      } else {
+        setError(data.message || 'Audit failed due to server error.');
+      }
+    } catch (err) {
+      setError('Network error: Could not reach the SYZMEKU Engine.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const requiredAudits = Math.ceil(2044 / parseFloat(FLASH_SALE_PRICE));
 
   return (
-    <div className="app-container">
-      <div className="main-header">
-        <h1>SYZMEKU ENGINE // OPERATIONAL INTERFACE</h1>
-      </div>
-      <div className="ui-grid">
-        <div className="ui-panel nav-panel">
-          
-          {/* StatusIndicator now uses the user state directly */}
-          {/* NOTE: If isAuthenticated is true, user MUST exist, but we pass the derived value */}
-          <StatusIndicator username={username} isAuthenticated={isAuthenticated} /> 
-          
-          <nav>
-            <div className="panel-title">NAVIGATION</div>
-            <ul>
-              <li>
-                <button onClick={() => setCurrentView('DASHBOARD')}>
-                  ACCESS: DASHBOARD
-                </button>
-              </li>
-              <li>
-                <button onClick={() => setCurrentView('PROJECTS')}>
-                  ACCESS: PROJECTS
-                </button>
-              </li>
-              <li>
-                <button onClick={() => setCurrentView('SETTINGS')}>
-                  CONFIG: SETTINGS 
-                </button>
-              </li>
-              {/* Logout button is now styled via index.css classes for visibility */}
-              <li>
-                <button className="nav-button logout-button" onClick={logout}>
-                  LOGOUT: TERMINATE SESSION
-                </button>
-              </li>
-            </ul>
-          </nav>
+    <div className="container">
+      <header>
+        <h1>SYZMEKU AI MENTOR // COHERENCE AUDIT</h1>
+        <h2>The Core 5D Axiom Test (Jarvis/Griot Integrity Check)</h2>
+      </header>
+      
+      <main>
+        <div className="flash-sale-banner">
+            <h3>✨ 24-HOUR FLASH SALE: PRICE ENDS IN '8' FOR ABUNDANCE FLOW! ✨</h3>
         </div>
+        
+        {error && <div className="message error">{error}</div>}
 
-        <div className="ui-panel data-panel">
-          {currentView === 'DASHBOARD' && <Dashboard />}
-          {currentView === 'PROJECTS' && (
-            <>
-              <div className="panel-title">DATA INPUT PROTOCOL</div>
-              <AddProjectForm />
-              <hr className="divider" />
-              <ProjectList />
-            </>
-          )}
-          {currentView === 'SETTINGS' && (
-            <div className="panel-title">SETTINGS // PROTOCOL CONFIG</div>
-          )}
-        </div>
-      </div>
+        <form onSubmit={handleAudit} className="audit-form">
+          <label htmlFor="cost">Enter Your 4D Optimized Cost/Metric (e.g., 2777777.78)</label>
+          <input
+            id="cost"
+            type="number"
+            step="0.01"
+            value={costOptimized}
+            onChange={(e) => setCostOptimized(e.target.value)}
+            placeholder="e.g., 2777777.78"
+            disabled={loading}
+            required
+          />
+          <button type="submit" disabled={loading}>
+            {loading ? 'ENFORCING AXIOM...' : `RUN COHERENCE AUDIT ($${FLASH_SALE_PRICE})`}
+          </button>
+          <p className="small-text">Bypasses login. Proof of concept for immediate revenue stream.</p>
+        </form>
+
+        {auditResult && (
+          <div className="result-box success">
+            <h3>✅ AXIOM ENFORCEMENT SUCCESSFUL</h3>
+            <p><strong>Axiom Applied:</strong> {auditResult.axiom_enforced} (Steward Archetype)</p>
+            <p><strong>4D Flawed Input:</strong> ${auditResult.old_cost_4D}</p>
+            <p className="large-result">
+              <strong>5D Coherent Metric Required:</strong> ${auditResult.new_coherent_cost_5D}
+            </p>
+            <p className="risk-eliminated">
+              **Systemic Risk Eliminated:** {auditResult.risk_eliminated} (by accepting ${auditResult.cost_increase_amount})
+            </p>
+          </div>
+        )}
+      </main>
+      
+      <footer>
+        <p>Revenue Target: Sell **{requiredAudits}** Audits at ${FLASH_SALE_PRICE} each to hit ${2044} monthly VA compensation on launch night.</p>
+      </footer>
     </div>
   );
-};
+}
 
 export default App;
