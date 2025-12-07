@@ -1,4 +1,4 @@
-// client/src/App.jsx - FINAL REVENUE PROTOTYPE CODE
+// client/src/App.jsx - FINAL REVENUE PROTOTYPE CODE (Banner Restored)
 
 import React, { useState } from 'react';
 import './App.css'; 
@@ -9,8 +9,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // --- PRICING & URL ---
-  const FLASH_SALE_PRICE = '9.88'; // Energetic pricing ending in 8
+  // --- API URL ---
   // NOTE: You MUST replace this with your actual live Render URL.
   const API_BASE_URL = 'https://syzmeku-api.onrender.com'; 
   // -----------------------------
@@ -29,8 +28,8 @@ function App() {
     }
 
     try {
-      // Step 1: Simulated Payment Success (Pretend payment for $9.88 has been made)
-      console.log(`Payment simulation successful for $${FLASH_SALE_PRICE}. Calling Axiom Fixes Protocol...`);
+      // NOTE: Payment logic is now assumed to be handled externally before this call.
+      console.log(`Payment assumed successful. Calling Axiom Fixes Protocol...`);
 
       // Step 2: Call the validated Axiom Fixes Protocol endpoint
       const response = await fetch(`${API_BASE_URL}/api/fixes/protocol`, {
@@ -63,8 +62,9 @@ function App() {
       </header>
       
       <main>
+        {/* RE-INTRODUCED BANNER WITH CLEAN TEXT */}
         <div className="flash-sale-banner">
-            <h3>✨ 24-HOUR FLASH SALE: PRICE ENDS IN '8' FOR ABUNDANCE FLOW! ✨</h3>
+            <h3>⏳ LIMITED TIME ACCESS: ENFORCE COHERENCE NOW ⚡</h3>
         </div>
         
         {error && <div className="message error">{error}</div>}
@@ -82,9 +82,9 @@ function App() {
             required
           />
           <button type="submit" disabled={loading}>
-            {loading ? 'ENFORCING AXIOM...' : `RUN COHERENCE AUDIT ($${FLASH_SALE_PRICE})`}
+            {loading ? 'ENFORCING AXIOM...' : 'RUN COHERENCE AUDIT (PAID ACCESS)'}
           </button>
-          <p className="small-text">Bypasses login. Proof of concept for immediate revenue stream.</p>
+          <p className="small-text">Prototype feature. Bypasses standard authentication.</p>
         </form>
 
         {auditResult && (
@@ -103,7 +103,7 @@ function App() {
       </main>
       
       <footer>
-        {/* CORRECTED LINE: Public-facing statement */}
+        {/* CORRECT FOOTER WITHOUT REVENUE GOALS */}
         <p>Powered by the Crystalline Engine. Ensuring systemic integrity and avoiding hidden failure costs.</p>
       </footer>
     </div>
