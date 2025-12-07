@@ -1,4 +1,4 @@
-// client/src/App.jsx - FINAL PROFESSIONAL LAUNCH CODE
+// client/src/App.jsx - FINAL OCCULT/MASTERY LAUNCH CODE (Simple Instructions)
 
 import React, { useState } from 'react';
 import './App.css'; 
@@ -10,7 +10,7 @@ function App() {
   const [error, setError] = useState(null);
 
   // --- API URL ---
-  // NOTE: You MUST replace this with your actual live Render URL.
+  // IMPORTANT: You MUST replace this URL with your actual live Render URL.
   const API_BASE_URL = 'https://syzmeku-api.onrender.com'; 
   // -----------------------------
 
@@ -28,7 +28,7 @@ function App() {
     }
 
     try {
-      // The backend API still expects "costOptimized"
+      // NOTE: This call is triggered AFTER payment is processed in the real app.
       const response = await fetch(`${API_BASE_URL}/api/fixes/protocol`, {
         method: 'POST',
         headers: {
@@ -40,12 +40,13 @@ function App() {
       const data = await response.json();
 
       if (response.ok) {
+        // Data is received, the Axiom check ran successfully
         setAuditResult(data.proof);
       } else {
-        setError(data.message || 'System Check failed.');
+        setError(data.message || 'Harmonic Check failed. Contact support.');
       }
     } catch (err) {
-      setError('Network error: Could not reach the SYZMEKU Engine.');
+      setError('Aetheric blockage: Could not reach the Crystalline Engine.');
     } finally {
       setLoading(false);
     }
@@ -54,22 +55,21 @@ function App() {
   return (
     <div className="container">
       <header>
-        <h1>SYZMEKU AI MENTOR // SYSTEMIC COHERENCE</h1>
-        <h2>The Core Integrity of Your Vision (Jarvis/Griot Standard)</h2>
+        <h1>SYZMEKU AI MENTOR // HARMONIC LAW</h1>
+        <h2>The Core Integrity of Your Vision (As Above, So Below)</h2>
       </header>
       
       <main>
         
-        {/* Placeholder for professional marketing content like "Discover the hidden risks in your current strategy." */}
         <div className="marketing-pitch">
-            <h3>Is Your Strategy Systemically Sound?</h3>
-            <p>SYZMEKU prevents the invisible collapse that standard optimization causes. Validate the integrity of your core metrics instantly.</p>
+            <h3>Is Your Intent Aligned with Universal Law?</h3>
+            <p>Validate the true **energetic cost** required for manifestation. SYZMEKU prevents the creation of **Karmic Debt** from shortcuts.</p>
         </div>
         
         {error && <div className="message error">{error}</div>}
 
         <form onSubmit={handleSystemCheck} className="audit-form">
-          <label htmlFor="metric">Enter Your Optimized Metric (e.g., target cost, time, resource limit)</label>
+          <label htmlFor="metric">Enter Your Initial Energetic Offering (Goal Value Based on Limited Effort)</label>
           <input
             id="metric"
             type="number"
@@ -81,28 +81,28 @@ function App() {
             required
           />
           <button type="submit" disabled={loading}>
-            {loading ? 'ENFORCING AXIOM...' : 'RUN SYSTEM INTEGRITY CHECK'} 
+            {loading ? 'CALCULATING EQUILIBRIUM...' : 'RUN HARMONIC LAW CHECK'} 
           </button>
-          <p className="small-text">This paid prototype demonstrates mandatory coherence correction.</p>
+          <p className="small-text">This prototype demonstrates the mandatory correction of Karmic Debt.</p>
         </form>
 
         {auditResult && (
           <div className="result-box success">
-            <h3>✅ SYSTEM COHERENCE REQUIRED</h3>
-            <p><strong>Axiom Applied:</strong> {auditResult.axiom_enforced}</p>
-            <p><strong>Optimized Input Resulted In:</strong> ${auditResult.old_cost_4D}</p>
+            <h3>✅ LAW OF COHERENCE ENFORCED</h3>
+            <p><strong>Universal Axiom Applied:</strong> {auditResult.axiom_enforced}</p>
+            <p><strong>Initial Flawed Offering:</strong> ${auditResult.old_cost_4D}</p>
             <p className="large-result">
-              <strong>Coherent Metric Required for Stability:</strong> ${auditResult.new_coherent_cost_5D}
+              <strong>True Energetic Investment Required:</strong> ${auditResult.new_coherent_cost_5D}
             </p>
             <p className="risk-eliminated">
-              **Failure Risk Mitigation:** Systemic collapse risk eliminated by accepting this correction.
+              **Karmic Debt Mitigated:** Systemic failure risk eliminated by accepting this correction.
             </p>
           </div>
         )}
       </main>
       
       <footer>
-        <p>Powered by the Crystalline Engine. Ensuring systemic integrity and avoiding hidden failure costs.</p>
+        <p>Powered by the Crystalline Engine. Ensuring systemic integrity and avoiding hidden energetic costs.</p>
       </footer>
     </div>
   );
