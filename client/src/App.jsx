@@ -1,4 +1,4 @@
-// client/src/App.jsx - Revised to $9.88 Flash Sale Price
+// client/src/App.jsx - FINAL REVENUE PROTOTYPE CODE
 
 import React, { useState } from 'react';
 import './App.css'; 
@@ -9,8 +9,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // --- REVISED PRICING & URL ---
+  // --- PRICING & URL ---
   const FLASH_SALE_PRICE = '9.88'; // Energetic pricing ending in 8
+  // NOTE: You MUST replace this with your actual live Render URL.
   const API_BASE_URL = 'https://syzmeku-api.onrender.com'; 
   // -----------------------------
 
@@ -53,8 +54,6 @@ function App() {
       setLoading(false);
     }
   };
-
-  const requiredAudits = Math.ceil(2044 / parseFloat(FLASH_SALE_PRICE));
 
   return (
     <div className="container">
@@ -104,7 +103,8 @@ function App() {
       </main>
       
       <footer>
-        <p>Revenue Target: Sell **{requiredAudits}** Audits at ${FLASH_SALE_PRICE} each to hit ${2044} monthly VA compensation on launch night.</p>
+        {/* CORRECTED LINE: Public-facing statement */}
+        <p>Powered by the Crystalline Engine. Ensuring systemic integrity and avoiding hidden failure costs.</p>
       </footer>
     </div>
   );
