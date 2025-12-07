@@ -1,10 +1,10 @@
-// client/src/App.jsx - FINAL REVENUE PROTOTYPE CODE (Banner Restored)
+// client/src/App.jsx - FINAL PROFESSIONAL LAUNCH CODE
 
 import React, { useState } from 'react';
 import './App.css'; 
 
 function App() {
-  const [costOptimized, setCostOptimized] = useState('');
+  const [inputMetric, setInputMetric] = useState('');
   const [auditResult, setAuditResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -14,30 +14,27 @@ function App() {
   const API_BASE_URL = 'https://syzmeku-api.onrender.com'; 
   // -----------------------------
 
-  const handleAudit = async (e) => {
+  const handleSystemCheck = async (e) => {
     e.preventDefault();
     setLoading(true);
     setAuditResult(null);
     setError(null);
 
-    const costValue = parseFloat(costOptimized);
-    if (isNaN(costValue) || costValue <= 0) {
-      setError('Please enter a positive numeric value for the 4D Cost.');
+    const metricValue = parseFloat(inputMetric);
+    if (isNaN(metricValue) || metricValue <= 0) {
+      setError('Please enter a valid numeric value for the metric to be checked.');
       setLoading(false);
       return;
     }
 
     try {
-      // NOTE: Payment logic is now assumed to be handled externally before this call.
-      console.log(`Payment assumed successful. Calling Axiom Fixes Protocol...`);
-
-      // Step 2: Call the validated Axiom Fixes Protocol endpoint
+      // The backend API still expects "costOptimized"
       const response = await fetch(`${API_BASE_URL}/api/fixes/protocol`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ costOptimized: costValue }),
+        body: JSON.stringify({ costOptimized: metricValue }),
       });
 
       const data = await response.json();
@@ -45,7 +42,7 @@ function App() {
       if (response.ok) {
         setAuditResult(data.proof);
       } else {
-        setError(data.message || 'Audit failed due to server error.');
+        setError(data.message || 'System Check failed.');
       }
     } catch (err) {
       setError('Network error: Could not reach the SYZMEKU Engine.');
@@ -57,53 +54,54 @@ function App() {
   return (
     <div className="container">
       <header>
-        <h1>SYZMEKU AI MENTOR // COHERENCE AUDIT</h1>
-        <h2>The Core 5D Axiom Test (Jarvis/Griot Integrity Check)</h2>
+        <h1>SYZMEKU AI MENTOR // SYSTEMIC COHERENCE</h1>
+        <h2>The Core Integrity of Your Vision (Jarvis/Griot Standard)</h2>
       </header>
       
       <main>
-        {/* RE-INTRODUCED BANNER WITH CLEAN TEXT */}
-        <div className="flash-sale-banner">
-            <h3>⏳ LIMITED TIME ACCESS: ENFORCE COHERENCE NOW ⚡</h3>
+        
+        {/* Placeholder for professional marketing content like "Discover the hidden risks in your current strategy." */}
+        <div className="marketing-pitch">
+            <h3>Is Your Strategy Systemically Sound?</h3>
+            <p>SYZMEKU prevents the invisible collapse that standard optimization causes. Validate the integrity of your core metrics instantly.</p>
         </div>
         
         {error && <div className="message error">{error}</div>}
 
-        <form onSubmit={handleAudit} className="audit-form">
-          <label htmlFor="cost">Enter Your 4D Optimized Cost/Metric (e.g., 2777777.78)</label>
+        <form onSubmit={handleSystemCheck} className="audit-form">
+          <label htmlFor="metric">Enter Your Optimized Metric (e.g., target cost, time, resource limit)</label>
           <input
-            id="cost"
+            id="metric"
             type="number"
             step="0.01"
-            value={costOptimized}
-            onChange={(e) => setCostOptimized(e.target.value)}
+            value={inputMetric}
+            onChange={(e) => setInputMetric(e.target.value)}
             placeholder="e.g., 2777777.78"
             disabled={loading}
             required
           />
           <button type="submit" disabled={loading}>
-            {loading ? 'ENFORCING AXIOM...' : 'RUN COHERENCE AUDIT (PAID ACCESS)'}
+            {loading ? 'ENFORCING AXIOM...' : 'RUN SYSTEM INTEGRITY CHECK'} 
           </button>
-          <p className="small-text">Prototype feature. Bypasses standard authentication.</p>
+          <p className="small-text">This paid prototype demonstrates mandatory coherence correction.</p>
         </form>
 
         {auditResult && (
           <div className="result-box success">
-            <h3>✅ AXIOM ENFORCEMENT SUCCESSFUL</h3>
-            <p><strong>Axiom Applied:</strong> {auditResult.axiom_enforced} (Steward Archetype)</p>
-            <p><strong>4D Flawed Input:</strong> ${auditResult.old_cost_4D}</p>
+            <h3>✅ SYSTEM COHERENCE REQUIRED</h3>
+            <p><strong>Axiom Applied:</strong> {auditResult.axiom_enforced}</p>
+            <p><strong>Optimized Input Resulted In:</strong> ${auditResult.old_cost_4D}</p>
             <p className="large-result">
-              <strong>5D Coherent Metric Required:</strong> ${auditResult.new_coherent_cost_5D}
+              <strong>Coherent Metric Required for Stability:</strong> ${auditResult.new_coherent_cost_5D}
             </p>
             <p className="risk-eliminated">
-              **Systemic Risk Eliminated:** {auditResult.risk_eliminated} (by accepting ${auditResult.cost_increase_amount})
+              **Failure Risk Mitigation:** Systemic collapse risk eliminated by accepting this correction.
             </p>
           </div>
         )}
       </main>
       
       <footer>
-        {/* CORRECT FOOTER WITHOUT REVENUE GOALS */}
         <p>Powered by the Crystalline Engine. Ensuring systemic integrity and avoiding hidden failure costs.</p>
       </footer>
     </div>
