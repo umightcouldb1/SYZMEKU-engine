@@ -1,18 +1,15 @@
 // SYZMEKU AI MENTOR // Client Application Entry Point (App.jsx)
-// FINAL VERSION: Corrected input type to 'text' AND fixed JSX syntax error.
+// FINAL VERSION: Corrected input type to 'text' AND removed dollar amount placeholder.
 
 import React, { useState } from 'react';
-import './App.css'; // Assuming standard CSS import
+import './App.css'; 
 
-// Component for the Audit Form (Simulated for replacement)
+// Component for the Audit Form 
 const AxiomAuditForm = () => {
     const [goalMetric, setGoalMetric] = useState('');
     const [loading, setLoading] = useState(false);
     const [auditResult, setAuditResult] = useState(null);
     const [error, setError] = useState(null);
-
-    // Placeholder for your live Render API URL
-    const API_ENDPOINT = 'https://syzmeku-api.onrender.com/api/payment/audit-checkout';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -29,14 +26,17 @@ const AxiomAuditForm = () => {
         try {
             console.log("Goal Metric submitted (as text):", goalMetric);
             
-            // Simulate success
+            // Simulating API call for audit proof
+            
+            // Simulate success and display result based on the text input
             setAuditResult({
                 initial_flawed_offering: goalMetric,
-                true_energetic_investment_required: "5D Target (e.g., $3,277,777.78)"
+                // >>> CRITICAL FIX: Changed the dollar placeholder to a qualitative one <<<
+                true_energetic_investment_required: "Full Dimensional Resource Commitment (e.g., 7 Years/3 Phases)"
             });
             
         } catch (err) {
-            setError("An error occurred. Check server logs.");
+            setError("Aetheric Blockage: Cannot execute audit.");
         } finally {
             setLoading(false);
         }
@@ -59,7 +59,7 @@ const AxiomAuditForm = () => {
                 
                 <input 
                     id="goal-metric"
-                    type="text" // Corrected to allow text input
+                    type="text" 
                     value={goalMetric}
                     onChange={(e) => setGoalMetric(e.target.value)}
                     placeholder="e.g., Reduce Burnout by 10 hours/week" 
@@ -76,7 +76,6 @@ const AxiomAuditForm = () => {
             {auditResult && (
                 <div className="result-box">
                     <h4>✅ KETSURON COMPLETE: HARMONIC LAW ENFORCED</h4>
-                    {/* >>> CRITICAL FIX: Removed the invalid LaTeX/math notation ($, \text) <<< */}
                     <p><strong>Initial 4D Input:</strong> {auditResult.initial_flawed_offering}</p>
                     <p className="required-investment">
                         <strong>Non-Collapsible Target:</strong> {auditResult.true_energetic_investment_required}
