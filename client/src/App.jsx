@@ -1,5 +1,5 @@
 // SYZMEKU AI MENTOR // Client Application Entry Point (App.jsx)
-// This file renders the main component, correcting the input type to "text".
+// FINAL VERSION: Corrected input type to 'text' AND fixed JSX syntax error.
 
 import React, { useState } from 'react';
 import './App.css'; // Assuming standard CSS import
@@ -26,16 +26,8 @@ const AxiomAuditForm = () => {
             return;
         }
 
-        // --- Payment/API Integration Placeholder ---
-        // In the final integrated system, this form is replaced by the UENI embed.
-        // This component fix is for when the Render URL is accessed directly.
-
         try {
             console.log("Goal Metric submitted (as text):", goalMetric);
-            
-            // Simulating API call for audit proof
-            // In the live system, the UENI embed handles the payment and sends the metric/token.
-            // This is simply to show the text input is now possible.
             
             // Simulate success
             setAuditResult({
@@ -65,7 +57,6 @@ const AxiomAuditForm = () => {
                     Enter Your Optimized Goal Metric (e.g., Target Cost, Time, or Resource Limit)
                 </label>
                 
-                {/* >>> CRUCIAL FIX: Input type changed from "number" to "text" <<< */}
                 <input 
                     id="goal-metric"
                     type="text" // Corrected to allow text input
@@ -85,7 +76,8 @@ const AxiomAuditForm = () => {
             {auditResult && (
                 <div className="result-box">
                     <h4>✅ KETSURON COMPLETE: HARMONIC LAW ENFORCED</h4>
-                    <p><strong>Initial $\text{4D}$ Input:</strong> {auditResult.initial_flawed_offering}</p>
+                    {/* >>> CRITICAL FIX: Removed the invalid LaTeX/math notation ($, \text) <<< */}
+                    <p><strong>Initial 4D Input:</strong> {auditResult.initial_flawed_offering}</p>
                     <p className="required-investment">
                         <strong>Non-Collapsible Target:</strong> {auditResult.true_energetic_investment_required}
                     </p>
