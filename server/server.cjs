@@ -27,19 +27,13 @@ const distPath = path.resolve(__dirname, '../client/dist');
 app.use(express.static(distPath));
 
 // API Routes
-let routesPath;
 try {
-  const routes = require(path.resolve(__dirname, 'routes/index.js'));
-  app.use('/api', routes);
+  const routesPath = path.resolve(__dirname, 'routes/index.js');
+  app.use('/api', require(routesPath));
   console.log('API PATHWAYS ESTABLISHED');
 } catch (err) {
   console.error('CRITICAL: API blueprints missing from server/routes/');
-  try {
-    app.use('/api/auth', require(path.resolve(__dirname, 'routes/authRoutes')));
-    console.log('API PATHWAYS ESTABLISHED (AUTH FALLBACK)');
-  } catch (fallbackError) {
-    console.error('CRITICAL: Auth routes missing from server/routes/');
-  }
+  app.use('/api/auth', require(path.resolve(__dirname, 'routes/authRoutes')));
 }
 
 // Catch-all to serve React UI

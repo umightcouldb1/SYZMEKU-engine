@@ -4,11 +4,12 @@ import AuthScreen from './AuthScreen';
 import Dashboard from './Dashboard';
 
 function App() {
-  const auth = useSelector((state) => state.auth || {});
-  const { user, isLoading } = auth;
+  const auth = useSelector((state) => state.auth) || {};
+  const user = auth.user || null;
+  const isLoading = auth.isLoading || false;
 
   if (isLoading) {
-    return <div style={{ color: 'gold', padding: '20px' }}>Loading Engine...</div>;
+    return <div className="loading-screen">BEGINNING ASCENSION...</div>;
   }
 
   return (
