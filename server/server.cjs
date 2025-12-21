@@ -23,21 +23,17 @@ app.use(express.json());
 app.use(cors());
 
 // Serve static assets from the client/dist folder
-const distPath = path.join(__dirname, '../client/dist');
+const distPath = path.resolve(__dirname, '../client/dist');
 app.use(express.static(distPath));
 
 // API Routes
 let routesPath;
 try {
-  const routesPath = path.resolve(__dirname, 'routes/index.js');
-  app.use('/api', require(routesPath));
+  const routes = require(path.resolve(__dirname, 'routes/index.js'));
+  app.use('/api', routes);
+  console.log('API PATHWAYS ESTABLISHED');
 } catch (err) {
-  try {
-    app.use('/api/auth', require(path.resolve(__dirname, 'routes/authRoutes')));
-    console.log('API ROUTES LOADED MANUALLY');
-  } catch (fallbackErr) {
-    console.warn('CRITICAL: API Route files missing from server/routes/');
-  }
+  console.error('CRITICAL: API blueprints missing from server/routes/');
 }
 
 // Catch-all to serve React UI
