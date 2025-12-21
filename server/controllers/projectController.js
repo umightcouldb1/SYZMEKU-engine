@@ -1,24 +1,61 @@
-// --- FILE: server/controllers/projectController.js (Placeholder) ---
-// Note: These functions use an async wrapper since they will interact with Mongoose/MongoDB
+const Project = require('../models/Project');
 
+// @desc    Get all projects for the authenticated operative
 const getProjects = async (req, res) => {
-    res.status(200).json({ message: 'Placeholder for fetching projects' });
+    const projects = await Project.find({ owner: req.user._id });
+    res.status(200).json(projects);
 };
 
+// @desc    Get a single project for the authenticated operative
 const getProject = async (req, res) => {
-    res.status(200).json({ message: `Placeholder for fetching project ${req.params.id}` });
+    const project = await Project.findOne({ _id: req.params.id, owner: req.user._id });
+
+    if (!project) {
+        return res.status(404).json({ message: 'Project not found.' });
+    }
+
+    res.status(200).json(project);
 };
 
+// @desc    Create a new project entry
 const createProject = async (req, res) => {
-    res.status(201).json({ message: 'Placeholder for creating a new project' });
+    const { title } = req.body;
+    if (!title) {
+        return res.status(400).json({ message: 'Title required.' });
+    }
+
+    const project = await Project.create({
+        title,
+        owner: req.user._id,
+        status: 'ACTIVE',
+    });
+    res.status(201).json(project);
 };
 
+// @desc    Update a project entry
 const updateProject = async (req, res) => {
-    res.status(200).json({ message: `Placeholder for updating project ${req.params.id}` });
+    const project = await Project.findOneAndUpdate(
+        { _id: req.params.id, owner: req.user._id },
+        req.body,
+        { new: true, runValidators: true }
+    );
+
+    if (!project) {
+        return res.status(404).json({ message: 'Project not found.' });
+    }
+
+    res.status(200).json(project);
 };
 
+// @desc    Delete a project entry
 const deleteProject = async (req, res) => {
-    res.status(200).json({ message: `Placeholder for deleting project ${req.params.id}` });
+    const project = await Project.findOneAndDelete({ _id: req.params.id, owner: req.user._id });
+
+    if (!project) {
+        return res.status(404).json({ message: 'Project not found.' });
+    }
+
+    res.status(200).json({ message: 'Project removed.' });
 };
 
 module.exports = {
