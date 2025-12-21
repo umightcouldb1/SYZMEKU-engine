@@ -53,10 +53,12 @@ body {
 }
 
 h1 {
+  font-family: 'Space Mono', monospace;
   font-size: 1.5rem;
-  letter-spacing: 0.5rem;
+  letter-spacing: 8px;
   margin-bottom: 30px;
-  text-shadow: 0 0 15px var(--atlantean-gold);
+  color: #ffd700;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
 }
 
 input {
@@ -74,13 +76,15 @@ input {
   width: 100%;
   padding: 15px;
   margin-top: 30px;
-  background: rgba(255, 215, 0, 0.05) !important;
+  background: rgba(0, 0, 0, 0.9) !important;
   color: #ffd700 !important;
-  border: 1px solid #ffd700 !important;
-  font-family: 'Space Mono', monospace;
-  letter-spacing: 4px;
+  border: 1px solid rgba(255, 215, 0, 0.6) !important;
+  font-family: 'Space Mono', monospace !important;
+  text-transform: uppercase;
+  letter-spacing: 6px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
   position: relative;
   overflow: hidden;
   box-shadow: 0 0 15px rgba(255, 215, 0, 0.1);
@@ -89,7 +93,7 @@ input {
 .sovereign-button:hover {
   background: #ffd700 !important;
   color: #000 !important;
-  box-shadow: 0 0 30px #ffd700;
+  box-shadow: 0 0 50px rgba(255, 215, 0, 0.8);
 }
 
 .sovereign-button::after {
