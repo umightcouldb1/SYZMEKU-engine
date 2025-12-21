@@ -27,6 +27,7 @@ const distPath = path.join(__dirname, '../client/dist');
 app.use(express.static(distPath));
 
 // API Routes
+let routesPath;
 try {
   const routesPath = path.resolve(__dirname, 'routes/index.js');
   app.use('/api', require(routesPath));
