@@ -24,7 +24,7 @@ const AuthScreen = () => {
     resizeCanvas();
 
     const characters =
-      'ᚙᚚ᚛᚜☖☗☰☱☲☳☴☵☶☷☸♈♉♊♋♌♍♎♏♐♑♒♓♔♕♖♗♘♙♚♛♜♝♞♟';
+      'ᚙᚚ᚛᚜☖☗☰☱☲☳☴☵☶☷☸♔♕♖♗♘♙♚♛♜♝♞♟✚✙✛✜✟✠✡✢✣✤✥';
     const charArray = characters.split('');
     const fontSize = 16;
     const columns = Math.floor(canvas.width / fontSize);
@@ -41,14 +41,14 @@ const AuthScreen = () => {
         const text = charArray[Math.floor(Math.random() * charArray.length)];
         ctx.fillText(text, i * fontSize, drops[i] * fontSize);
 
-        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.99) {
           drops[i] = 0;
         }
         drops[i] += 1;
       }
     };
 
-    const interval = setInterval(draw, 33);
+    const interval = setInterval(draw, 65);
     window.addEventListener('resize', resizeCanvas);
 
     return () => {
