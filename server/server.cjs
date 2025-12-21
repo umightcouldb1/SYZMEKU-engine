@@ -2,51 +2,12 @@ const express = require('express');
 const path = require('path');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const connectDB = require('./configure/db');
-const { errorHandler } = require('./middleware/errorMiddleware');
-
-// Load environment variables
-dotenv.config();
-
-// Connect to the Memory Grid (MongoDB)
-connectDB();
-
-const app = express();
-
-// Middleware
-app.use(express.json());
-app.use(cors());
-
-// API Routes
-app.use(require('./routes'));
-
-// --- PRODUCTION SERVING LOGIC (THE WHITE SCREEN FIX) ---
-
-// 1. Point to the compiled React assets
-const distPath = path.join(path.resolve(), 'client/dist');
-app.use(express.static(distPath));
-
-// 2. The Catch-All: Serve index.html for any non-API route
-app.get('*', (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
-});
-
-// --- END PRODUCTION LOGIC ---
-
-// Sovereign Error Handling
-app.use(errorHandler);
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`SYZMEKU ENGINE ACTIVE ON PORT ${PORT}`));
 const mongoose = require('mongoose');
 
-// Load secrets from Render environment
+// Load Sovereign Secrets
 dotenv.config();
 
-const app = express();
-
-// --- INTERNAL DATABASE CONNECTION ---
-// This bypasses the missing './config/db' file error
+// Ignite Memory Grid (Database)
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
@@ -58,22 +19,28 @@ const connectDB = async () => {
 };
 connectDB();
 
+// Initialize Engine (ONLY ONCE)
+const app = express();
+
 app.use(express.json());
 app.use(cors());
 
-// --- PRODUCTION SERVING LOGIC (THE WHITE SCREEN FIX) ---
-// Serve the static files from the React dist folder
-const __dirname_path = path.resolve();
-const distPath = path.join(__dirname_path, 'client/dist');
+// --- PRODUCTION BRIDGE (The White Screen Fix) ---
+const distPath = path.join(path.resolve(), 'client/dist');
 app.use(express.static(distPath));
 
 // API Routes
-app.use('/api/auth', require('./routes/authRoutes'));
+try {
+  app.use('/api', require('./routes'));
+} catch (e) {
+  console.warn('WARNING: API routes loading in limited mode.');
+}
 
-// The Catch-All: Serve index.html for any request that isn't an API
+// Catch-All: Directs all web traffic to the React interface
 app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
+// Start Sovereign Service
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`SYZMEKU ENGINE ACTIVE ON ${PORT}`));
