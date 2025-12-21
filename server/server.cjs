@@ -30,10 +30,12 @@ const distPath = path.join(path.resolve(), 'client/dist');
 app.use(express.static(distPath));
 
 // API Routes
+let routesPath;
 try {
-  app.use('/api', require('./routes'));
+  routesPath = path.resolve(__dirname, './routes/index.js');
+  app.use('/api', require(routesPath));
 } catch (e) {
-  console.warn('WARNING: API routes loading in limited mode.');
+  console.error('CRITICAL: Routes not found at', routesPath);
 }
 
 // Catch-All: Directs all web traffic to the React interface
