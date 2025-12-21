@@ -1,7 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const AuthScreen = () => {
   const canvasRef = useRef(null);
+  const [buttonText, setButtonText] = useState('INITIATE ASCENSION');
+  const [titleText, setTitleText] = useState('SYZMEKU ENGINE');
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -21,7 +23,8 @@ const AuthScreen = () => {
 
     resizeCanvas();
 
-    const characters = 'ΔΘΛΞΠΣΦΨΩαβγδεζηθικλμνξοπρστυφχψω0123456789';
+    const characters =
+      'ᚐᚑᚒᚓᚔᚕᚖᚗᚘᚙᚚ᚛᚜☖☗☙☚☛☜☝☞☟☠☡☢☣☤☥☦☧☨☩☪☫☬☭☮☯☰☱☲☳☴☵☶☷☸☹☺☻☼☽☾☿♀♁♂♃♄♅♆♇♈♉♊♋♌♍♎♏♐♑♒♓♔♕♖♗♘♙♚♛♜♝♞♟';
     const charArray = characters.split('');
     const fontSize = 16;
     const columns = Math.floor(canvas.width / fontSize);
@@ -31,8 +34,8 @@ const AuthScreen = () => {
       ctx.fillStyle = 'rgba(5, 5, 15, 0.05)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.fillStyle = '#ffd700';
-      ctx.font = `${fontSize}px serif`;
+      ctx.fillStyle = '#FFD700';
+      ctx.font = `${fontSize}px "Space Mono", monospace`;
 
       for (let i = 0; i < drops.length; i += 1) {
         const text = charArray[Math.floor(Math.random() * charArray.length)];
@@ -54,14 +57,50 @@ const AuthScreen = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const scripts = {
+      english: 'INITIATE ASCENSION',
+      atlantean: 'ᚐᚑᚒᚓᚔᚕᚖᚗᚘᚙᚚ',
+      aurebesh: 'ᔓᔗᔘᔙᔚᔛᔜᔝᔞᔟ',
+    };
+    const keys = Object.keys(scripts);
+    let i = 0;
+
+    const interval = setInterval(() => {
+      i = (i + 1) % keys.length;
+      setButtonText(scripts[keys[i]]);
+    }, 800);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const scripts = {
+      english: 'SYZMEKU ENGINE',
+      atlantean: 'ᚐᚑᚒᚓᚔᚕᚖᚗᚘᚙᚚ',
+      aurebesh: 'ᔓᔗᔘᔙᔚᔛᔜᔝᔞᔟ',
+    };
+    const keys = Object.keys(scripts);
+    let i = 0;
+
+    const interval = setInterval(() => {
+      i = (i + 1) % keys.length;
+      setTitleText(scripts[keys[i]]);
+    }, 800);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="access-portal">
       <canvas id="atlantean-bg" ref={canvasRef} />
       <div className="login-card">
-        <h1>ACCESS PROTOCOL</h1>
+        <h1 className="glitch-text">{titleText}</h1>
         <input type="email" placeholder="IDENTIFIER" />
         <input type="password" placeholder="SECURITY KEY" />
-        <button type="button">INITIATE ASCENSION</button>
+        <button className="sovereign-button" type="button">
+          {buttonText}
+        </button>
       </div>
     </div>
   );

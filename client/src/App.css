@@ -36,13 +36,19 @@ body {
 }
 
 .login-card {
-  background: rgba(0, 5, 15, 0.85);
-  backdrop-filter: blur(20px);
-  border: 2px solid var(--atlantean-gold);
-  padding: 40px;
-  border-radius: 2px; /* Sharp, monolith edges */
-  box-shadow: 0 0 50px var(--power-glow), inset 0 0 20px rgba(0, 242, 255, 0.1);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(25px) saturate(180%);
+  -webkit-backdrop-filter: blur(25px) saturate(180%);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  box-shadow:
+    0 0 40px rgba(0, 0, 0, 0.5),
+    inset 0 0 20px rgba(255, 215, 0, 0.1);
+  padding: 60px;
+  border-radius: 0;
+  width: 100%;
+  max-width: 500px;
   text-align: center;
+  position: relative;
   z-index: 10;
 }
 
@@ -64,19 +70,60 @@ input {
   font-family: inherit;
 }
 
-button {
+.sovereign-button {
+  width: 100%;
+  padding: 15px;
   margin-top: 30px;
-  background: transparent !important;
-  color: var(--atlantean-gold) !important;
-  border: 1px solid var(--atlantean-gold) !important;
-  padding: 12px 30px;
+  background: rgba(255, 215, 0, 0.05) !important;
+  color: #ffd700 !important;
+  border: 1px solid #ffd700 !important;
+  font-family: 'Space Mono', monospace;
+  letter-spacing: 4px;
   cursor: pointer;
-  transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
-  letter-spacing: 3px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.1);
 }
 
-button:hover {
-  background: var(--atlantean-gold) !important;
-  color: black !important;
-  box-shadow: 0 0 30px var(--atlantean-gold);
+.sovereign-button:hover {
+  background: #ffd700 !important;
+  color: #000 !important;
+  box-shadow: 0 0 30px #ffd700;
+}
+
+.sovereign-button::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(rgba(255, 215, 0, 0), rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0));
+  transform: rotate(45deg);
+  animation: sweep 4s infinite;
+}
+
+.login-card::before {
+  content: ' ';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background:
+    linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+    linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes sweep {
+  0% {
+    transform: translate(-100%, -100%) rotate(45deg);
+  }
+  100% {
+    transform: translate(100%, 100%) rotate(45deg);
+  }
 }
