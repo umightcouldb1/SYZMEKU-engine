@@ -1,33 +1,55 @@
-// --- FILE: server/controllers/authController.js (Placeholder) ---
-// We will replace this with real logic later when we focus on user API
+// File: server/controllers/auth controller.js
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
+// @desc    Register new operative
+// @route   POST /api/auth/signup
 const registerUser = async (req, res) => {
-    // This is the placeholder response. We'll add the Mongoose logic later.
-    res.status(201).json({ 
-        _id: '12345', 
-        name: 'Placeholder User',
-        email: req.body.email,
-        token: 'placeholder-token-123',
+    const { username, email, password } = req.body;
+    
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+        return res.status(400).json({ message: 'Operative already exists.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const user = await User.create({
+        name: username,
+        email,
+        password: hashedPassword,
     });
+
+    if (user) {
+        res.status(201).json({
+            _id: user._id,
+            username: user.name,
+            email: user.email,
+            token: jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' }),
+        });
+    } else {
+        res.status(400).json({ message: 'Invalid operative data.' });
+    }
 };
 
+// @desc    Authenticate operative
+// @route   POST /api/auth/login
 const loginUser = async (req, res) => {
-    // This is the placeholder response. We'll add the Mongoose logic later.
-    res.status(200).json({ 
-        _id: '12345', 
-        name: 'Placeholder User',
-        email: req.body.email,
-        token: 'placeholder-token-123',
-    });
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+
+    if (user && (await bcrypt.compare(password, user.password))) {
+        res.json({
+            _id: user._id,
+            username: user.name,
+            email: user.email,
+            token: jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' }),
+        });
+    } else {
+        res.status(401).json({ message: 'Access Denied: Invalid credentials.' });
+    }
 };
 
-const getMe = async (req, res) => {
-    // This is the placeholder response. We'll add the Mongoose logic later.
-    res.status(200).json(req.user);
-};
-
-module.exports = {
-    registerUser,
-    loginUser,
-    getMe,
-};
+module.exports = { registerUser, loginUser };
