@@ -23,6 +23,9 @@ if (!rootElement) {
           <App />
         </Provider>
       </ErrorBoundary>
+      <Provider store={store}>
+        <App />
+      </Provider>
     </React.StrictMode>,
   );
 }
