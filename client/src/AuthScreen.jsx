@@ -24,7 +24,7 @@ const AuthScreen = () => {
     resizeCanvas();
 
     const characters =
-      'ᚙᚚ᚛᚜☖☗☰☱☲☳☴☵☶☷☸♔♕♖♗♘♙♚♛♜♝♞♟✚✙✛✜✟✠✡✢✣✤✥';
+      'ᚙᚚ᚛᚜☖☗☰☱☲☳☴☵☶☷☸♔♕♖♗♘♙♚♛♜♝♞♟✚✙✛✜✟✠✢✣✤✥';
     const charArray = characters.split('');
     const fontSize = 16;
     const columns = Math.floor(canvas.width / fontSize);
