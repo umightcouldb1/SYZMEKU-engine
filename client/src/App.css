@@ -1,156 +1,129 @@
-/* client/src/App.css - Final Styles for Self-Mastery Platform */
-
+/* SOVEREIGN ATLANTEAN INTERFACE 2026 */
 :root {
-    --color-primary: #8b5cf6; /* Purple/Violet for spirituality/mastery */
-    --color-secondary: #fcd34d; /* Gold/Yellow for energetic abundance */
-    --color-background: #0f172a; /* Deep Dark Blue/Indigo */
-    --color-text: #f8fafc; /* Near-White */
-    --color-error: #ef4444; /* Red */
-    --color-success: #10b981; /* Green */
+  --atlantean-gold: #ffd700;
+  --deep-ocean: #0a0a1a;
+  --phosphor-cyan: #00f2ff;
+  --power-glow: rgba(255, 215, 0, 0.3);
 }
 
 body {
-    background-color: var(--color-background);
-    color: var(--color-text);
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    margin: 0;
+  margin: 0;
+  background-color: var(--deep-ocean);
+  color: var(--atlantean-gold);
+  font-family: 'Space Mono', monospace;
+  overflow: hidden;
+  height: 100vh;
 }
 
-.container {
-    background: #1e293b; 
-    padding: 30px 40px;
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
-    max-width: 500px;
-    width: 90%;
-    text-align: center;
-    border: 2px solid var(--color-primary);
+/* Background "Rain" Container */
+#atlantean-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  opacity: 0.15; /* Subtle background depth */
+  pointer-events: none;
 }
 
-header h1 {
-    color: var(--color-primary);
-    font-size: 1.8em;
-    margin-bottom: 5px;
+.access-portal {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: radial-gradient(circle, rgba(10, 30, 60, 0.5) 0%, rgba(5, 5, 5, 1) 100%);
 }
 
-header h2 {
-    color: var(--color-secondary);
-    font-size: 1em;
-    font-weight: 300;
-    margin-bottom: 20px;
+.login-card {
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(25px) saturate(180%);
+  -webkit-backdrop-filter: blur(25px) saturate(180%);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  box-shadow:
+    0 0 40px rgba(0, 0, 0, 0.5),
+    inset 0 0 20px rgba(255, 215, 0, 0.1);
+  padding: 60px;
+  border-radius: 0;
+  width: 100%;
+  max-width: 500px;
+  text-align: center;
+  position: relative;
+  z-index: 10;
 }
 
-.marketing-pitch {
-    background: #334155;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-}
-.marketing-pitch h3 {
-    color: var(--color-secondary);
-    margin: 0 0 5px 0;
-}
-.marketing-pitch p {
-    font-size: 0.9em;
-    color: #cbd5e1;
+h1 {
+  font-size: 1.5rem;
+  letter-spacing: 0.5rem;
+  margin-bottom: 30px;
+  text-shadow: 0 0 15px var(--atlantean-gold);
 }
 
-/* Form Styles */
-.audit-form label {
-    display: block;
-    text-align: left;
-    margin-bottom: 8px;
-    color: var(--color-text);
-    font-weight: bold;
-    font-size: 0.9em;
+input {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--atlantean-gold) !important;
+  color: white !important;
+  margin: 15px 0;
+  padding: 10px;
+  width: 100%;
+  font-family: inherit;
 }
 
-.audit-form input[type="number"] {
-    width: 100%;
-    padding: 12px;
-    margin-bottom: 20px;
-    background: #475569; 
-    border: 1px solid #64748b;
-    border-radius: 6px;
-    color: var(--color-text);
-    box-sizing: border-box;
-    font-size: 1em;
+.sovereign-button {
+  width: 100%;
+  padding: 15px;
+  margin-top: 30px;
+  background: rgba(255, 215, 0, 0.05) !important;
+  color: #ffd700 !important;
+  border: 1px solid #ffd700 !important;
+  font-family: 'Space Mono', monospace;
+  letter-spacing: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.1);
 }
 
-.audit-form button {
-    width: 100%;
-    padding: 12px;
-    background-color: var(--color-primary);
-    color: var(--color-text);
-    border: none;
-    border-radius: 6px;
-    font-size: 1.1em;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.2s;
+.sovereign-button:hover {
+  background: #ffd700 !important;
+  color: #000 !important;
+  box-shadow: 0 0 30px #ffd700;
 }
 
-.audit-form button:hover:not(:disabled) {
-    background-color: #a78bfa;
+.sovereign-button::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(rgba(255, 215, 0, 0), rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0));
+  transform: rotate(45deg);
+  animation: sweep 4s infinite;
 }
 
-.audit-form button:disabled {
-    background-color: #6b7280;
-    cursor: not-allowed;
+.login-card::before {
+  content: ' ';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background:
+    linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+    linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+  z-index: 2;
 }
 
-/* Result and Message Styles */
-.message {
-    padding: 15px;
-    border-radius: 6px;
-    margin-bottom: 20px;
-    font-weight: bold;
-}
-
-.error {
-    background-color: rgba(239, 68, 68, 0.2);
-    color: var(--color-error);
-    border: 1px solid var(--color-error);
-}
-
-.result-box {
-    margin-top: 30px;
-    padding: 20px;
-    border-radius: 8px;
-    text-align: left;
-    border: 2px solid var(--color-success);
-    background-color: rgba(16, 185, 129, 0.1);
-}
-
-.result-box h3 {
-    color: var(--color-success);
-    margin-top: 0;
-    border-bottom: 1px dashed #4b5563;
-    padding-bottom: 10px;
-    margin-bottom: 15px;
-}
-
-.large-result {
-    font-size: 1.3em;
-    font-weight: bold;
-    color: var(--color-secondary);
-    margin: 10px 0;
-}
-
-.risk-eliminated {
-    color: var(--color-text);
-    font-style: italic;
-    margin-top: 15px;
-}
-
-footer {
-    margin-top: 20px;
-    padding-top: 15px;
-    border-top: 1px solid #374151;
-    font-size: 0.8em;
-    color: #9ca3af;
+@keyframes sweep {
+  0% {
+    transform: translate(-100%, -100%) rotate(45deg);
+  }
+  100% {
+    transform: translate(100%, 100%) rotate(45deg);
+  }
 }

@@ -4,10 +4,10 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const mongoose = require('mongoose');
 
-// Load Sovereign Secrets
 dotenv.config();
 
-// Ignite Memory Grid (Database)
+const app = express();
+
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
@@ -19,28 +19,27 @@ const connectDB = async () => {
 };
 connectDB();
 
-// Initialize Engine (ONLY ONCE)
-const app = express();
-
 app.use(express.json());
 app.use(cors());
 
-// --- PRODUCTION BRIDGE (The White Screen Fix) ---
-const distPath = path.join(path.resolve(), 'client/dist');
+// Serve static assets from the client/dist folder
+const distPath = path.resolve(__dirname, '../client/dist');
 app.use(express.static(distPath));
 
 // API Routes
 try {
-  app.use('/api', require('./routes'));
-} catch (e) {
-  console.warn('WARNING: API routes loading in limited mode.');
+  const routes = require(path.resolve(__dirname, 'routes/index.js'));
+  app.use('/api', routes);
+  console.log('API PATHWAYS ESTABLISHED');
+} catch (err) {
+  console.error('CRITICAL: API blueprints missing from server/routes/');
 }
 
-// Catch-All: Directs all web traffic to the React interface
+// Catch-all to serve React UI
 app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
 // Start Sovereign Service
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`SYZMEKU ENGINE ACTIVE ON ${PORT}`));

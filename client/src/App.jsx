@@ -5,15 +5,16 @@ import Dashboard from './Dashboard';
 import './App.css';
 
 function App() {
-  const { user } = useSelector((state) => state.auth);
+  const auth = useSelector((state) => state.auth || {});
+  const { user, isLoading } = auth;
+
+  if (isLoading) {
+    return <div style={{ color: 'gold', padding: '20px' }}>Loading Engine...</div>;
+  }
 
   return (
     <div className="App">
-      {!user ? (
-        <AuthScreen />
-      ) : (
-        <Dashboard />
-      )}
+      {!user ? <AuthScreen /> : <Dashboard />}
     </div>
   );
 }
