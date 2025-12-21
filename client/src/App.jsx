@@ -5,7 +5,8 @@ import Dashboard from './Dashboard';
 import './App.css';
 
 function App() {
-  const { user } = useSelector((state) => state.auth);
+  const auth = useSelector((state) => state.auth || {});
+  const user = auth.user;
 
   return (
     <div className="App">
