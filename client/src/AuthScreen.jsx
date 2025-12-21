@@ -1,78 +1,67 @@
-// File: client/src/AuthScreen.jsx
-import React, { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { login, register, reset } from './features/auth/authSlice';
+import React, { useEffect, useRef } from 'react';
 
 const AuthScreen = () => {
-  const [isLogin, setIsLogin] = useState(true); 
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-
-  const { user, isLoading, isError, isSuccess, message } = useSelector(
-    (state) => state.auth
-  );
+  const canvasRef = useRef(null);
 
   useEffect(() => {
-    if (isSuccess || user) {
-        navigate('/dashboard');
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return undefined;
     }
-    dispatch(reset());
-  }, [user, isSuccess, navigate, dispatch]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const userData = { username, email, password };
-    if (isLogin) {
-      dispatch(login({ email, password }));
-    } else {
-      dispatch(register(userData));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return undefined;
     }
-  };
+
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+
+    resizeCanvas();
+
+    const characters = 'ΔΘΛΞΠΣΦΨΩαβγδεζηθικλμνξοπρστυφχψω0123456789';
+    const charArray = characters.split('');
+    const fontSize = 16;
+    const columns = Math.floor(canvas.width / fontSize);
+    const drops = Array.from({ length: columns }, () => 1);
+
+    const draw = () => {
+      ctx.fillStyle = 'rgba(5, 5, 15, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#ffd700';
+      ctx.font = `${fontSize}px serif`;
+
+      for (let i = 0; i < drops.length; i += 1) {
+        const text = charArray[Math.floor(Math.random() * charArray.length)];
+        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+        drops[i] += 1;
+      }
+    };
+
+    const interval = setInterval(draw, 33);
+    window.addEventListener('resize', resizeCanvas);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('resize', resizeCanvas);
+    };
+  }, []);
 
   return (
-    <div className="auth-container">
-      <div className="main-header">
-        <h1>SYZMEKU ENGINE // ACCESS PROTOCOL</h1>
-      </div>
-      <div className="auth-form-panel">
-        <h2 className="panel-title">{isLogin ? 'SECURE LOGIN' : 'NEW REGISTRATION'}</h2>
-        <form onSubmit={handleSubmit} className="auth-form">
-          {!isLogin && (
-            <input
-              type="text"
-              placeholder="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          )}
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Security Key"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <button type="submit" disabled={isLoading}>
-            {isLoading ? 'PROCESSING...' : (isLogin ? 'INITIATE LOGIN' : 'REGISTER')}
-          </button>
-        </form>
-        {isError && <div className="error-message">{message}</div>}
-        <button className="toggle-auth-button" onClick={() => setIsLogin(!isLogin)}>
-          {isLogin ? 'Switch to Registration' : 'Switch to Login'}
-        </button>
+    <div className="access-portal">
+      <canvas id="atlantean-bg" ref={canvasRef} />
+      <div className="login-card">
+        <h1>ACCESS PROTOCOL</h1>
+        <input type="email" placeholder="IDENTIFIER" />
+        <input type="password" placeholder="SECURITY KEY" />
+        <button type="button">INITIATE ASCENSION</button>
       </div>
     </div>
   );
