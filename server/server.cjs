@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const connectDB = require('./configure/db');
+const connectDB = require('./config/db');
 const { errorHandler } = require('./middleware/errorMiddleware');
 
 // Load environment variables
