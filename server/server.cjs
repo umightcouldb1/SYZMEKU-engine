@@ -34,6 +34,12 @@ try {
   console.log('API PATHWAYS ESTABLISHED');
 } catch (err) {
   console.error('CRITICAL: API blueprints missing from server/routes/');
+  try {
+    app.use('/api/auth', require(path.resolve(__dirname, 'routes/authRoutes')));
+    console.log('API PATHWAYS ESTABLISHED (AUTH FALLBACK)');
+  } catch (fallbackError) {
+    console.error('CRITICAL: Auth routes missing from server/routes/');
+  }
 }
 
 // Catch-all to serve React UI
