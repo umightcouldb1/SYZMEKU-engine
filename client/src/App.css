@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
 /* SOVEREIGN ATLANTEAN INTERFACE 2026 */
 :root {
   --atlantean-gold: #ffd700;
@@ -10,9 +12,16 @@ body {
   margin: 0;
   background-color: var(--deep-ocean);
   color: var(--atlantean-gold);
-  font-family: 'Space Mono', monospace;
+  font-family: 'Orbitron', sans-serif;
   overflow: hidden;
   height: 100vh;
+}
+
+body,
+button,
+input {
+  font-family: 'Orbitron', sans-serif !important;
+  letter-spacing: 3px;
 }
 
 /* Background "Rain" Container */
@@ -64,12 +73,19 @@ h1 {
 input {
   background: transparent !important;
   border: none !important;
-  border-bottom: 1px solid var(--atlantean-gold) !important;
-  color: white !important;
-  margin: 15px 0;
-  padding: 10px;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.2) !important;
+  color: #ffd700 !important;
+  margin-bottom: 30px;
+  padding: 15px 5px;
   width: 100%;
   font-family: inherit;
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+input:focus {
+  outline: none;
+  border-bottom: 1px solid #ffd700 !important;
+  box-shadow: 0 10px 20px -10px rgba(255, 215, 0, 0.3);
 }
 
 .sovereign-button {
@@ -79,7 +95,7 @@ input {
   background: rgba(0, 0, 0, 0.9) !important;
   color: #ffd700 !important;
   border: 1px solid rgba(255, 215, 0, 0.6) !important;
-  font-family: 'Space Mono', monospace !important;
+  font-family: 'Orbitron', sans-serif !important;
   text-transform: uppercase;
   letter-spacing: 6px;
   font-weight: 700;

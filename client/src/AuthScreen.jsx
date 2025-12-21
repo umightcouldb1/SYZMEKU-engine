@@ -2,8 +2,8 @@ import React, { useEffect, useRef } from 'react';
 
 const AuthScreen = () => {
   const canvasRef = useRef(null);
-  const buttonText = 'INITIATE ASCENSION';
-  const titleText = 'SYZMEKU ENGINE';
+  const buttonText = 'BEGIN ASCENSION';
+  const titleText = 'SYZMEKU // RECLAIM YOUR ESSENCE';
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -23,8 +23,7 @@ const AuthScreen = () => {
 
     resizeCanvas();
 
-    const characters =
-      'ᚙᚚ᚛᚜☖☗☰☱☲☳☴☵☶☷☸♔♕♖♗♘♙♚♛♜♝♞♟✚✙✛✜✟✠✢✣✤✥';
+    const characters = 'ᚙᚚ᚛᚜☖☗☰☱☲☳☴☵☶☷☸♔♕♖♗♘♙♚♛♜♝♞♟✚✙✛✜';
     const charArray = characters.split('');
     const fontSize = 16;
     const columns = Math.floor(canvas.width / fontSize);
@@ -48,7 +47,7 @@ const AuthScreen = () => {
       }
     };
 
-    const interval = setInterval(draw, 65);
+    const interval = setInterval(draw, 75);
     window.addEventListener('resize', resizeCanvas);
 
     return () => {
@@ -62,8 +61,8 @@ const AuthScreen = () => {
       <canvas id="atlantean-bg" ref={canvasRef} />
       <div className="login-card">
         <h1 className="glitch-text">{titleText}</h1>
-        <input type="email" placeholder="IDENTIFIER" />
-        <input type="password" placeholder="SECURITY KEY" />
+        <input type="email" placeholder="WHO ARE YOU?" />
+        <input type="password" placeholder="YOUR SECRET SIGN" />
         <button className="sovereign-button" type="button">
           {buttonText}
         </button>
