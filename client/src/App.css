@@ -44,6 +44,17 @@ input {
   background: radial-gradient(circle, rgba(10, 30, 60, 0.5) 0%, rgba(5, 5, 5, 1) 100%);
 }
 
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--atlantean-gold);
+  font-size: 1rem;
+  letter-spacing: 4px;
+  background: var(--deep-ocean);
+}
+
 .login-card {
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(25px) saturate(180%);
@@ -73,19 +84,21 @@ h1 {
 input {
   background: transparent !important;
   border: none !important;
-  border-bottom: 1px solid rgba(255, 215, 0, 0.2) !important;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.3) !important;
   color: #ffd700 !important;
   margin-bottom: 30px;
   padding: 15px 5px;
   width: 100%;
   font-family: inherit;
-  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: center;
+  letter-spacing: 2px;
+  transition: 0.5s ease;
 }
 
 input:focus {
   outline: none;
   border-bottom: 1px solid #ffd700 !important;
-  box-shadow: 0 10px 20px -10px rgba(255, 215, 0, 0.3);
+  box-shadow: 0 10px 20px -10px rgba(255, 215, 0, 0.4);
 }
 
 .sovereign-button {
@@ -96,8 +109,9 @@ input:focus {
   color: #ffd700 !important;
   border: 1px solid rgba(255, 215, 0, 0.6) !important;
   font-family: 'Orbitron', sans-serif !important;
+  border-radius: 50px !important;
   text-transform: uppercase;
-  letter-spacing: 6px;
+  letter-spacing: 5px !important;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
