@@ -14,7 +14,7 @@ function App() {
 
   return (
     <div className="App">
-      {!user ? <AuthScreen /> : <Dashboard />}
+      {!user ? <AuthScreen /> : <Dashboard user={user} />}
     </div>
   );
 }
