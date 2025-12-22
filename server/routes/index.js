@@ -7,5 +7,7 @@ router.use('/codex-command', require('./codexRoutes'));
 router.use('/mirror', require('./mirrorRoutes'));
 router.use('/scrolltones', require('./scrolltoneRoutes'));
 router.use('/crystalline', require('./crystallineRoutes'));
+router.use('/scroll-intake', require('./scrollIntakeRoutes'));
+router.use('/scroll-match', require('./scrollMatchRoutes'));
 
 module.exports = router;

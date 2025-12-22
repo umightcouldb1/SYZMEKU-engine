@@ -100,6 +100,7 @@ const AxiomAuditForm = () => {
             {auditResult && (
                 <div className="result-box">
                     <h4>✅ KETSURON COMPLETE: HARMONIC LAW ENFORCED</h4>
+                    <div className="radiant-spiral" aria-hidden="true" />
                     <p><strong>Initial 4D Input:</strong> {auditResult.initial_flawed_offering}</p>
                     <p className="required-investment">
                         <strong>Non-Collapsible Target:</strong> {auditResult.true_energetic_investment_required}
