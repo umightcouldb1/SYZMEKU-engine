@@ -4,11 +4,12 @@ import AuthScreen from './AuthScreen';
 import Dashboard from './Dashboard';
 
 function App() {
-  const auth = useSelector((state) => state.auth || {});
-  const { user, isLoading } = auth;
+  const authState = useSelector((state) => state.auth || {});
+  const user = authState.user || null;
+  const isLoading = authState.isLoading || false;
 
   if (isLoading) {
-    return <div style={{ color: 'gold', padding: '20px' }}>Loading Engine...</div>;
+    return <div className="portal-text">SYNCHRONIZING...</div>;
   }
 
   return (

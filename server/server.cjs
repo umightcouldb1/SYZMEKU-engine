@@ -27,13 +27,13 @@ const distPath = path.resolve(__dirname, '../client/dist');
 app.use(express.static(distPath));
 
 // API Routes
-let routesPath;
 try {
   const routes = require(path.resolve(__dirname, 'routes/index.js'));
   app.use('/api', routes);
   console.log('API PATHWAYS ESTABLISHED');
 } catch (err) {
   console.error('CRITICAL: API blueprints missing from server/routes/');
+  app.use('/api/auth', require(path.resolve(__dirname, 'routes/authRoutes')));
 }
 
 // Catch-all to serve React UI

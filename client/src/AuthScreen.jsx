@@ -1,9 +1,15 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { login, reset } from './features/auth/authSlice';
 
 const AuthScreen = () => {
   const canvasRef = useRef(null);
-  const buttonText = 'BEGIN ASCENSION';
   const titleText = 'SYZMEKU // RECLAIM YOUR ESSENCE';
+  const [displayText, setDisplayText] = useState('BEGIN ASCENSION');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const dispatch = useDispatch();
+  const { isError, isLoading, message } = useSelector((state) => state.auth || {});
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -56,16 +62,60 @@ const AuthScreen = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (isError) {
+      setDisplayText('SIGN REJECTED');
+      const timeout = setTimeout(() => setDisplayText('BEGIN ASCENSION'), 2000);
+      dispatch(reset());
+      return () => clearTimeout(timeout);
+    }
+
+    return undefined;
+  }, [dispatch, isError]);
+
+  const handleLogin = async (event) => {
+    event.preventDefault();
+    setDisplayText('SYNCHRONIZING...');
+
+    try {
+      const resultAction = await dispatch(login({ email, password }));
+      if (!login.fulfilled.match(resultAction)) {
+        setDisplayText('SIGN REJECTED');
+        setTimeout(() => setDisplayText('BEGIN ASCENSION'), 2000);
+        return;
+      }
+
+      setDisplayText('ASCENSION COMPLETE');
+    } catch (error) {
+      setDisplayText('ENGINE ERROR');
+    }
+  };
+
   return (
     <div className="access-portal">
       <canvas id="atlantean-bg" ref={canvasRef} />
       <div className="login-card">
         <h1 className="glitch-text">{titleText}</h1>
-        <input type="email" placeholder="WHO ARE YOU?" />
-        <input type="password" placeholder="YOUR SECRET SIGN" />
-        <button className="sovereign-button" type="button">
-          {buttonText}
-        </button>
+        <form onSubmit={handleLogin}>
+          <input
+            type="email"
+            placeholder="WHO ARE YOU?"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+          />
+          <input
+            type="password"
+            placeholder="YOUR SECRET SIGN"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
+          <button className="sovereign-button" type="submit" disabled={isLoading}>
+            {displayText}
+          </button>
+        </form>
+        {isError && message ? <p className="auth-error">{message}</p> : null}
       </div>
     </div>
   );
