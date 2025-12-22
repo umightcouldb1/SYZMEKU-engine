@@ -6,6 +6,7 @@ import { Provider } from 'react-redux'; // Identity Anchor
 import { BrowserRouter } from 'react-router-dom';
 import { store } from './app/store';     // Redux Store
 import './index.css';
+import './Crystalline.css';
 import App from './App.jsx';
 import { AuthProvider } from './hooks/useAuth.jsx';
 

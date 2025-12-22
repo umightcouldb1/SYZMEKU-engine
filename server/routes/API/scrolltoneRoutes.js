@@ -18,8 +18,15 @@ router.post(
       return;
     }
 
+    const resolvedUserId = req.user?._id || req.body.userId;
+
+    if (!resolvedUserId) {
+      res.status(401).json({ message: 'User ID is required to log sound key data.' });
+      return;
+    }
+
     const logEntry = await SoundKeyLog.create({
-      userId: req.user._id,
+      userId: resolvedUserId,
       frequency,
       timestamp: timestamp ? new Date(timestamp) : new Date(),
       activationKey: activationKey || '',

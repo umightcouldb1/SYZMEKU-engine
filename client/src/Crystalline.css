@@ -1,0 +1,42 @@
+:root {
+  --syz-neon: #00f3ff;
+  --syz-purple: #bc13fe;
+  --syz-void: #050505;
+}
+
+body {
+  background-color: var(--syz-void);
+  background-image:
+    linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px);
+  background-size: 50px 50px;
+  color: white;
+  font-family: 'Orbitron', sans-serif;
+  overflow-x: hidden;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 243, 255, 0.2);
+  box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+  border-radius: 20px;
+  padding: 2rem;
+  transition: all 0.3s ease;
+}
+
+.glow-text {
+  text-shadow: 0 0 10px var(--syz-neon), 0 0 20px var(--syz-neon);
+}
+
+.audit-button {
+  background: linear-gradient(45deg, var(--syz-neon), var(--syz-purple));
+  border: none;
+  color: white;
+  padding: 15px 30px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
