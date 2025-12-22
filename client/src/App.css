@@ -45,6 +45,7 @@ input {
 }
 
 .portal-text {
+  background: var(--deep-ocean);
   color: var(--atlantean-gold);
   font-size: 1rem;
   letter-spacing: 4px;
@@ -52,7 +53,6 @@ input {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: var(--deep-ocean);
 }
 
 .login-card {

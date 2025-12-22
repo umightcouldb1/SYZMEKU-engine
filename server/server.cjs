@@ -29,7 +29,8 @@ app.use(express.static(distPath));
 // API Routes
 try {
   const routesPath = path.resolve(__dirname, 'routes/index.js');
-  app.use('/api', require(routesPath));
+  const routes = require(routesPath);
+  app.use('/api', routes);
   console.log('API PATHWAYS ESTABLISHED');
 } catch (err) {
   console.error('CRITICAL: API blueprints missing from server/routes/');
