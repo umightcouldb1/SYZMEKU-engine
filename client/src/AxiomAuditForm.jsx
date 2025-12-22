@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import useApi from './utils/api';
+import { calculateSustainableSuccess } from './utils/successAudit';
 
 const AxiomAuditForm = () => {
     const [goalMetric, setGoalMetric] = useState('');
     const [loading, setLoading] = useState(false);
     const [auditResult, setAuditResult] = useState(null);
     const [error, setError] = useState(null);
+    const [missionText, setMissionText] = useState('');
+    const [codexMatch, setCodexMatch] = useState(false);
     const { authorizedFetch } = useApi();
 
     const handleSubmit = async (e) => {
@@ -26,10 +29,19 @@ const AxiomAuditForm = () => {
                 throw new Error(data.message || 'Aetheric Blockage detected.');
             }
 
+            const localAudit = calculateSustainableSuccess(
+                parseFloat(goalMetric) || 100,
+                missionText,
+                codexMatch,
+            );
+
             setAuditResult({
                 initial_flawed_offering: data.proof.old_cost_4D,
-                true_energetic_investment_required: `${data.proof.new_coherent_cost_5D} (Axiom Enforced)`,
-                risk_status: data.proof.risk_assessment_status,
+                true_energetic_investment_required: localAudit.nonCollapsibleTarget
+                    ? `${localAudit.nonCollapsibleTarget} (Axiom Enforced)`
+                    : `${data.proof.new_coherent_cost_5D} (Axiom Enforced)`,
+                risk_status: localAudit.riskStatus || data.proof.risk_assessment_status,
+                message: localAudit.message,
             });
         } catch (err) {
             setError(err.message);
@@ -40,10 +52,10 @@ const AxiomAuditForm = () => {
 
     return (
         <div className="syzmeku-app-container">
-            <h1 className="title">// SYZMEKU AI MENTOR // SUSTAINABLE SUCCESS</h1>
+            <h1 className="title glow-text">// SYZMEKU AI MENTOR // SUSTAINABLE SUCCESS</h1>
             <p className="subtitle">The Core Integrity Check (Prevents Burnout and Collapse)</p>
 
-            <div className="ready-box">
+            <div className="ready-box glass-card">
                 <h3 className="ready-title">Ready to Future-Proof Your Goals?</h3>
                 <p>Your current plan hides a **Mandatory Investment** needed for success. SYZMEKU reveals the **Hidden Cost of Failure** before it hits.</p>
             </div>
@@ -61,8 +73,24 @@ const AxiomAuditForm = () => {
                     placeholder="e.g., Reduce Burnout by 10 hours/week"
                     required
                 />
+                <input
+                    id="mission-text"
+                    type="text"
+                    value={missionText}
+                    onChange={(e) => setMissionText(e.target.value)}
+                    placeholder="Describe your mission (e.g., lottery, promotion)"
+                />
+                <label htmlFor="codex-match">
+                    <input
+                        id="codex-match"
+                        type="checkbox"
+                        checked={codexMatch}
+                        onChange={(e) => setCodexMatch(e.target.checked)}
+                    />
+                    Codex resonance match confirmed (445Hz)
+                </label>
 
-                <button type="submit" disabled={loading}>
+                <button type="submit" disabled={loading} className="audit-button">
                     {loading ? 'RUNNING AUDIT...' : 'RUN SUSTAINABLE SUCCESS AUDIT'}
                 </button>
             </form>
@@ -77,7 +105,7 @@ const AxiomAuditForm = () => {
                         <strong>Non-Collapsible Target:</strong> {auditResult.true_energetic_investment_required}
                     </p>
                     <p><strong>Risk Status:</strong> {auditResult.risk_status}</p>
-                    <p>**Hidden Failure Risk is Obliterated.**</p>
+                    <p>{auditResult.message}</p>
                 </div>
             )}
 
