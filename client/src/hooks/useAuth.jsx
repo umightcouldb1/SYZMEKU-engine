@@ -11,6 +11,8 @@ export const AuthProvider = ({ children }) => {
     const normalizedUser = {
       username: payload.username || payload.email?.split('@')[0] || 'OPERATOR',
       token: payload.token || 'local-dev-token',
+      role: payload.role || 'user',
+      mirrorMode: payload.mirrorMode || { origin: 'user' },
     };
 
     localStorage.setItem('user', JSON.stringify(normalizedUser));
@@ -110,6 +112,16 @@ export const AuthProvider = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+const defaultAuthContext = {
+  user: null,
+  loading: true,
+  login: async () => null,
+  signup: async () => null,
+  logout: () => {},
+  getToken: () => null,
+  isAuthenticated: false,
+};
+
 export const useAuth = () => {
-  return useContext(AuthContext);
+  return useContext(AuthContext) ?? defaultAuthContext;
 };

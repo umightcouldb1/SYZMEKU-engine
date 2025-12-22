@@ -161,3 +161,15 @@ input:focus {
     transform: translate(100%, 100%) rotate(45deg);
   }
 }
+
+.glyph-overlay {
+  font-size: 1.6rem;
+  text-align: center;
+  color: var(--atlantean-gold);
+  margin: 1rem 0;
+}
+
+.glyph-overlay .glyph {
+  display: inline-block;
+  margin-right: 0.5rem;
+}

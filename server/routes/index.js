@@ -4,5 +4,6 @@ const router = require('express').Router();
 router.use('/auth', require('./authRoutes'));
 router.use('/fixes', require('./fixesRoutes'));
 router.use('/codex-command', require('./codexRoutes'));
+router.use('/mirror', require('./mirrorRoutes'));
 
 module.exports = router;
