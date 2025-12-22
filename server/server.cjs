@@ -3,10 +3,12 @@ const path = require('path');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const { loadArchitectBaseTone } = require('./logic/architectLayer');
 
 dotenv.config();
 
 const app = express();
+global.toneMatrix = loadArchitectBaseTone();
 
 const connectDB = async () => {
   try {
