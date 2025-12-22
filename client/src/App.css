@@ -173,3 +173,47 @@ input:focus {
   display: inline-block;
   margin-right: 0.5rem;
 }
+
+.sound-key-layer {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.sound-key-header h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.sound-key-actions {
+  margin: 1rem 0;
+}
+
+.sound-key-canvas {
+  width: 100%;
+  border: 1px solid rgba(255, 215, 0, 0.2);
+  background: #050508;
+}
+
+.sound-key-meta {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+}
+
+.sound-key-match {
+  color: var(--phosphor-cyan);
+}
+
+.mirror-intake-card {
+  margin: 2rem auto;
+  padding: 1.5rem;
+  max-width: 600px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+}
+
+.mirror-intake-form {
+  display: grid;
+  gap: 1rem;
+}

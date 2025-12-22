@@ -55,6 +55,10 @@ const userSchema = mongoose.Schema(
                 type: String,
                 default: '',
             },
+            mirrorSeedEncrypted: {
+                type: String,
+                default: '',
+            },
         },
     },
     {

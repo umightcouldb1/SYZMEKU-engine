@@ -5,5 +5,6 @@ router.use('/auth', require('./authRoutes'));
 router.use('/fixes', require('./fixesRoutes'));
 router.use('/codex-command', require('./codexRoutes'));
 router.use('/mirror', require('./mirrorRoutes'));
+router.use('/scrolltones', require('./scrolltoneRoutes'));
 
 module.exports = router;

@@ -1,24 +1,18 @@
 import React from 'react';
 import StatusIndicator from './StatusIndicator';
-import { useAuth } from './hooks/useAuth.jsx';
 import AxiomAuditForm from './AxiomAuditForm';
 import { glyphResonanceMap } from './constants/glyphMap';
+import SoundKeyLayer from './components/SoundKeyLayer';
 
-const Dashboard = () => {
-    const { user, isAuthenticated, loading } = useAuth() ?? {};
-
-    if (loading) {
-        return <div className="portal-text">SYNCHRONIZING ESSENCE...</div>;
-    }
-
+const Dashboard = ({ user }) => {
     if (!user) {
-        return null;
+        return <div className="portal-text">CALIBRATING DASHBOARD...</div>;
     }
 
     return (
         <div className="action-module dashboard-module">
             <h2 className="panel-title">SYSTEM STATUS OVERVIEW</h2>
-            <StatusIndicator username={user.username} isAuthenticated={isAuthenticated} />
+            <StatusIndicator username={user.username} isAuthenticated />
             {user.mirrorMode?.glyphOverlayEnabled && (
                 <div className="glyph-overlay">
                     <span className="glyph">{glyphResonanceMap.mirror.glyph}</span>
@@ -35,6 +29,7 @@ const Dashboard = () => {
             </div>
 
             <AxiomAuditForm />
+            <SoundKeyLayer user={user} />
         </div>
     );
 };
