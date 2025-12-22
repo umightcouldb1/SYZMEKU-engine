@@ -1,0 +1,11 @@
+{
+  "vault": "13",
+  "layer": "8",
+  "frequencyKeys": ["445", "107", "344", "528"],
+  "glyphAnchors": ["⟁", "⚜", "✶", "∞"],
+  "toneMap": {
+    "grace": "F#",
+    "sovereign": "D",
+    "core": "A"
+  }
+}

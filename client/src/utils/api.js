@@ -3,10 +3,12 @@ import { useAuth } from '../hooks/useAuth.jsx';
 const BASE_URL = import.meta.env.VITE_API_URL;
 
 const useApi = () => {
-    const { getToken, logout } = useAuth();
+    const { getToken, logout } = useAuth() ?? {};
+    const safeGetToken = getToken ?? (() => null);
+    const safeLogout = logout ?? (() => {});
 
     const authorizedFetch = async (endpoint, options = {}) => {
-        const token = getToken();
+        const token = safeGetToken();
         
         const headers = {
             'Content-Type': 'application/json',
@@ -23,7 +25,7 @@ const useApi = () => {
         });
 
         if (response.status === 401) {
-            logout(); 
+            safeLogout(); 
         }
 
         return response;
