@@ -60,6 +60,20 @@ const userSchema = mongoose.Schema(
                 default: '',
             },
         },
+        metaCodex: {
+            harmonicKey: {
+                type: String,
+                default: '',
+            },
+            ketsuronStatus: {
+                type: String,
+                default: '',
+            },
+            scrollTrigger: {
+                type: Boolean,
+                default: false,
+            },
+        },
     },
     {
         timestamps: true,

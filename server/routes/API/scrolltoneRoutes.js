@@ -1,12 +1,14 @@
 const express = require('express');
 const expressAsyncHandler = require('express-async-handler');
 const { protect } = require('../../middleware/authMiddleware');
+const { soundKeyMatcher } = require('../../middleware/soundKeyMatcher');
 const SoundKeyLog = require('../../models/SoundKeyLog');
 
 const router = express.Router();
 
 router.post(
   '/log',
+  soundKeyMatcher,
   protect,
   expressAsyncHandler(async (req, res) => {
     const { frequency, timestamp, activationKey } = req.body;
@@ -32,6 +34,7 @@ router.post(
 
 router.post(
   '/match',
+  soundKeyMatcher,
   protect,
   expressAsyncHandler(async (req, res) => {
     res.status(200).json({

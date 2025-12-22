@@ -3,11 +3,16 @@ import StatusIndicator from './StatusIndicator';
 import AxiomAuditForm from './AxiomAuditForm';
 import { glyphResonanceMap } from './constants/glyphMap';
 import SoundKeyLayer from './components/SoundKeyLayer';
+import { calculateNonCollapsibleTarget } from './utils/ketsuron';
+import CrystallineGridTrigger from './components/CrystallineGridTrigger';
 
 const Dashboard = ({ user }) => {
     if (!user) {
         return <div className="portal-text">CALIBRATING DASHBOARD...</div>;
     }
+
+    const ketsuronInput = 100;
+    const ketsuronTarget = calculateNonCollapsibleTarget(ketsuronInput);
 
     return (
         <div className="action-module dashboard-module">
@@ -29,6 +34,11 @@ const Dashboard = ({ user }) => {
             </div>
 
             <AxiomAuditForm />
+            <div className="ketsuron-panel">
+                <p>Input: {ketsuronInput.toFixed(2)}</p>
+                <p>Non-Collapsible Target: {ketsuronTarget.toFixed(2)}</p>
+            </div>
+            <CrystallineGridTrigger user={user} />
             <SoundKeyLayer user={user} />
         </div>
     );

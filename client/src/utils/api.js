@@ -8,7 +8,16 @@ const useApi = () => {
     const safeLogout = logout ?? (() => {});
 
     const authorizedFetch = async (endpoint, options = {}) => {
-        const token = safeGetToken();
+        const tokenFromContext = safeGetToken();
+        const tokenFromStorage = (() => {
+            try {
+                const storedUser = JSON.parse(localStorage.getItem('user'));
+                return storedUser?.token || null;
+            } catch (error) {
+                return null;
+            }
+        })();
+        const token = tokenFromContext || tokenFromStorage;
         
         const headers = {
             'Content-Type': 'application/json',

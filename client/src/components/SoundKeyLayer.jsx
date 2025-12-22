@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import SoundKeyVisualizer from './SoundKeyVisualizer';
+import ScrollMatchOverlay from './ScrollMatchOverlay';
 import { CODEX_TONES, findCodexMatch, getDominantFrequency } from '../utils/codexFrequencyEngine';
 import useApi from '../utils/api';
 
@@ -9,6 +10,7 @@ const SoundKeyLayer = ({ user }) => {
   const [dominantFrequency, setDominantFrequency] = useState(0);
   const [lastMatch, setLastMatch] = useState(null);
   const [statusMessage, setStatusMessage] = useState('Awaiting activation.');
+  const [codexMatch, setCodexMatch] = useState(false);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const streamRef = useRef(null);
@@ -31,6 +33,7 @@ const SoundKeyLayer = ({ user }) => {
     analyserRef.current = null;
     setIsActive(false);
     setStatusMessage('Audio scan paused.');
+    setCodexMatch(false);
   }, []);
 
   const logMatch = useCallback(
@@ -42,6 +45,9 @@ const SoundKeyLayer = ({ user }) => {
       try {
         await authorizedFetch('/api/scrolltones/log', {
           method: 'POST',
+          headers: {
+            'x-codex-frequency': tone.frequency,
+          },
           body: JSON.stringify({
             userId: user._id,
             frequency: tone.frequency,
@@ -67,7 +73,7 @@ const SoundKeyLayer = ({ user }) => {
     );
 
     if (amplitude > 40) {
-      const match = findCodexMatch(frequency);
+      const match = findCodexMatch(frequency, 2);
       setDominantFrequency(frequency);
 
       if (match) {
@@ -76,7 +82,8 @@ const SoundKeyLayer = ({ user }) => {
         if (now - lastHit > 2000) {
           matchCooldownRef.current[match.activationKey] = now;
           setLastMatch(match);
-          setStatusMessage(`Codex match detected: ${match.frequency}Hz`);
+          setStatusMessage(`Codex resonance match confirmed: ${match.frequency}Hz. Harmonic Law Enforced.`);
+          setCodexMatch(true);
           logMatch(match, now);
         }
       }
@@ -130,6 +137,7 @@ const SoundKeyLayer = ({ user }) => {
       </div>
 
       <SoundKeyVisualizer />
+      <ScrollMatchOverlay visible={codexMatch} frequency={lastMatch?.frequency || 445} />
 
       <div className="sound-key-meta">
         <p>Dominant frequency: {dominantFrequency.toFixed(1)} Hz</p>

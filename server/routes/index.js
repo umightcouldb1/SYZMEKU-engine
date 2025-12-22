@@ -6,5 +6,6 @@ router.use('/fixes', require('./fixesRoutes'));
 router.use('/codex-command', require('./codexRoutes'));
 router.use('/mirror', require('./mirrorRoutes'));
 router.use('/scrolltones', require('./scrolltoneRoutes'));
+router.use('/crystalline', require('./crystallineRoutes'));
 
 module.exports = router;
