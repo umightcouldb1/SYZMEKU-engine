@@ -44,14 +44,14 @@ input {
   background: radial-gradient(circle, rgba(10, 30, 60, 0.5) 0%, rgba(5, 5, 5, 1) 100%);
 }
 
-.loading-screen {
+.portal-text {
+  color: var(--atlantean-gold);
+  font-size: 1rem;
+  letter-spacing: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100vh;
-  color: var(--atlantean-gold);
-  font-size: 1rem;
-  letter-spacing: 4px;
   background: var(--deep-ocean);
 }
 

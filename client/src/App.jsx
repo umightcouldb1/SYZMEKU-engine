@@ -4,12 +4,12 @@ import AuthScreen from './AuthScreen';
 import Dashboard from './Dashboard';
 
 function App() {
-  const auth = useSelector((state) => state.auth) || {};
-  const user = auth.user || null;
-  const isLoading = auth.isLoading || false;
+  const authState = useSelector((state) => state.auth || {});
+  const user = authState.user || null;
+  const isLoading = authState.isLoading || false;
 
   if (isLoading) {
-    return <div className="loading-screen">BEGINNING ASCENSION...</div>;
+    return <div className="portal-text">SYNCHRONIZING...</div>;
   }
 
   return (
