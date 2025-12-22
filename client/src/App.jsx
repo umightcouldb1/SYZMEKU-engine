@@ -5,10 +5,11 @@ import Dashboard from './Dashboard';
 
 function App() {
   const auth = useSelector((state) => state.auth || {});
-  const { user, isLoading } = auth;
+  const user = auth.user || null;
+  const isLoading = auth.isLoading || false;
 
   if (isLoading) {
-    return <div style={{ color: 'gold', padding: '20px' }}>Loading Engine...</div>;
+    return <div className="portal-text">SYNCHRONIZING ESSENCE...</div>;
   }
 
   return (

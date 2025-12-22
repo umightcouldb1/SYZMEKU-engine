@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: syzmeku-api
+    env: node
+    plan: starter
+    buildCommand: npm run render-build
+    startCommand: npm start
