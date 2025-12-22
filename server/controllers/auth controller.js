@@ -27,7 +27,17 @@ const registerUser = async (req, res) => {
             _id: user._id,
             username: user.name,
             email: user.email,
-            token: jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' }),
+            role: user.role || 'user',
+            mirrorMode: user.mirrorMode,
+            token: jwt.sign(
+                {
+                    id: user._id,
+                    role: user.role || 'user',
+                    mirrorMode: user.mirrorMode,
+                },
+                process.env.JWT_SECRET,
+                { expiresIn: '30d' },
+            ),
         });
     } else {
         res.status(400).json({ message: 'Invalid operative data.' });
@@ -45,7 +55,17 @@ const loginUser = async (req, res) => {
             _id: user._id,
             username: user.name,
             email: user.email,
-            token: jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' }),
+            role: user.role || 'user',
+            mirrorMode: user.mirrorMode,
+            token: jwt.sign(
+                {
+                    id: user._id,
+                    role: user.role || 'user',
+                    mirrorMode: user.mirrorMode,
+                },
+                process.env.JWT_SECRET,
+                { expiresIn: '30d' },
+            ),
         });
     } else {
         res.status(401).json({ message: 'Access Denied: Invalid credentials.' });
