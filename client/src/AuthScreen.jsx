@@ -1,14 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { login, reset } from './features/auth/authSlice';
 
 const AuthScreen = () => {
   const canvasRef = useRef(null);
   const titleText = 'SYZMEKU // RECLAIM YOUR ESSENCE';
   const [displayText, setDisplayText] = useState('BEGIN ASCENSION');
+  const [ascensionActive, setAscensionActive] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { isError, isLoading, message } = useSelector((state) => state.auth || {});
 
   useEffect(() => {
@@ -78,7 +81,7 @@ const AuthScreen = () => {
     setDisplayText('SYNCHRONIZING...');
 
     try {
-      const resultAction = await dispatch(login({ email, password }));
+      const resultAction = await dispatch(login({ email, password, frequency: 445 }));
       if (!login.fulfilled.match(resultAction)) {
         setDisplayText('SIGN REJECTED');
         setTimeout(() => setDisplayText('BEGIN ASCENSION'), 2000);
@@ -86,14 +89,17 @@ const AuthScreen = () => {
       }
 
       setDisplayText('ASCENSION COMPLETE');
+      setAscensionActive(true);
+      setTimeout(() => navigate('/dashboard'), 900);
     } catch (error) {
       setDisplayText('ENGINE ERROR');
     }
   };
 
   return (
-    <div className="access-portal">
+    <div className="access-portal login-container">
       <canvas id="atlantean-bg" ref={canvasRef} />
+      {ascensionActive ? <div className="ascension-bloom" /> : null}
       <div className="login-card">
         <h1 className="glitch-text">{titleText}</h1>
         <form onSubmit={handleLogin}>
