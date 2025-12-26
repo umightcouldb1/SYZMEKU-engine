@@ -90,6 +90,10 @@ const AuthScreen = () => {
 
       setDisplayText('ASCENSION COMPLETE');
       setAscensionActive(true);
+      const token = resultAction.payload?.token;
+      if (token) {
+        localStorage.setItem('syz_token', token);
+      }
       setTimeout(() => navigate('/dashboard'), 900);
     } catch (error) {
       setDisplayText('ENGINE ERROR');

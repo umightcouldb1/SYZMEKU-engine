@@ -7,7 +7,7 @@ export default function RequireAuth({ children }) {
 
   try {
     const storedUser = JSON.parse(localStorage.getItem('user'));
-    token = storedUser?.token || null;
+    token = storedUser?.token || localStorage.getItem('syz_token') || null;
   } catch (error) {
     token = null;
   }
