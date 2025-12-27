@@ -1,6 +1,14 @@
+const DEFAULT_RESONANCE_KEY = 445;
+const RESONANCE_TOLERANCE = 2;
+
 const isHighVarianceIntent = (codexIntent = '') => /\b(lottery|gambling|luck)\b/i.test(codexIntent);
 
-const validateCodexAxiom = ({ frequency, codexIntent, source }) => {
+const resolveResonanceKey = (resonanceKey) => {
+  const parsedKey = Number(resonanceKey);
+  return Number.isFinite(parsedKey) ? parsedKey : DEFAULT_RESONANCE_KEY;
+};
+
+const validateCodexAxiom = ({ frequency, codexIntent, source, resonanceKey }) => {
   if (source === 'mentor') {
     return {
       status: 403,
@@ -26,7 +34,8 @@ const validateCodexAxiom = ({ frequency, codexIntent, source }) => {
     };
   }
 
-  const harmonicMatch = frequency >= 443 && frequency <= 447;
+  const resonance = resolveResonanceKey(resonanceKey);
+  const harmonicMatch = Math.abs(frequency - resonance) <= RESONANCE_TOLERANCE;
 
   if (harmonicMatch) {
     return {
@@ -49,4 +58,5 @@ const validateCodexAxiom = ({ frequency, codexIntent, source }) => {
 module.exports = {
   validateCodexAxiom,
   isHighVarianceIntent,
+  resolveResonanceKey,
 };

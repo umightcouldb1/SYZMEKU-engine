@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { login, reset } from './features/auth/authSlice';
 
-const AuthScreen = () => {
+const AuthScreen = ({ onAscend }) => {
   const canvasRef = useRef(null);
   const titleText = 'SYZMEKU // RECLAIM YOUR ESSENCE';
   const [displayText, setDisplayText] = useState('BEGIN ASCENSION');
@@ -93,6 +93,9 @@ const AuthScreen = () => {
       const token = resultAction.payload?.token;
       if (token) {
         localStorage.setItem('syz_token', token);
+        if (typeof onAscend === 'function') {
+          onAscend(token);
+        }
       }
       setTimeout(() => navigate('/dashboard'), 900);
     } catch (error) {
