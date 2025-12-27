@@ -1,11 +1,24 @@
 const express = require('express');
 const expressAsyncHandler = require('express-async-handler');
-const { validateCodexAxiom } = require('../../logic/codexIntakeMirror');
+const { mirrorLogic } = require('../../middleware/mirror-logic');
 
 const router = express.Router();
 
+const validateIntakeFields = (req, res, next) => {
+  const { name, email, dob } = req.body;
+
+  if (!name || !email || !dob) {
+    res.status(400).json({ message: 'Missing required intake fields.' });
+    return;
+  }
+
+  next();
+};
+
 router.post(
   '/',
+  validateIntakeFields,
+  mirrorLogic,
   expressAsyncHandler(async (req, res) => {
     const {
       name,
@@ -15,25 +28,9 @@ router.post(
       codex_intent: codexIntent,
       shadow_code: shadowCode,
       resonance_color: resonanceColor,
-      source,
     } = req.body;
-
-    if (!name || !email || !dob) {
-      res.status(400).json({ message: 'Missing required intake fields.' });
-      return;
-    }
-    const codexValidation = validateCodexAxiom({
-      frequency,
-      codexIntent,
-      source,
-    });
-
-    if (codexValidation.status !== 200) {
-      res.status(codexValidation.status).json(codexValidation.body);
-      return;
-    }
-
-    const matchConfirmed = codexValidation.body.mirror_path_status === 'ACTIVE';
+    const codexValidation = res.locals.codexValidation;
+    const matchConfirmed = codexValidation?.mirror_path_status === 'ACTIVE';
 
     res.status(200).json({
       status: 'INTAKE_RECEIVED',
@@ -48,7 +45,7 @@ router.post(
         shadow_code: shadowCode || '',
         resonance_color: resonanceColor || '',
       },
-      codex: codexValidation.body,
+      codex: codexValidation,
     });
   }),
 );
