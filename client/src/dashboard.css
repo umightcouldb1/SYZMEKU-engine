@@ -1,0 +1,271 @@
+:root {
+  --prism-glow: rgba(0, 255, 255, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --text-light: #e0faff;
+}
+
+.crystalline-container {
+  background: #02040a;
+  min-height: 100svh;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  font-family: 'Syncopate', sans-serif;
+  color: var(--text-light);
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.nebula-1,
+.nebula-2 {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  filter: blur(120px);
+  z-index: 0;
+  opacity: 0.3;
+}
+
+.nebula-1 {
+  background: radial-gradient(circle, #00f2ff, transparent);
+  top: -10%;
+  left: -10%;
+}
+
+.nebula-2 {
+  background: radial-gradient(circle, #7000ff, transparent);
+  bottom: -10%;
+  right: -10%;
+}
+
+.crystal-shard {
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(15px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+  border-radius: 2px;
+  padding: 1.5rem;
+  clip-path: polygon(0% 0%, 100% 5%, 100% 100%, 5% 95%);
+}
+
+.crystal-header {
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.crystal-title {
+  font-size: 1.5rem;
+  letter-spacing: 8px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.dimension-tag {
+  color: #00f2ff;
+  font-size: 0.6rem;
+  margin-top: 5px;
+}
+
+.crystal-status {
+  font-size: 0.65rem;
+  text-align: right;
+}
+
+.light-status {
+  color: #7ef9ff;
+}
+
+.crystal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1fr;
+  gap: 3rem;
+  flex-grow: 1;
+  margin-top: 4rem;
+  z-index: 1;
+  align-items: center;
+}
+
+.shard-content h3 {
+  font-size: 0.75rem;
+  letter-spacing: 4px;
+  margin-top: 0;
+}
+
+.light-terminal {
+  font-size: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+}
+
+.pulse-text {
+  color: #7ef9ff;
+  animation: pulse-text 2.5s ease-in-out infinite;
+}
+
+.crystal-prism {
+  width: 300px;
+  height: 300px;
+  margin: 0 auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prism-inner {
+  width: 120px;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid #fff;
+  transform: rotate(45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 50px var(--prism-glow);
+  animation: pulse 4s infinite ease-in-out;
+}
+
+.prism-label {
+  transform: rotate(-45deg);
+  font-size: 0.8rem;
+  letter-spacing: 2px;
+}
+
+.geo-ring {
+  position: absolute;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  animation: spin 20s linear infinite;
+}
+
+.ring-1 {
+  width: 300px;
+  height: 300px;
+  border-style: dashed;
+}
+
+.ring-2 {
+  width: 350px;
+  height: 350px;
+  opacity: 0.4;
+}
+
+.manifest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.manifest-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  font-size: 0.65rem;
+  letter-spacing: 2px;
+}
+
+.glow-bar {
+  height: 6px;
+  width: 40%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #00f2ff, #7000ff);
+  box-shadow: 0 0 12px rgba(0, 242, 255, 0.6);
+}
+
+.glow-bar.half {
+  width: 60%;
+}
+
+.glow-bar.full {
+  width: 100%;
+}
+
+.crystal-footer {
+  z-index: 2;
+  margin-top: 2rem;
+}
+
+.input-shard {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.glyph-prompt {
+  font-size: 1rem;
+  color: #7ef9ff;
+}
+
+.input-shard input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  width: 100%;
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: rotate(45deg) scale(1);
+    box-shadow: 0 0 50px var(--prism-glow);
+  }
+  50% {
+    transform: rotate(45deg) scale(1.1);
+    box-shadow: 0 0 80px #7000ff;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-text {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 1024px) {
+  .crystal-grid {
+    grid-template-columns: 1fr;
+    margin-top: 2.5rem;
+  }
+
+  .crystal-prism {
+    width: 240px;
+    height: 240px;
+  }
+
+  .ring-2 {
+    width: 280px;
+    height: 280px;
+  }
+}

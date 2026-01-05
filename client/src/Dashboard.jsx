@@ -1,50 +1,80 @@
 import React from 'react';
-import StatusIndicator from './StatusIndicator';
-import AxiomAuditForm from './AxiomAuditForm';
-import { glyphResonanceMap } from './constants/glyphMap';
-import SoundKeyLayer from './components/SoundKeyLayer';
-import { calculateNonCollapsibleTarget } from './utils/ketsuron';
-import CrystallineGridTrigger from './components/CrystallineGridTrigger';
-import GlassCard from './components/GlassCard';
+import './dashboard.css';
 
 const Dashboard = ({ user }) => {
-    if (!user) {
-        return <div className="portal-text">CALIBRATING DASHBOARD...</div>;
-    }
+  if (!user) {
+    return <div className="portal-text">CALIBRATING DASHBOARD...</div>;
+  }
 
-    const ketsuronInput = 100;
-    const ketsuronTarget = calculateNonCollapsibleTarget(ketsuronInput);
+  return (
+    <div className="crystalline-container">
+      <div className="nebula-1" />
+      <div className="nebula-2" />
 
-    return (
-        <GlassCard>
-            <div className="action-module dashboard-module">
-                <h2 className="panel-title">SYSTEM STATUS OVERVIEW</h2>
-                <StatusIndicator username={user.username} isAuthenticated />
-                {user.mirrorMode?.glyphOverlayEnabled && (
-                    <div className="glyph-overlay">
-                        <span className="glyph">{glyphResonanceMap.mirror.glyph}</span>
-                        <p>Welcome to your Codex stream, {user.username}</p>
-                    </div>
-                )}
-                <hr className="divider" />
+      <header className="crystal-header">
+        <div className="epoch-branding">
+          <h1 className="crystal-title">SYZMEKU // ARCHITECT</h1>
+          <p className="dimension-tag">
+            DIMENSION: 5D | EPOCH: NOVA-GAIA | OPERATOR: {user.username.toUpperCase()}
+          </p>
+        </div>
+        <div className="crystal-status">
+          <p>CORE RESONANCE: 528Hz</p>
+          <p className="light-status">ETHEREAL LINK: ACTIVE</p>
+        </div>
+      </header>
 
-                <div className="dashboard-content">
-                    <p className="system-status active">USER: {user.username.toUpperCase()}</p>
-                    <p className="system-status">AUTH TOKEN STATUS: ACTIVE (Encrypted)</p>
-                    <p className="system-status">PROJECT INTERFACE: READY</p>
-                    <p className="system-status">NEXT PROTOCOL: SECURITY HARDENING (Required)</p>
-                </div>
-
-                <AxiomAuditForm />
-                <div className="ketsuron-panel">
-                    <p>Input: {ketsuronInput.toFixed(2)}</p>
-                    <p>Non-Collapsible Target: {ketsuronTarget.toFixed(2)}</p>
-                </div>
-                <CrystallineGridTrigger user={user} />
-                <SoundKeyLayer user={user} />
+      <main className="crystal-grid">
+        <section className="crystal-shard left-shard">
+          <div className="shard-content">
+            <h3>SCROLL_RECORDS</h3>
+            <div className="light-terminal">
+              <p>&gt; syncing with ancestral grid...</p>
+              <p>&gt; downloading epoch templates...</p>
+              <p className="pulse-text">&gt; 5D geometry stabilized.</p>
             </div>
-        </GlassCard>
-    );
+          </div>
+        </section>
+
+        <section className="crystal-heart-section">
+          <div className="crystal-prism">
+            <div className="prism-inner">
+              <span className="prism-label">SYZMEKU</span>
+            </div>
+            <div className="geo-ring ring-1" />
+            <div className="geo-ring ring-2" />
+          </div>
+        </section>
+
+        <section className="crystal-shard right-shard">
+          <div className="shard-content">
+            <h3>MANIFEST_INDEX</h3>
+            <div className="manifest-list">
+              <div className="manifest-item">
+                <span>VIRTUAL_REALM</span>
+                <div className="glow-bar" />
+              </div>
+              <div className="manifest-item">
+                <span>ETHERIC_ANCHOR</span>
+                <div className="glow-bar half" />
+              </div>
+              <div className="manifest-item">
+                <span>5D_TRANSITION</span>
+                <div className="glow-bar full" />
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="crystal-footer">
+        <div className="input-shard">
+          <span className="glyph-prompt">✧</span>
+          <input type="text" placeholder="TRANSMIT CODEX OR EPOCH COMMAND..." />
+        </div>
+      </footer>
+    </div>
+  );
 };
 
 export default Dashboard;
