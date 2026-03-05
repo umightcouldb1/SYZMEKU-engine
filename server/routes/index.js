@@ -10,4 +10,6 @@ router.use('/crystalline', require('./crystallineRoutes'));
 router.use('/scroll-intake', require('./scrollIntakeRoutes'));
 router.use('/scroll-match', require('./scrollMatchRoutes'));
 
+router.use('/core', require('./API/coreRoutes'));
+
 module.exports = router;

@@ -1,13 +1,12 @@
+require("dotenv").config();
+
 const express = require('express');
 const path = require('path');
-const dotenv = require('dotenv');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { loadArchitectBaseTone } = require('./logic/architectLayer');
-
-dotenv.config();
 
 const app = express();
 global.toneMatrix = loadArchitectBaseTone();
@@ -15,12 +14,16 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
 const connectDB = async () => {
+  if (!process.env.MONGO_URI) {
+    console.warn('⚠️ MONGO_URI missing — starting without DB connection.');
+    return;
+  }
+
   try {
     await mongoose.connect(process.env.MONGO_URI);
-    console.log('MEMORY GRID CONNECTED (MONGODB)');
+    console.log('✅ Mongo connected');
   } catch (err) {
     console.error(`DATABASE ERROR: ${err.message}`);
-    process.exit(1);
   }
 };
 connectDB();
