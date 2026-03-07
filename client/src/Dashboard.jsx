@@ -1,10 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import './dashboard.css';
 
 const ANALYSIS_SECTIONS = ['objectives', 'constraints', 'risks', 'leverage', 'next_actions'];
+const HELP_LINES = [
+  'Supported commands:',
+  '• analyze <text>',
+  '• show signals',
+  '• show systems',
+  '• create system <name>',
+  '• log signal key=value key=value',
+  '• help',
+];
 const UNKNOWN_COMMAND_MESSAGE =
-  'Unknown command. Supported commands: analyze, show signals, show systems, create system, log signal.';
+  'Unknown command. Type help to view supported commands.';
+const COMMAND_HISTORY_KEY = 'syzmeku.commandHistory';
+const MAX_COMMAND_HISTORY = 20;
 
 const parseValue = (value) => {
   if (/^-?\d+(\.\d+)?$/.test(value)) {
@@ -102,6 +113,15 @@ const getCommandRoute = (rawCommand) => {
     };
   }
 
+  if (lowered === 'help') {
+    return {
+      type: 'help',
+      routeLabel: 'help',
+      title: 'COMMAND REFERENCE',
+      request: null,
+    };
+  }
+
   return {
     type: 'unknown',
     routeLabel: 'unknown',
@@ -144,6 +164,36 @@ const Dashboard = ({ user }) => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [showOverlay, setShowOverlay] = useState(false);
+  const [commandHistory, setCommandHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  useEffect(() => {
+    try {
+      const rawHistory = localStorage.getItem(COMMAND_HISTORY_KEY);
+      const parsedHistory = JSON.parse(rawHistory || '[]');
+      if (Array.isArray(parsedHistory)) {
+        setCommandHistory(parsedHistory.slice(0, MAX_COMMAND_HISTORY));
+      }
+    } catch {
+      setCommandHistory([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(COMMAND_HISTORY_KEY, JSON.stringify(commandHistory));
+  }, [commandHistory]);
+
+  const addCommandToHistory = (rawCommand) => {
+    setCommandHistory((previous) => {
+      const updated = [
+        rawCommand,
+        ...previous.filter((entry) => entry.toLowerCase() !== rawCommand.toLowerCase()),
+      ];
+
+      return updated.slice(0, MAX_COMMAND_HISTORY);
+    });
+    setHistoryIndex(-1);
+  };
 
   const submitCommand = async () => {
     if (loading || !command.trim()) {
@@ -162,6 +212,16 @@ const Dashboard = ({ user }) => {
       setOutputMode('unknown');
       setResult({ message: UNKNOWN_COMMAND_MESSAGE });
       setShowOverlay(true);
+      setLoading(false);
+      return;
+    }
+
+    if (route.type === 'help') {
+      setOutputMode('help');
+      setResult({ lines: HELP_LINES });
+      setShowOverlay(true);
+      addCommandToHistory(rawCommand);
+      setCommand('');
       setLoading(false);
       return;
     }
@@ -188,6 +248,7 @@ const Dashboard = ({ user }) => {
       }
 
       setShowOverlay(true);
+      addCommandToHistory(rawCommand);
       setCommand('');
     } catch (err) {
       const message = err?.response?.data?.message || err.message || 'Command execution failed.';
@@ -204,6 +265,37 @@ const Dashboard = ({ user }) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       await submitCommand();
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (!commandHistory.length) {
+        return;
+      }
+
+      const nextIndex = Math.min(historyIndex + 1, commandHistory.length - 1);
+      setHistoryIndex(nextIndex);
+      setCommand(commandHistory[nextIndex]);
+      return;
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      if (!commandHistory.length || historyIndex < 0) {
+        return;
+      }
+
+      const nextIndex = historyIndex - 1;
+
+      if (nextIndex < 0) {
+        setHistoryIndex(-1);
+        setCommand('');
+        return;
+      }
+
+      setHistoryIndex(nextIndex);
+      setCommand(commandHistory[nextIndex]);
     }
   };
 
@@ -351,6 +443,16 @@ const Dashboard = ({ user }) => {
 
             {outputMode === 'unknown' && (
               <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', opacity: 0.88 }}>{result.message}</p>
+            )}
+
+            {outputMode === 'help' && (
+              <div>
+                {(result?.lines || []).map((line) => (
+                  <p key={line} style={{ margin: '0.18rem 0', fontSize: '0.82rem', opacity: 0.88 }}>
+                    {line}
+                  </p>
+                ))}
+              </div>
             )}
 
             {outputMode === 'error' && (
