@@ -4,7 +4,7 @@ import './dashboard.css';
 
 const ANALYSIS_SECTIONS = ['objectives', 'constraints', 'risks', 'leverage', 'next_actions'];
 const UNKNOWN_COMMAND_MESSAGE =
-  'Unknown command. Supported commands: analyze, log signal, create system, show signals, show systems.';
+  'Unknown command. Supported commands: analyze, show signals, show systems, create system, log signal.';
 
 const parseValue = (value) => {
   if (/^-?\d+(\.\d+)?$/.test(value)) {
@@ -35,19 +35,113 @@ const parseSignalPayload = (rawText) => {
     }
 
     if (currentKey) {
-      payload[currentKey] = `${payload[currentKey]} ${token}`.trim();
+      payload[currentKey] = parseValue(`${payload[currentKey]} ${token}`.trim());
     }
   });
 
   return payload;
 };
 
+const getCommandRoute = (rawCommand) => {
+  const trimmed = rawCommand.trim();
+  const lowered = trimmed.toLowerCase();
+
+  if (lowered.startsWith('analyze ')) {
+    return {
+      type: 'analyze',
+      routeLabel: 'analyze',
+      title: 'TACTICAL READOUT',
+      request: () => axios.post('/api/core/analyze', { text: trimmed.slice(8).trim() }),
+    };
+  }
+
+  if (lowered === 'show signals') {
+    return {
+      type: 'show-signals',
+      routeLabel: 'show signals',
+      title: 'SIGNAL LOG',
+      request: () => axios.get('/api/core/signals'),
+    };
+  }
+
+  if (lowered === 'show systems') {
+    return {
+      type: 'show-systems',
+      routeLabel: 'show systems',
+      title: 'SYSTEM REGISTRY',
+      request: () => axios.get('/api/core/systems'),
+    };
+  }
+
+  if (lowered.startsWith('create system ')) {
+    const name = trimmed.slice(14).trim();
+
+    return {
+      type: 'create-system',
+      routeLabel: 'create system',
+      title: 'SYSTEM CREATED',
+      request: () =>
+        axios.post('/api/core/systems', {
+          name,
+          purpose: '',
+          inputs: [],
+          outputs: [],
+          routines: [],
+        }),
+    };
+  }
+
+  if (lowered.startsWith('log signal ')) {
+    const signalText = trimmed.slice(11).trim();
+
+    return {
+      type: 'log-signal',
+      routeLabel: 'log signal',
+      title: 'SIGNAL RECORDED',
+      request: () => axios.post('/api/core/signals', parseSignalPayload(signalText)),
+    };
+  }
+
+  return {
+    type: 'unknown',
+    routeLabel: 'unknown',
+    title: 'COMMAND ERROR',
+    request: null,
+  };
+};
+
+const renderCompactJson = (data, keyPrefix = 'json') => (
+  <div
+    key={keyPrefix}
+    style={{
+      marginBottom: '0.5rem',
+      border: '1px solid rgba(120, 180, 255, 0.2)',
+      borderRadius: '8px',
+      padding: '0.45rem 0.55rem',
+    }}
+  >
+    <pre
+      style={{
+        margin: 0,
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        fontSize: '0.77rem',
+        lineHeight: 1.35,
+        fontFamily: 'monospace',
+      }}
+    >
+      {JSON.stringify(data, null, 2)}
+    </pre>
+  </div>
+);
+
 const Dashboard = ({ user }) => {
   const [command, setCommand] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
   const [outputMode, setOutputMode] = useState('analyze');
   const [outputTitle, setOutputTitle] = useState('TACTICAL READOUT');
+  const [routeLabel, setRouteLabel] = useState('analyze');
+  const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [showOverlay, setShowOverlay] = useState(false);
 
@@ -57,34 +151,48 @@ const Dashboard = ({ user }) => {
     }
 
     const rawCommand = command.trim();
-    const lowered = rawCommand.toLowerCase();
+    const route = getCommandRoute(rawCommand);
 
     setLoading(true);
     setError('');
+    setOutputTitle(route.title);
+    setRouteLabel(route.routeLabel);
+
+    if (route.type === 'unknown') {
+      setOutputMode('unknown');
+      setResult({ message: UNKNOWN_COMMAND_MESSAGE });
+      setShowOverlay(true);
+      setLoading(false);
+      return;
+    }
 
     try {
-      const [analysisResponse, signalsResponse, systemsResponse] = await Promise.all([
-        axios.post('/api/core/analyze', { text: command }),
-        axios.get('/api/core/signals'),
-        axios.get('/api/core/systems'),
-      ]);
+      const response = await route.request();
+      const data = response?.data;
 
-      const telemetry = {
-        signalCount: Array.isArray(signalsResponse.data) ? signalsResponse.data.length : 0,
-        systemCount: Array.isArray(systemsResponse.data) ? systemsResponse.data.length : 0,
-      };
+      if (route.type === 'analyze') {
+        setOutputMode('analyze');
+        setResult(data);
+      } else if (route.type === 'show-signals') {
+        setOutputMode('signals');
+        setResult(Array.isArray(data) ? data : []);
+      } else if (route.type === 'show-systems') {
+        setOutputMode('systems');
+        setResult(Array.isArray(data) ? data : []);
+      } else if (route.type === 'create-system') {
+        setOutputMode('created');
+        setResult(data);
+      } else if (route.type === 'log-signal') {
+        setOutputMode('logged');
+        setResult(data);
+      }
 
-      setResult({
-        ...analysisResponse.data,
-        _telemetry: telemetry,
-      });
       setShowOverlay(true);
       setCommand('');
     } catch (err) {
       const message = err?.response?.data?.message || err.message || 'Command execution failed.';
       setError(message);
       setOutputMode('error');
-      setOutputTitle('TACTICAL READOUT');
       setResult({ message });
       setShowOverlay(true);
     } finally {
@@ -203,12 +311,13 @@ const Dashboard = ({ user }) => {
               </button>
             </div>
 
+            <p style={{ margin: '0 0 0.6rem', fontSize: '0.72rem', letterSpacing: '0.08em', opacity: 0.9 }}>
+              ROUTE: {routeLabel}
+            </p>
+
             {outputMode === 'analyze' &&
               ANALYSIS_SECTIONS.map((section) => {
-                const items = Array.isArray(result[section]) ? result[section] : [];
-                if (!items.length) {
-                  return null;
-                }
+                const items = Array.isArray(result?.[section]) ? result[section] : [];
 
                 return (
                   <div key={section} style={{ marginBottom: '0.55rem' }}>
@@ -224,60 +333,29 @@ const Dashboard = ({ user }) => {
                 );
               })}
 
-            {outputMode === 'list' && (
+            {outputMode === 'signals' && (
               <div>
-                {!result.length && <p style={{ margin: 0, fontSize: '0.84rem' }}>&gt; No records found.</p>}
-                {result.map((item, index) => (
-                  <div
-                    key={item._id || index}
-                    style={{
-                      marginBottom: '0.5rem',
-                      border: '1px solid rgba(120, 180, 255, 0.2)',
-                      borderRadius: '8px',
-                      padding: '0.45rem 0.55rem',
-                    }}
-                  >
-                    <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.8 }}>#{index + 1}</p>
-                    <pre
-                      style={{
-                        margin: '0.15rem 0 0',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        fontSize: '0.77rem',
-                        lineHeight: 1.35,
-                        fontFamily: 'monospace',
-                      }}
-                    >
-                      {JSON.stringify(item, null, 2)}
-                    </pre>
-                  </div>
-                ))}
+                {!result.length && <p style={{ margin: 0, fontSize: '0.84rem' }}>No signals recorded yet.</p>}
+                {result.map((item, index) => renderCompactJson(item, `signal-${item?._id || index}`))}
               </div>
             )}
 
-            {outputMode === 'entity' && (
+            {outputMode === 'systems' && (
               <div>
-                <p style={{ margin: '0 0 0.45rem', fontSize: '0.82rem', opacity: 0.92 }}>&gt; {result.message}</p>
-                <pre
-                  style={{
-                    margin: 0,
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    fontSize: '0.77rem',
-                    lineHeight: 1.35,
-                    fontFamily: 'monospace',
-                  }}
-                >
-                  {JSON.stringify(result.payload, null, 2)}
-                </pre>
+                {!result.length && <p style={{ margin: 0, fontSize: '0.84rem' }}>No systems created yet.</p>}
+                {result.map((item, index) => renderCompactJson(item, `system-${item?._id || index}`))}
               </div>
+            )}
+
+            {(outputMode === 'created' || outputMode === 'logged') && renderCompactJson(result)}
+
+            {outputMode === 'unknown' && (
+              <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', opacity: 0.88 }}>{result.message}</p>
             )}
 
             {outputMode === 'error' && (
               <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', opacity: 0.88 }}>&gt; {result.message}</p>
             )}
-
-            {error && outputMode !== 'error' && <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem' }}>&gt; ERROR: {error}</p>}
           </div>
         )}
 
@@ -293,7 +371,7 @@ const Dashboard = ({ user }) => {
               pointerEvents: 'none',
             }}
           >
-            ANALYZING COMMAND...
+            ROUTING COMMAND...
           </div>
         )}
 
