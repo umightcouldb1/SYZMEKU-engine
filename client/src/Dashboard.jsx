@@ -20,8 +20,21 @@ const Dashboard = ({ user }) => {
     setError('');
 
     try {
-      const { data } = await axios.post('/api/core/analyze', { text: command });
-      setResult(data);
+      const [analysisResponse, signalsResponse, systemsResponse] = await Promise.all([
+        axios.post('/api/core/analyze', { text: command }),
+        axios.get('/api/core/signals'),
+        axios.get('/api/core/systems'),
+      ]);
+
+      const telemetry = {
+        signalCount: Array.isArray(signalsResponse.data) ? signalsResponse.data.length : 0,
+        systemCount: Array.isArray(systemsResponse.data) ? systemsResponse.data.length : 0,
+      };
+
+      setResult({
+        ...analysisResponse.data,
+        _telemetry: telemetry,
+      });
       setShowOverlay(true);
       setCommand('');
     } catch (err) {
