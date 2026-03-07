@@ -48,7 +48,6 @@ const Dashboard = ({ user }) => {
   const [result, setResult] = useState(null);
   const [outputMode, setOutputMode] = useState('analyze');
   const [outputTitle, setOutputTitle] = useState('TACTICAL READOUT');
-  const [outputRoute, setOutputRoute] = useState('ANALYZE');
   const [error, setError] = useState('');
   const [showOverlay, setShowOverlay] = useState(false);
 
@@ -64,85 +63,28 @@ const Dashboard = ({ user }) => {
     setError('');
 
     try {
-      if (lowered.startsWith('analyze')) {
-        const text = rawCommand.slice(7).trim();
+      const [analysisResponse, signalsResponse, systemsResponse] = await Promise.all([
+        axios.post('/api/core/analyze', { text: command }),
+        axios.get('/api/core/signals'),
+        axios.get('/api/core/systems'),
+      ]);
 
-        if (!text) {
-          throw new Error('Usage: analyze <text>');
-        }
+      const telemetry = {
+        signalCount: Array.isArray(signalsResponse.data) ? signalsResponse.data.length : 0,
+        systemCount: Array.isArray(systemsResponse.data) ? systemsResponse.data.length : 0,
+      };
 
-        const { data } = await axios.post('/api/core/analyze', { text });
-        setOutputMode('analyze');
-        setOutputTitle('TACTICAL READOUT');
-        setOutputRoute('ANALYZE');
-        setResult(data);
-      } else if (lowered.startsWith('log signal')) {
-        const signalText = rawCommand.slice(10).trim();
-
-        if (!signalText || !signalText.includes('=')) {
-          throw new Error('Usage: log signal <key=value pairs>');
-        }
-
-        const payload = parseSignalPayload(signalText);
-
-        if (!Object.keys(payload).length) {
-          throw new Error('Signal payload is empty. Include at least one key=value pair.');
-        }
-
-        const { data } = await axios.post('/api/core/signals', payload);
-        setOutputMode('entity');
-        setOutputTitle('SIGNAL RECORDED');
-        setOutputRoute('LOG SIGNAL');
-        setResult({
-          message: 'Signal entry recorded successfully.',
-          payload: data,
-        });
-      } else if (lowered.startsWith('create system')) {
-        const name = rawCommand.slice(13).trim();
-
-        if (!name) {
-          throw new Error('Usage: create system <name>');
-        }
-
-        const { data } = await axios.post('/api/core/systems', {
-          name,
-          purpose: '',
-          inputs: [],
-          outputs: [],
-          routines: [],
-        });
-
-        setOutputMode('entity');
-        setOutputTitle('SYSTEM CREATED');
-        setOutputRoute('CREATE SYSTEM');
-        setResult({
-          message: 'System record created successfully.',
-          payload: data,
-        });
-      } else if (lowered === 'show signals') {
-        const { data } = await axios.get('/api/core/signals');
-        setOutputMode('list-signals');
-        setOutputTitle('SIGNAL LOG');
-        setOutputRoute('SHOW SIGNALS');
-        setResult(Array.isArray(data) ? data : []);
-      } else if (lowered === 'show systems') {
-        const { data } = await axios.get('/api/core/systems');
-        setOutputMode('list-systems');
-        setOutputTitle('SYSTEM REGISTRY');
-        setOutputRoute('SHOW SYSTEMS');
-        setResult(Array.isArray(data) ? data : []);
-      } else {
-        throw new Error(UNKNOWN_COMMAND_MESSAGE);
-      }
-
+      setResult({
+        ...analysisResponse.data,
+        _telemetry: telemetry,
+      });
       setShowOverlay(true);
       setCommand('');
     } catch (err) {
       const message = err?.response?.data?.message || err.message || 'Command execution failed.';
       setError(message);
       setOutputMode('error');
-      setOutputTitle('COMMAND ERROR');
-      setOutputRoute('UNKNOWN');
+      setOutputTitle('TACTICAL READOUT');
       setResult({ message });
       setShowOverlay(true);
     } finally {
@@ -261,10 +203,6 @@ const Dashboard = ({ user }) => {
               </button>
             </div>
 
-            <p style={{ margin: '0 0 0.55rem', fontSize: '0.68rem', letterSpacing: '0.08em', opacity: 0.76 }}>
-              &gt; ROUTE: {outputRoute}
-            </p>
-
             {outputMode === 'analyze' &&
               ANALYSIS_SECTIONS.map((section) => {
                 const items = Array.isArray(result[section]) ? result[section] : [];
@@ -286,40 +224,9 @@ const Dashboard = ({ user }) => {
                 );
               })}
 
-            {outputMode === 'list-signals' && (
+            {outputMode === 'list' && (
               <div>
-                {!result.length && <p style={{ margin: 0, fontSize: '0.84rem' }}>&gt; No signals recorded yet.</p>}
-                {result.map((item, index) => (
-                  <div
-                    key={item._id || index}
-                    style={{
-                      marginBottom: '0.5rem',
-                      border: '1px solid rgba(120, 180, 255, 0.2)',
-                      borderRadius: '8px',
-                      padding: '0.45rem 0.55rem',
-                    }}
-                  >
-                    <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.8 }}>#{index + 1}</p>
-                    <pre
-                      style={{
-                        margin: '0.15rem 0 0',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        fontSize: '0.77rem',
-                        lineHeight: 1.35,
-                        fontFamily: 'monospace',
-                      }}
-                    >
-                      {JSON.stringify(item, null, 2)}
-                    </pre>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {outputMode === 'list-systems' && (
-              <div>
-                {!result.length && <p style={{ margin: 0, fontSize: '0.84rem' }}>&gt; No systems created yet.</p>}
+                {!result.length && <p style={{ margin: 0, fontSize: '0.84rem' }}>&gt; No records found.</p>}
                 {result.map((item, index) => (
                   <div
                     key={item._id || index}
