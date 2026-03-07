@@ -63,72 +63,21 @@ const Dashboard = ({ user }) => {
     setError('');
 
     try {
-      if (lowered.startsWith('analyze')) {
-        const text = rawCommand.slice(7).trim();
+      const [analysisResponse, signalsResponse, systemsResponse] = await Promise.all([
+        axios.post('/api/core/analyze', { text: command }),
+        axios.get('/api/core/signals'),
+        axios.get('/api/core/systems'),
+      ]);
 
-        if (!text) {
-          throw new Error('Usage: analyze <text>');
-        }
+      const telemetry = {
+        signalCount: Array.isArray(signalsResponse.data) ? signalsResponse.data.length : 0,
+        systemCount: Array.isArray(systemsResponse.data) ? systemsResponse.data.length : 0,
+      };
 
-        const { data } = await axios.post('/api/core/analyze', { text });
-        setOutputMode('analyze');
-        setOutputTitle('TACTICAL READOUT');
-        setResult(data);
-      } else if (lowered.startsWith('log signal')) {
-        const signalText = rawCommand.slice(10).trim();
-
-        if (!signalText || !signalText.includes('=')) {
-          throw new Error('Usage: log signal <key=value pairs>');
-        }
-
-        const payload = parseSignalPayload(signalText);
-
-        if (!Object.keys(payload).length) {
-          throw new Error('Signal payload is empty. Include at least one key=value pair.');
-        }
-
-        const { data } = await axios.post('/api/core/signals', payload);
-        setOutputMode('entity');
-        setOutputTitle('SIGNAL LOGGED');
-        setResult({
-          message: 'Signal entry recorded successfully.',
-          payload: data,
-        });
-      } else if (lowered.startsWith('create system')) {
-        const name = rawCommand.slice(13).trim();
-
-        if (!name) {
-          throw new Error('Usage: create system <name>');
-        }
-
-        const { data } = await axios.post('/api/core/systems', {
-          name,
-          purpose: '',
-          inputs: [],
-          outputs: [],
-          routines: [],
-        });
-
-        setOutputMode('entity');
-        setOutputTitle('SYSTEM CREATED');
-        setResult({
-          message: 'System record created successfully.',
-          payload: data,
-        });
-      } else if (lowered === 'show signals') {
-        const { data } = await axios.get('/api/core/signals');
-        setOutputMode('list');
-        setOutputTitle('SIGNAL REGISTRY');
-        setResult(Array.isArray(data) ? data : []);
-      } else if (lowered === 'show systems') {
-        const { data } = await axios.get('/api/core/systems');
-        setOutputMode('list');
-        setOutputTitle('SYSTEM REGISTRY');
-        setResult(Array.isArray(data) ? data : []);
-      } else {
-        throw new Error(UNKNOWN_COMMAND_MESSAGE);
-      }
-
+      setResult({
+        ...analysisResponse.data,
+        _telemetry: telemetry,
+      });
       setShowOverlay(true);
       setCommand('');
     } catch (err) {
