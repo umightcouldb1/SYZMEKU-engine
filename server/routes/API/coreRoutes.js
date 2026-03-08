@@ -3,25 +3,75 @@ const System = require("../../models/System");
 const SignalEntry = require("../../models/SignalEntry");
 
 router.post("/analyze", async (req, res) => {
-  const { text } = req.body;
-
-  const analysis = {
-    objectives: [],
-    constraints: [],
-    risks: [],
-    leverage: [],
-    next_actions: [],
+  const fallbackAnalysis = {
+    objectives: ["Clarify the main objective"],
+    constraints: ["Identify current limitations"],
+    risks: ["Evaluate potential obstacles"],
+    leverage: ["Identify strategic advantages"],
+    next_actions: ["Define the first executable step"],
   };
 
-  if (text) {
-    analysis.objectives.push("Clarify the main objective");
-    analysis.constraints.push("Identify current limitations");
-    analysis.risks.push("Evaluate potential obstacles");
-    analysis.leverage.push("Identify strategic advantages");
-    analysis.next_actions.push("Define the first executable step");
+  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+
+  if (!text) {
+    return res.status(400).json({ message: "Command text is required." });
   }
 
-  res.json(analysis);
+  const apiKey = process.env.Gemini_API_Key;
+
+  if (!apiKey) {
+    return res.json(fallbackAnalysis);
+  }
+
+  const prompt = [
+    "Analyze the user input like a strategic systems architect.",
+    "Return ONLY valid JSON.",
+    "No markdown.",
+    "No explanation outside JSON.",
+    "No code fences.",
+    "Each field must be an array of strings.",
+    "Use this exact shape:",
+    '{"objectives":[],"constraints":[],"risks":[],"leverage":[],"next_actions":[]}',
+    `User input: ${text}`,
+  ].join("\n");
+
+  try {
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+          },
+        }),
+      }
+    );
+
+    const data = await geminiResponse.json();
+    const modelText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!modelText) {
+      return res.json(fallbackAnalysis);
+    }
+
+    try {
+      const parsed = JSON.parse(modelText);
+      return res.json(parsed);
+    } catch (error) {
+      return res.json(fallbackAnalysis);
+    }
+  } catch (error) {
+    return res.json(fallbackAnalysis);
+  }
 });
 
 /* SYSTEM BUILDER */
