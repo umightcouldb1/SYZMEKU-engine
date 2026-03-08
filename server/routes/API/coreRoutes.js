@@ -82,7 +82,20 @@ const persistLoopState = async (patch = {}) => {
     ...(typeof nextPatch.last_error === "string" ? { last_error: nextPatch.last_error } : {}),
   };
 
-  const record = await AgentLoopState.findOneAndUpdate({ singletonKey: "primary" }, { $set: payload }, { new: true });
+  const record = await AgentLoopState.findOneAndUpdate(
+    { singletonKey: "primary" },
+    {
+      $set: payload,
+      $setOnInsert: {
+        singletonKey: "primary",
+        active: DEV_DEFAULT_ACTIVE,
+        interval_ms: LOOP_INTERVAL_MS,
+        run_count: 0,
+        last_error: "",
+      },
+    },
+    { new: true, upsert: true }
+  );
   if (record) syncLoopStateFromRecord(record);
   return record;
 };
