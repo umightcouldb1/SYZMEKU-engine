@@ -4,6 +4,8 @@ const SignalEntry = require("../../models/SignalEntry");
 const SystemExecution = require("../../models/SystemExecution");
 const Task = require("../../models/Task");
 const StrategicMemory = require("../../models/StrategicMemory");
+const AgentLoopState = require("../../models/AgentLoopState");
+const mongoose = require("mongoose");
 
 const REQUIRED_ANALYSIS_KEYS = ["objectives", "constraints", "risks", "leverage", "next_actions"];
 const LINKABLE_SIGNAL_KEYS = ["sleep", "stress", "symptoms", "notes"];
@@ -22,7 +24,9 @@ const autonomyState = {
   activeAlerts: [],
 };
 
-const LOOP_INTERVAL_MS = Number(process.env.AGENT_LOOP_INTERVAL_MS) > 0 ? Number(process.env.AGENT_LOOP_INTERVAL_MS) : 6 * 60 * 60 * 1000;
+const LOOP_INTERVAL_MS = Number(process.env.AGENT_LOOP_INTERVAL_MS) > 0 ? Number(process.env.AGENT_LOOP_INTERVAL_MS) : 60000;
+const DEV_DEFAULT_ACTIVE =
+  process.env.NODE_ENV === "development" && String(process.env.AGENT_LOOP_DEFAULT_ACTIVE || "false").toLowerCase() === "true";
 const loopState = {
   active: false,
   intervalMs: LOOP_INTERVAL_MS,
@@ -37,6 +41,50 @@ const loopState = {
 
 const appendLoopEvent = (event) => {
   loopState.eventLog = [{ recordedAt: new Date().toISOString(), ...event }, ...loopState.eventLog].slice(0, 50);
+};
+
+const getLoopStateRecord = async () => {
+  let record = await AgentLoopState.findOne({ singletonKey: "primary" });
+  if (record) return record;
+
+  record = await AgentLoopState.create({
+    singletonKey: "primary",
+    active: DEV_DEFAULT_ACTIVE,
+    interval_ms: LOOP_INTERVAL_MS,
+    run_count: 0,
+    last_error: "",
+  });
+
+  return record;
+};
+
+const syncLoopStateFromRecord = (record) => {
+  if (!record) return;
+  loopState.active = Boolean(record.active);
+  loopState.intervalMs = Number(record.interval_ms) > 0 ? Number(record.interval_ms) : LOOP_INTERVAL_MS;
+  loopState.lastRunAt = record.last_run_at || null;
+  loopState.runCount = Number(record.run_count) || 0;
+  loopState.lastError = record.last_error || "";
+};
+
+const persistLoopState = async (patch = {}) => {
+  const nextPatch = { ...patch };
+  if (typeof nextPatch.intervalMs !== "undefined") {
+    nextPatch.interval_ms = nextPatch.intervalMs;
+    delete nextPatch.intervalMs;
+  }
+
+  const payload = {
+    ...(typeof nextPatch.active === "boolean" ? { active: nextPatch.active } : {}),
+    ...(typeof nextPatch.interval_ms === "number" && nextPatch.interval_ms > 0 ? { interval_ms: nextPatch.interval_ms } : {}),
+    ...(Object.prototype.hasOwnProperty.call(nextPatch, "last_run_at") ? { last_run_at: nextPatch.last_run_at } : {}),
+    ...(typeof nextPatch.run_count === "number" ? { run_count: nextPatch.run_count } : {}),
+    ...(typeof nextPatch.last_error === "string" ? { last_error: nextPatch.last_error } : {}),
+  };
+
+  const record = await AgentLoopState.findOneAndUpdate({ singletonKey: "primary" }, { $set: payload }, { new: true });
+  if (record) syncLoopStateFromRecord(record);
+  return record;
 };
 
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
@@ -442,6 +490,12 @@ const runAgentLoopCycle = async () => {
   loopState.lastError = null;
   loopState.lastReport = event;
   appendLoopEvent(event);
+  await persistLoopState({
+    last_run_at: loopState.lastRunAt,
+    run_count: loopState.runCount,
+    last_error: "",
+  });
+  console.log("Agent loop cycle completed");
 
   return event;
 };
@@ -530,18 +584,29 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
   };
 };
 
-const startAgentLoop = async () => {
-  if (loopState.active && loopState.timer) return loopState;
+const startAgentLoop = async ({ intervalMs } = {}) => {
+  const resolvedInterval = Number(intervalMs) > 0 ? Number(intervalMs) : loopState.intervalMs;
+  const shouldRestartTimer = Boolean(loopState.timer) && loopState.intervalMs !== resolvedInterval;
+  if (loopState.active && loopState.timer && !shouldRestartTimer) return loopState;
+
+  if (shouldRestartTimer) {
+    clearInterval(loopState.timer);
+    loopState.timer = null;
+  }
 
   loopState.active = true;
+  loopState.intervalMs = resolvedInterval;
   loopState.startedAt = new Date();
-  loopState.lastError = null;
+  loopState.lastError = "";
+
+  await persistLoopState({ active: true, interval_ms: loopState.intervalMs, last_error: "" });
 
   try {
     await runAgentLoopCycle();
   } catch (error) {
     loopState.lastError = String(error?.message || error);
     appendLoopEvent({ type: "loop-cycle-error", error: loopState.lastError });
+    await persistLoopState({ last_error: loopState.lastError });
   }
 
   loopState.timer = setInterval(async () => {
@@ -550,19 +615,26 @@ const startAgentLoop = async () => {
     } catch (error) {
       loopState.lastError = String(error?.message || error);
       appendLoopEvent({ type: "loop-cycle-error", error: loopState.lastError });
+      await persistLoopState({ last_error: loopState.lastError });
     }
   }, loopState.intervalMs);
+
+  console.log("Agent loop started");
+  appendLoopEvent({ type: "loop-started", interval_ms: loopState.intervalMs });
 
   return loopState;
 };
 
-const stopAgentLoop = () => {
+const stopAgentLoop = async () => {
   if (loopState.timer) {
     clearInterval(loopState.timer);
     loopState.timer = null;
   }
   loopState.active = false;
+  loopState.lastError = "";
   appendLoopEvent({ type: "loop-stopped" });
+  await persistLoopState({ active: false, last_error: "" });
+  console.log("Agent loop stopped");
   return loopState;
 };
 
@@ -576,6 +648,29 @@ const loopStatusPayload = () => ({
   last_report: loopState.lastReport,
   recent_events: loopState.eventLog.slice(0, 10),
 });
+
+const restoreAgentLoopOnBoot = async () => {
+  if (mongoose.connection.readyState !== 1) return;
+  const record = await getLoopStateRecord();
+  syncLoopStateFromRecord(record);
+  appendLoopEvent({ type: "loop-restored", active: loopState.active, interval_ms: loopState.intervalMs });
+  console.log("Agent loop restored on boot");
+  if (record.active) {
+    await startAgentLoop({ intervalMs: record.interval_ms });
+  }
+};
+
+if (mongoose.connection.readyState === 1) {
+  restoreAgentLoopOnBoot().catch((error) => {
+    console.warn("Failed to restore agent loop on boot:", error?.message || error);
+  });
+} else {
+  mongoose.connection.once("connected", () => {
+    restoreAgentLoopOnBoot().catch((error) => {
+      console.warn("Failed to restore agent loop on boot:", error?.message || error);
+    });
+  });
+}
 
 /* CORE REASONING */
 router.post("/analyze", async (req, res) => {
@@ -922,16 +1017,19 @@ router.get("/autonomy/status", async (_req, res) => {
 });
 
 router.get("/loop/status", async (_req, res) => {
+  const record = await getLoopStateRecord();
+  syncLoopStateFromRecord(record);
   return res.json(loopStatusPayload());
 });
 
-router.post("/loop/start", async (_req, res) => {
-  await startAgentLoop();
+router.post("/loop/start", async (req, res) => {
+  const requestedInterval = Number(req.body?.interval_ms);
+  await startAgentLoop({ intervalMs: requestedInterval });
   return res.json({ message: "Agent loop started.", ...loopStatusPayload() });
 });
 
 router.post("/loop/stop", async (_req, res) => {
-  stopAgentLoop();
+  await stopAgentLoop();
   return res.json({ message: "Agent loop stopped.", ...loopStatusPayload() });
 });
 
@@ -1016,6 +1114,8 @@ router.get("/summary", async (_req, res) => {
     StrategicMemory.countDocuments(),
   ]);
   if (!autonomyState.lastRunAt) await evaluateMonitorState();
+  const loopRecord = await getLoopStateRecord();
+  syncLoopStateFromRecord(loopRecord);
 
   return res.json({
     state_summary: latestSignal
@@ -1038,6 +1138,7 @@ router.get("/summary", async (_req, res) => {
       interval_ms: loopState.intervalMs,
       last_run_at: loopState.lastRunAt,
       run_count: loopState.runCount,
+      last_error: loopState.lastError,
     },
   });
 });
