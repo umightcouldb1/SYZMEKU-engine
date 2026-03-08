@@ -13,6 +13,21 @@ router.post("/analyze", async (req, res) => {
 
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
 
+  const analyzeModeInstructions = {
+    general:
+      "Balance strategic and practical reasoning using signals, systems, and recent context.",
+    strategic:
+      "Emphasize priorities, leverage, sequencing, and decision quality.",
+    health: "Emphasize signals, stability, recovery, and stress patterns.",
+    build: "Emphasize product design, architecture, engineering execution, and UX quality.",
+    signal: "Emphasize trends, anomalies, and recent state changes in the signal stream.",
+  };
+
+  const modeMatch = text.match(/^(strategic|health|build|signal)\b\s*(.*)$/i);
+  const analyzeMode = modeMatch ? modeMatch[1].toLowerCase() : "general";
+  const modeSpecificCommand = modeMatch ? modeMatch[2].trim() : text;
+  const effectiveCommand = modeSpecificCommand || text;
+
   if (!text) {
     return res.status(400).json({ message: "Command text is required." });
   }
@@ -128,7 +143,9 @@ router.post("/analyze", async (req, res) => {
     "Use this exact shape:",
     '{"objectives":[],"constraints":[],"risks":[],"leverage":[],"next_actions":[]}',
     "",
-    `Current user command: ${text}`,
+    `Analyze mode: ${analyzeMode}`,
+    `Mode guidance: ${analyzeModeInstructions[analyzeMode] || analyzeModeInstructions.general}`,
+    `Current user command: ${effectiveCommand}`,
     `Active route type: ${activeRouteType || "(none provided)"}`,
     `Recent command history: ${recentCommands.length ? JSON.stringify(recentCommands) : "(none provided)"}`,
     "Latest signals (newest first, max 5):",
