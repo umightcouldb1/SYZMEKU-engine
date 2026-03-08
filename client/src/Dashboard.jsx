@@ -61,7 +61,7 @@ const parseSignalPayload = (rawText) => {
   return payload;
 };
 
-const getCommandRoute = (rawCommand) => {
+const getCommandRoute = (rawCommand, analyzeContext = DEFAULT_SESSION_MEMORY) => {
   const trimmed = rawCommand.trim();
   const lowered = trimmed.toLowerCase();
 
@@ -70,7 +70,15 @@ const getCommandRoute = (rawCommand) => {
       type: 'analyze',
       routeLabel: 'analyze',
       title: 'TACTICAL READOUT',
-      request: () => axios.post('/api/core/analyze', { text: trimmed.slice(8).trim() }),
+      request: () =>
+        axios.post('/api/core/analyze', {
+          text: trimmed.slice(8).trim(),
+          context: {
+            recentCommands: analyzeContext.recentCommands,
+            lastOverlayResult: analyzeContext.lastOverlayResult,
+            activeRouteType: analyzeContext.activeRouteType,
+          },
+        }),
     };
   }
 
@@ -301,7 +309,11 @@ const Dashboard = ({ user }) => {
     }
 
     const rawCommand = command.trim();
-    const route = getCommandRoute(rawCommand);
+    const route = getCommandRoute(rawCommand, {
+      recentCommands: commandHistory,
+      lastOverlayResult,
+      activeRouteType,
+    });
 
     setLoading(true);
     setError('');
