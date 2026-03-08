@@ -9,6 +9,12 @@ const HELP_LINES = [
   '• recommend <optional text>',
   '• show signals',
   '• show systems',
+  '• map systems',
+  '• trend signals',
+  '• run system <name>',
+  '• task create <text>',
+  '• task show',
+  '• task complete <id>',
   '• create system <name>',
   '• log signal key=value key=value',
   '• history',
@@ -117,6 +123,66 @@ const getCommandRoute = (rawCommand, analyzeContext = DEFAULT_SESSION_MEMORY) =>
       routeLabel: 'show systems',
       title: 'SYSTEM REGISTRY',
       request: () => axios.get('/api/core/systems'),
+    };
+  }
+
+  if (lowered === 'map systems') {
+    return {
+      type: 'map-systems',
+      routeLabel: 'map systems',
+      title: 'SYSTEM MAP',
+      request: () => axios.get('/api/core/map/systems'),
+    };
+  }
+
+  if (lowered === 'trend signals') {
+    return {
+      type: 'trend-signals',
+      routeLabel: 'trend signals',
+      title: 'SIGNAL TRENDS',
+      request: () => axios.get('/api/core/trends/signals'),
+    };
+  }
+
+  if (lowered.startsWith('run system ')) {
+    const systemName = trimmed.slice(11).trim();
+
+    return {
+      type: 'run-system',
+      routeLabel: 'run system',
+      title: 'SYSTEM EXECUTION',
+      request: () => axios.post('/api/core/systems/run', { name: systemName }),
+    };
+  }
+
+  if (lowered.startsWith('task create ')) {
+    const description = trimmed.slice(12).trim();
+
+    return {
+      type: 'task-create',
+      routeLabel: 'task create',
+      title: 'TASK CREATED',
+      request: () => axios.post('/api/core/task/create', { description }),
+    };
+  }
+
+  if (lowered === 'task show') {
+    return {
+      type: 'task-show',
+      routeLabel: 'task show',
+      title: 'TASK LIST',
+      request: () => axios.get('/api/core/task/list'),
+    };
+  }
+
+  if (lowered.startsWith('task complete ')) {
+    const taskId = trimmed.slice(14).trim();
+
+    return {
+      type: 'task-complete',
+      routeLabel: 'task complete',
+      title: 'TASK COMPLETED',
+      request: () => axios.post('/api/core/task/complete', { id: taskId }),
     };
   }
 
@@ -402,6 +468,24 @@ const Dashboard = ({ user }) => {
       } else if (route.type === 'show-systems') {
         setOutputMode('systems');
         setResult(Array.isArray(data) ? data : []);
+      } else if (route.type === 'map-systems') {
+        setOutputMode('system-map');
+        setResult(data);
+      } else if (route.type === 'trend-signals') {
+        setOutputMode('signal-trends');
+        setResult(data);
+      } else if (route.type === 'run-system') {
+        setOutputMode('system-run');
+        setResult(data);
+      } else if (route.type === 'task-create') {
+        setOutputMode('task-created');
+        setResult(data);
+      } else if (route.type === 'task-show') {
+        setOutputMode('tasks');
+        setResult(data);
+      } else if (route.type === 'task-complete') {
+        setOutputMode('task-completed');
+        setResult(data);
       } else if (route.type === 'create-system') {
         setOutputMode('created');
         setResult(data);
@@ -602,6 +686,113 @@ const Dashboard = ({ user }) => {
                 {result.map((item, index) => renderCompactJson(item, `system-${item?._id || index}`))}
               </div>
             )}
+
+            {outputMode === 'system-map' && (
+              <div>
+                {!(result?.systems || []).length && (
+                  <p style={{ margin: 0, fontSize: '0.84rem' }}>No systems available to map.</p>
+                )}
+                {(result?.systems || []).map((item, index) => (
+                  <div
+                    key={`mapped-${item?.id || index}`}
+                    style={{
+                      marginBottom: '0.5rem',
+                      border: '1px solid rgba(120, 180, 255, 0.2)',
+                      borderRadius: '8px',
+                      padding: '0.45rem 0.55rem',
+                    }}
+                  >
+                    <p style={{ margin: '0.12rem 0', fontSize: '0.85rem' }}>
+                      <strong>{item?.name || 'Unnamed System'}</strong>
+                    </p>
+                    <p style={{ margin: '0.12rem 0', fontSize: '0.8rem' }}>
+                      Inputs: {(item?.inputs || []).join(', ') || 'none'}
+                    </p>
+                    <p style={{ margin: '0.12rem 0', fontSize: '0.8rem' }}>
+                      Outputs: {(item?.outputs || []).join(', ') || 'none'}
+                    </p>
+                    <p style={{ margin: '0.12rem 0', fontSize: '0.8rem' }}>
+                      Linked signals: {(item?.linkedSignals || []).join(', ') || 'none'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {outputMode === 'signal-trends' && (
+              <div>
+                <p style={{ margin: '0.12rem 0', fontSize: '0.82rem' }}>
+                  Sample size: {result?.sampleSize || 0}
+                </p>
+                <p style={{ margin: '0.12rem 0', fontSize: '0.82rem' }}>
+                  Sleep trend: {result?.sleep?.direction || 'unknown'} ({result?.sleep?.previous ?? 'n/a'} → {result?.sleep?.latest ?? 'n/a'})
+                </p>
+                <p style={{ margin: '0.12rem 0', fontSize: '0.82rem' }}>
+                  Stress trend: {result?.stress?.direction || 'unknown'} ({result?.stress?.previous ?? 'n/a'} → {result?.stress?.latest ?? 'n/a'})
+                </p>
+                <p style={{ margin: '0.12rem 0', fontSize: '0.82rem' }}>
+                  Symptoms trend: {result?.symptoms?.direction || 'unknown'}
+                </p>
+              </div>
+            )}
+
+            {outputMode === 'system-run' && (
+              <div>
+                <p style={{ margin: '0.12rem 0', fontSize: '0.84rem' }}>
+                  System: {result?.system?.name || 'Unknown'}
+                </p>
+                <p style={{ margin: '0.12rem 0', fontSize: '0.82rem' }}>
+                  Readiness: {result?.execution?.readiness || 'unknown'}
+                </p>
+                {!!(result?.execution?.riskFlags || []).length && (
+                  <ul style={{ margin: '0.25rem 0 0.25rem', paddingLeft: '1rem' }}>
+                    {(result?.execution?.riskFlags || []).map((flag, index) => (
+                      <li key={`risk-${index}`} style={{ fontSize: '0.8rem', lineHeight: 1.4 }}>
+                        {flag}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1rem' }}>
+                  {(result?.execution?.actions || []).map((step, index) => (
+                    <li key={`step-${index}`} style={{ fontSize: '0.8rem', lineHeight: 1.4 }}>
+                      {step}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {outputMode === 'tasks' && (
+              <div>
+                {!((result?.tasks || []).length) && (
+                  <p style={{ margin: 0, fontSize: '0.84rem' }}>No tasks created yet.</p>
+                )}
+                {(result?.tasks || []).map((task, index) => (
+                  <div
+                    key={`task-${task?._id || index}`}
+                    style={{
+                      marginBottom: '0.5rem',
+                      border: '1px solid rgba(120, 180, 255, 0.2)',
+                      borderRadius: '8px',
+                      padding: '0.45rem 0.55rem',
+                    }}
+                  >
+                    <p style={{ margin: '0.12rem 0', fontSize: '0.83rem' }}>
+                      <strong>ID:</strong> {task?._id || 'unknown'}
+                    </p>
+                    <p style={{ margin: '0.12rem 0', fontSize: '0.83rem' }}>
+                      <strong>Description:</strong> {task?.description || '(empty)'}
+                    </p>
+                    <p style={{ margin: '0.12rem 0', fontSize: '0.83rem' }}>
+                      <strong>Status:</strong> {task?.status || 'pending'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {(outputMode === 'task-created' || outputMode === 'task-completed') && renderCompactJson(result)}
 
             {outputMode === 'created' && renderCompactJson(result)}
 
