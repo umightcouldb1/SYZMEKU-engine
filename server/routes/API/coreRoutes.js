@@ -411,6 +411,14 @@ const evaluateMonitorState = async () => {
 
 const runAgentLoopCycle = async () => {
   const report = await evaluateMonitorState();
+  const agentReport = await runAgentKernelEvaluation({
+    text: "Evaluate current operating state and recommend immediate next actions.",
+    rawContext: {
+      source: "agent-loop",
+      monitorState: report,
+    },
+    allowTaskExecution: false,
+  });
   const enabledProtocols = await System.find({ automationEnabled: true }).sort({ updatedAt: -1 }).lean();
   const protocolTriggers = enabledProtocols
     .flatMap((system) => (Array.isArray(system?.triggerConditions) ? system.triggerConditions : []))
@@ -424,6 +432,9 @@ const runAgentLoopCycle = async () => {
     protocol_trigger_count: protocolTriggers.length,
     protocol_triggers: protocolTriggers.slice(0, 10),
     recommended_actions: report.recommended_actions,
+    agent_summary: agentReport.summary,
+    agent_mode: agentReport.mode_selected,
+    agent_next_actions: agentReport.next_actions.slice(0, 5),
   };
 
   loopState.lastRunAt = new Date();
@@ -433,6 +444,90 @@ const runAgentLoopCycle = async () => {
   appendLoopEvent(event);
 
   return event;
+};
+
+const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution = true }) => {
+  const [latestSignals, latestSystems, latestTasks, strategicMemory] = await Promise.all([
+    SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
+    System.find().sort({ createdAt: -1 }).limit(5).lean(),
+    Task.find().sort({ createdAt: -1 }).limit(10).lean(),
+    StrategicMemory.find().sort({ updatedAt: -1 }).limit(5).lean(),
+  ]);
+
+  const mode_selected = selectAgentMode(text, latestSignals);
+  const recentCommands = normalizeRecentCommands(rawContext);
+  const actions_taken = [];
+  const recommended_tasks = [];
+  let objectives = [];
+  let constraints = [];
+  let risks = [];
+  let leverage = [];
+  let next_actions = [];
+
+  if (process.env.Gemini_API_Key) {
+    const prompt = buildAnalysisPrompt({
+      text,
+      mode: mode_selected,
+      modeInstruction: "Generate tactical objectives and next actions for execution planning.",
+      rawContext,
+      latestSignals,
+      latestSystems,
+      latestTasks,
+      strategicMemory,
+    });
+
+    const { error, result } = await requestGeminiJson(prompt);
+    const usedResult = result || error || FALLBACK_ANALYSIS;
+    objectives = usedResult.objectives || [];
+    constraints = usedResult.constraints || [];
+    risks = usedResult.risks || [];
+    leverage = usedResult.leverage || [];
+    next_actions = usedResult.next_actions || [];
+    actions_taken.push(mode_selected === "recommend" ? "recommend" : "analyze");
+  } else {
+    objectives = ["Gemini_API_Key is missing on the server."];
+    next_actions = ["Add Gemini_API_Key to enable full agent reasoning."];
+  }
+
+  if (/\b(execute|orchestrate|agent)\b/i.test(text) || /\b(task|todo|plan)\b/i.test(text)) {
+    recommended_tasks.push(...next_actions.slice(0, 3));
+  }
+
+  if (/\bexecute\b/i.test(text) && recommended_tasks.length && allowTaskExecution) {
+    const created = await Promise.all(
+      recommended_tasks.map((description) => Task.create({ description, source: "agent-kernel" }))
+    );
+    actions_taken.push("create_tasks");
+    recommended_tasks.splice(0, recommended_tasks.length, ...created.map((task) => task.description));
+  }
+
+  const matchedSystem = latestSystems.find((system) => normalizeText(text).includes(normalizeText(system?.name)));
+  if (matchedSystem && /\b(run|execute|orchestrate|protocol)\b/i.test(text)) {
+    actions_taken.push("run_system_protocol");
+  }
+
+  if (!actions_taken.length) actions_taken.push("strategic_plan");
+
+  const summary = objectives[0] || `Agent reviewed ${latestSignals.length} signals, ${latestSystems.length} systems, and ${latestTasks.length} tasks.`;
+
+  return {
+    summary,
+    mode_selected,
+    actions_taken,
+    recommended_tasks,
+    objectives,
+    constraints,
+    risks,
+    leverage,
+    next_actions,
+    context_scanned: {
+      signals: latestSignals.length,
+      systems: latestSystems.length,
+      tasks: latestTasks.length,
+      recent_commands: recentCommands,
+      has_last_overlay: Boolean(rawContext?.lastOverlayResult),
+    },
+  };
 };
 
 const startAgentLoop = async () => {
@@ -623,87 +718,8 @@ router.post("/agent", async (req, res) => {
   if (!text) return res.status(400).json({ message: "Agent goal is required." });
 
   const rawContext = req.body?.context;
-  const [latestSignals, latestSystems, latestTasks, strategicMemory] = await Promise.all([
-    SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
-    System.find().sort({ createdAt: -1 }).limit(5).lean(),
-    Task.find().sort({ createdAt: -1 }).limit(10).lean(),
-    StrategicMemory.find().sort({ updatedAt: -1 }).limit(5).lean(),
-  ]);
-
-  const mode_selected = selectAgentMode(text, latestSignals);
-  const recentCommands = normalizeRecentCommands(rawContext);
-  const actions_taken = [];
-  const recommended_tasks = [];
-  let objectives = [];
-  let constraints = [];
-  let risks = [];
-  let leverage = [];
-  let next_actions = [];
-
-  if (process.env.Gemini_API_Key) {
-    const prompt = buildAnalysisPrompt({
-      text,
-      mode: mode_selected,
-      modeInstruction: "Generate tactical objectives and next actions for execution planning.",
-      rawContext,
-      latestSignals,
-      latestSystems,
-      latestTasks,
-      strategicMemory,
-    });
-
-    const { error, result } = await requestGeminiJson(prompt);
-    const usedResult = result || error || FALLBACK_ANALYSIS;
-    objectives = usedResult.objectives || [];
-    constraints = usedResult.constraints || [];
-    risks = usedResult.risks || [];
-    leverage = usedResult.leverage || [];
-    next_actions = usedResult.next_actions || [];
-    actions_taken.push(mode_selected === "recommend" ? "recommend" : "analyze");
-  } else {
-    objectives = ["Gemini_API_Key is missing on the server."];
-    next_actions = ["Add Gemini_API_Key to enable full agent reasoning."];
-  }
-
-  if (/\b(execute|orchestrate|agent)\b/i.test(text) || /\b(task|todo|plan)\b/i.test(text)) {
-    recommended_tasks.push(...next_actions.slice(0, 3));
-  }
-
-  if (/\bexecute\b/i.test(text) && recommended_tasks.length) {
-    const created = await Promise.all(
-      recommended_tasks.map((description) => Task.create({ description, source: "agent-kernel" }))
-    );
-    actions_taken.push("create_tasks");
-    recommended_tasks.splice(0, recommended_tasks.length, ...created.map((task) => task.description));
-  }
-
-  const matchedSystem = latestSystems.find((system) => normalizeText(text).includes(normalizeText(system?.name)));
-  if (matchedSystem && /\b(run|execute|orchestrate|protocol)\b/i.test(text)) {
-    actions_taken.push("run_system_protocol");
-  }
-
-  if (!actions_taken.length) actions_taken.push("strategic_plan");
-
-  const summary = objectives[0] || `Agent reviewed ${latestSignals.length} signals, ${latestSystems.length} systems, and ${latestTasks.length} tasks.`;
-
-  return res.json({
-    summary,
-    mode_selected,
-    actions_taken,
-    recommended_tasks,
-    objectives,
-    constraints,
-    risks,
-    leverage,
-    next_actions,
-    context_scanned: {
-      signals: latestSignals.length,
-      systems: latestSystems.length,
-      tasks: latestTasks.length,
-      recent_commands: recentCommands,
-      has_last_overlay: Boolean(rawContext?.lastOverlayResult),
-    },
-  });
+  const result = await runAgentKernelEvaluation({ text, rawContext, allowTaskExecution: true });
+  return res.json(result);
 });
 
 /* SYSTEM BUILDER */
