@@ -29,18 +29,116 @@ router.post("/analyze", async (req, res) => {
     });
   }
 
+  const rawContext = req.body?.context;
+  const recentCommands = Array.isArray(rawContext?.recentCommands)
+    ? rawContext.recentCommands
+        .map((command) => {
+          if (typeof command === "string") {
+            return command.trim();
+          }
+
+          if (command && typeof command === "object") {
+            const normalized =
+              typeof command.text === "string"
+                ? command.text
+                : typeof command.command === "string"
+                  ? command.command
+                  : "";
+            return normalized.trim();
+          }
+
+          return "";
+        })
+        .filter(Boolean)
+        .slice(0, 20)
+    : [];
+  const activeRouteType =
+    typeof rawContext?.activeRouteType === "string" ? rawContext.activeRouteType.trim() : "";
+  const hasLastOverlayResult =
+    rawContext?.lastOverlayResult && typeof rawContext.lastOverlayResult === "object";
+
+  let latestSignals = [];
+  let latestSystems = [];
+
+  try {
+    [latestSignals, latestSystems] = await Promise.all([
+      SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
+      System.find().sort({ createdAt: -1 }).limit(5).lean(),
+    ]);
+  } catch (dbError) {
+    console.warn("Failed to fetch analyze context:", dbError?.message || dbError);
+  }
+
+  const toContextLines = (entries, keys) =>
+    entries.map((entry, index) => {
+      const line = keys
+        .map((key) => {
+          const value = entry?.[key];
+          if (typeof value === "string" && value.trim()) {
+            return `${key}: ${value.trim()}`;
+          }
+
+          if (typeof value === "number" || typeof value === "boolean") {
+            return `${key}: ${String(value)}`;
+          }
+
+          if (Array.isArray(value) && value.length) {
+            return `${key}: ${value
+              .map((item) => (typeof item === "string" ? item.trim() : ""))
+              .filter(Boolean)
+              .join(", ")}`;
+          }
+
+          return "";
+        })
+        .filter(Boolean)
+        .join(" | ");
+
+      return line ? `${index + 1}. ${line}` : `${index + 1}. ${JSON.stringify(entry)}`;
+    });
+
+  const signalContextLines = toContextLines(latestSignals, [
+    "title",
+    "signal",
+    "type",
+    "source",
+    "summary",
+    "description",
+    "impact",
+  ]);
+
+  const systemContextLines = toContextLines(latestSystems, [
+    "name",
+    "title",
+    "purpose",
+    "goal",
+    "status",
+    "description",
+    "constraints",
+  ]);
+
   const prompt = [
-    "Analyze the user input like a strategic systems architect.",
+    "Reason like a strategic operating system.",
+    "Synthesize command + systems + signals + recent session context.",
     "Return ONLY valid JSON.",
     "No markdown.",
     "No explanation outside JSON.",
     "No code fences.",
-    "Each field must be an array of strings.",
+    "Each field must be an array of concise strings.",
     "Use this exact shape:",
     '{"objectives":[],"constraints":[],"risks":[],"leverage":[],"next_actions":[]}',
-    `User input: ${text}`,
+    "",
+    `Current user command: ${text}`,
+    `Active route type: ${activeRouteType || "(none provided)"}`,
+    `Recent command history: ${recentCommands.length ? JSON.stringify(recentCommands) : "(none provided)"}`,
+    "Latest signals (newest first, max 5):",
+    ...(signalContextLines.length ? signalContextLines : ["(none found)"]),
+    "Latest systems (newest first, max 5):",
+    ...(systemContextLines.length ? systemContextLines : ["(none found)"]),
+    hasLastOverlayResult
+      ? `Last overlay result summary: ${JSON.stringify(rawContext.lastOverlayResult)}`
+      : "Last overlay result summary: (none provided)",
   ].join("\n");
-
   try {
     console.log("Gemini key exists:", hasGeminiKey);
 
@@ -100,7 +198,17 @@ router.post("/analyze", async (req, res) => {
       return res.json(fallbackAnalysis);
     }
 
-    return res.json(parsed);
+    const normalized = requiredKeys.reduce((acc, key) => {
+      const value = parsed[key];
+      acc[key] = Array.isArray(value)
+        ? value
+            .map((item) => (typeof item === "string" ? item.trim() : String(item || "").trim()))
+            .filter(Boolean)
+        : [];
+      return acc;
+    }, {});
+
+    return res.json(normalized);
   } catch (error) {
     return res.status(502).json({
       message: "Gemini request failed.",
