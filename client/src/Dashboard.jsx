@@ -17,6 +17,7 @@ const HELP_LINES = [
   'task create <description> | task show | task complete <id> | save recommendation',
   'memory save <text> | memory show | memory search <query> | history | context',
   'agent <goal> | execute <goal> | orchestrate <goal> | plan <goal> | build <goal>',
+  'mentor <text> | reflect <text> | reframe <text>',
   'monitor run | alerts | autonomy status',
   'analyze file | analyze image | voice on | voice off | clear | help',
 ];
@@ -68,6 +69,9 @@ const modeFromCommand = (commandText) => {
   if (lowered.startsWith('agent')) return 'AGENT';
   if (lowered.startsWith('execute')) return 'EXECUTION';
   if (lowered.startsWith('orchestrate')) return 'ORCHESTRATION';
+  if (lowered.startsWith('mentor')) return 'MENTOR';
+  if (lowered.startsWith('reflect')) return 'REFLECTION';
+  if (lowered.startsWith('reframe')) return 'REFRAME';
   return 'GENERAL';
 };
 
@@ -232,6 +236,13 @@ const Dashboard = ({ user }) => {
         nextRoute = lowered.startsWith('agent ') ? 'agent' : lowered.startsWith('execute ') ? 'execute' : 'orchestrate';
         response = await axios.post('/api/core/agent', { text: `${nextRoute} ${goal}`.trim(), context: sessionContext });
         setOutputMode('agent');
+      } else if (lowered.startsWith('mentor ') || lowered.startsWith('reflect ') || lowered.startsWith('reframe ')) {
+        const mentorText = rawCommand.split(/\s+/).slice(1).join(' ').trim();
+        const commandType = lowered.split(/\s+/)[0];
+        setOutputTitle(commandType === 'mentor' ? 'MENTOR NODE' : commandType === 'reflect' ? 'REFLECTION ENGINE' : 'REFRAME ENGINE');
+        nextRoute = commandType;
+        response = await axios.post('/api/core/mentor', { text: mentorText, context: sessionContext });
+        setOutputMode('analyze');
       } else if (lowered === 'show signals') {
         setOutputTitle('SIGNAL LOG');
         nextRoute = 'show signals';
