@@ -23,8 +23,6 @@ router.post("/analyze", async (req, res) => {
     return res.status(500).json({ message: "Gemini_API_Key is missing on the server." });
   }
 
-  const apiKey = process.env.Gemini_API_Key;
-
   const prompt = [
     "Analyze the user input like a strategic systems architect.",
     "Return ONLY valid JSON.",
@@ -41,7 +39,7 @@ router.post("/analyze", async (req, res) => {
     console.log("Gemini key exists:", hasGeminiKey);
 
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.Gemini_API_Key}`,
       {
         method: "POST",
         headers: {
@@ -53,9 +51,6 @@ router.post("/analyze", async (req, res) => {
               parts: [{ text: prompt }],
             },
           ],
-          generationConfig: {
-            responseMimeType: "application/json",
-          },
         }),
       }
     );
