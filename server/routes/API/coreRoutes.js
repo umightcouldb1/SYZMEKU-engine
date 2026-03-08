@@ -1036,9 +1036,39 @@ router.get("/loop/status", async (_req, res) => {
 });
 
 router.post("/loop/start", async (req, res) => {
-  const requestedInterval = Number(req.body?.interval_ms);
-  await startAgentLoop({ intervalMs: requestedInterval });
-  return res.json({ message: "Agent loop started.", ...loopStatusPayload() });
+  try {
+    const requestedInterval = Number(req.body?.interval_ms);
+    await startAgentLoop({ intervalMs: requestedInterval });
+    return res.json({ message: "Agent loop started.", ...loopStatusPayload() });
+  } catch (error) {
+    console.error("Loop start failed:", error?.message || error);
+    console.error(error?.stack || "No stack trace available.");
+
+    if (error?.name === "ValidationError" && error?.errors && typeof error.errors === "object") {
+      const validationDetails = Object.entries(error.errors).map(([field, detail]) => ({
+        field,
+        message: detail?.message || String(detail),
+        kind: detail?.kind,
+        value: detail?.value,
+      }));
+      console.error("Loop start validation error details:", validationDetails);
+    }
+
+    if (error?.code || error?.codeName || error?.errmsg || error?.writeErrors || error?.result) {
+      console.error("Loop start update error details:", {
+        code: error?.code,
+        codeName: error?.codeName,
+        errmsg: error?.errmsg,
+        writeErrors: error?.writeErrors,
+        result: error?.result,
+      });
+    }
+
+    return res.status(502).json({
+      message: "Loop start failed",
+      details: String(error?.message || error),
+    });
+  }
 });
 
 router.post("/loop/stop", async (_req, res) => {
