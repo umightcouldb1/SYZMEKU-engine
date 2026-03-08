@@ -3,6 +3,7 @@ const System = require("../../models/System");
 const SignalEntry = require("../../models/SignalEntry");
 const SystemExecution = require("../../models/SystemExecution");
 const Task = require("../../models/Task");
+const StrategicMemory = require("../../models/StrategicMemory");
 
 const REQUIRED_ANALYSIS_KEYS = ["objectives", "constraints", "risks", "leverage", "next_actions"];
 const LINKABLE_SIGNAL_KEYS = ["sleep", "stress", "symptoms", "notes"];
@@ -15,6 +16,12 @@ const FALLBACK_ANALYSIS = {
   next_actions: ["Adjust model prompt to always return the required schema."],
 };
 
+const autonomyState = {
+  monitoringEnabled: true,
+  lastRunAt: null,
+  activeAlerts: [],
+};
+
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -22,20 +29,12 @@ const normalizeRecentCommands = (rawContext) =>
   Array.isArray(rawContext?.recentCommands)
     ? rawContext.recentCommands
         .map((command) => {
-          if (typeof command === "string") {
-            return command.trim();
-          }
-
+          if (typeof command === "string") return command.trim();
           if (command && typeof command === "object") {
             const normalized =
-              typeof command.text === "string"
-                ? command.text
-                : typeof command.command === "string"
-                  ? command.command
-                  : "";
+              typeof command.text === "string" ? command.text : typeof command.command === "string" ? command.command : "";
             return normalized.trim();
           }
-
           return "";
         })
         .filter(Boolean)
@@ -47,21 +46,14 @@ const toContextLines = (entries, keys) =>
     const line = keys
       .map((key) => {
         const value = entry?.[key];
-        if (typeof value === "string" && value.trim()) {
-          return `${key}: ${value.trim()}`;
-        }
-
-        if (typeof value === "number" || typeof value === "boolean") {
-          return `${key}: ${String(value)}`;
-        }
-
+        if (typeof value === "string" && value.trim()) return `${key}: ${value.trim()}`;
+        if (typeof value === "number" || typeof value === "boolean") return `${key}: ${String(value)}`;
         if (Array.isArray(value) && value.length) {
           return `${key}: ${value
             .map((item) => (typeof item === "string" ? item.trim() : ""))
             .filter(Boolean)
             .join(", ")}`;
         }
-
         return "";
       })
       .filter(Boolean)
@@ -72,16 +64,17 @@ const toContextLines = (entries, keys) =>
 
 const fetchStrategicContext = async () => {
   try {
-    const [latestSignals, latestSystems, latestTasks] = await Promise.all([
+    const [latestSignals, latestSystems, latestTasks, strategicMemory] = await Promise.all([
       SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
       System.find().sort({ createdAt: -1 }).limit(5).lean(),
-      Task.find().sort({ createdAt: -1 }).limit(5).lean(),
+      Task.find().sort({ createdAt: -1 }).limit(10).lean(),
+      StrategicMemory.find().sort({ updatedAt: -1 }).limit(5).lean(),
     ]);
 
-    return { latestSignals, latestSystems, latestTasks };
+    return { latestSignals, latestSystems, latestTasks, strategicMemory };
   } catch (dbError) {
     console.warn("Failed to fetch strategic context:", dbError?.message || dbError);
-    return { latestSignals: [], latestSystems: [], latestTasks: [] };
+    return { latestSignals: [], latestSystems: [], latestTasks: [], strategicMemory: [] };
   }
 };
 
@@ -103,9 +96,10 @@ const mapSystemRecord = (system) => {
     purpose: system?.purpose || "",
     protocolType: system?.protocolType || "generic",
     protocolRules: Array.isArray(system?.protocolRules) ? system.protocolRules.filter(Boolean) : [],
-    recommendedActions: Array.isArray(system?.recommendedActions)
-      ? system.recommendedActions.filter(Boolean)
-      : [],
+    recommendedActions: Array.isArray(system?.recommendedActions) ? system.recommendedActions.filter(Boolean) : [],
+    triggerConditions: Array.isArray(system?.triggerConditions) ? system.triggerConditions.filter(Boolean) : [],
+    automationEnabled: Boolean(system?.automationEnabled),
+    escalationLevel: system?.escalationLevel || "low",
     inputs,
     outputs,
     routines,
@@ -114,57 +108,27 @@ const mapSystemRecord = (system) => {
 };
 
 const describeNumericTrend = (values) => {
-  if (!Array.isArray(values) || values.length < 2) {
-    return { direction: "insufficient-data", delta: 0, latest: null, previous: null };
-  }
-
+  if (!Array.isArray(values) || values.length < 2) return { direction: "insufficient-data", delta: 0, latest: null, previous: null };
   const latest = values[0];
   const previous = values[values.length - 1];
   const delta = Number((latest - previous).toFixed(2));
-
-  if (delta > 0) {
-    return { direction: "increasing", delta, latest, previous };
-  }
-
-  if (delta < 0) {
-    return { direction: "decreasing", delta, latest, previous };
-  }
-
+  if (delta > 0) return { direction: "increasing", delta, latest, previous };
+  if (delta < 0) return { direction: "decreasing", delta, latest, previous };
   return { direction: "stable", delta, latest, previous };
 };
 
 const describeSymptomsTrend = (entries) => {
   const normalized = entries.map((entry) => normalizeText(entry?.symptoms)).filter(Boolean);
-
-  if (!normalized.length) {
-    return { direction: "insufficient-data", latest: null };
-  }
-
-  if (normalized.length === 1) {
-    return { direction: "single-entry", latest: normalized[0] };
-  }
-
+  if (!normalized.length) return { direction: "insufficient-data", latest: null };
+  if (normalized.length === 1) return { direction: "single-entry", latest: normalized[0] };
   const uniqueRecent = new Set(normalized.slice(0, 3));
-
-  return {
-    direction: uniqueRecent.size === 1 ? "stable" : "mixed",
-    latest: normalized[0],
-  };
+  return { direction: uniqueRecent.size === 1 ? "stable" : "mixed", latest: normalized[0] };
 };
 
 const toDirectionalState = (trendDirection, increaseMeansImproving = false) => {
-  if (trendDirection === "stable") {
-    return "stable";
-  }
-
-  if (trendDirection === "insufficient-data" || trendDirection === "single-entry") {
-    return "insufficient-data";
-  }
-
-  if (increaseMeansImproving) {
-    return trendDirection === "increasing" ? "improving" : "worsening";
-  }
-
+  if (trendDirection === "stable") return "stable";
+  if (trendDirection === "insufficient-data" || trendDirection === "single-entry") return "insufficient-data";
+  if (increaseMeansImproving) return trendDirection === "increasing" ? "improving" : "worsening";
   return trendDirection === "decreasing" ? "improving" : "worsening";
 };
 
@@ -178,14 +142,8 @@ const computeSignalTrendBundle = (entries) => {
 
   return {
     sampleSize: latestFive.length,
-    sleep: {
-      ...sleepTrend,
-      state: toDirectionalState(sleepTrend.direction, true),
-    },
-    stress: {
-      ...stressTrend,
-      state: toDirectionalState(stressTrend.direction, false),
-    },
+    sleep: { ...sleepTrend, state: toDirectionalState(sleepTrend.direction, true) },
+    stress: { ...stressTrend, state: toDirectionalState(stressTrend.direction, false) },
     symptoms: {
       ...symptomTrend,
       state: symptomTrend.direction === "stable" ? "stable" : symptomTrend.direction === "mixed" ? "worsening" : "insufficient-data",
@@ -196,23 +154,18 @@ const computeSignalTrendBundle = (entries) => {
 const detectSignalAnomalies = (entries) => {
   const latestFive = entries.slice(0, 5);
   const anomalies = [];
-
   for (let index = 0; index < latestFive.length - 1; index += 1) {
     const current = latestFive[index];
     const previous = latestFive[index + 1];
 
     if (typeof current?.stress === "number" && typeof previous?.stress === "number") {
       const deltaStress = current.stress - previous.stress;
-      if (deltaStress >= 3) {
-        anomalies.push(`Stress spike detected (${previous.stress} -> ${current.stress}).`);
-      }
+      if (deltaStress >= 3) anomalies.push(`Stress spike detected (${previous.stress} -> ${current.stress}).`);
     }
 
     if (typeof current?.sleep === "number" && typeof previous?.sleep === "number") {
       const deltaSleep = previous.sleep - current.sleep;
-      if (deltaSleep >= 2) {
-        anomalies.push(`Sleep drop detected (${previous.sleep} -> ${current.sleep}).`);
-      }
+      if (deltaSleep >= 2) anomalies.push(`Sleep drop detected (${previous.sleep} -> ${current.sleep}).`);
     }
 
     const currentSymptoms = normalizeText(current?.symptoms);
@@ -221,7 +174,6 @@ const detectSignalAnomalies = (entries) => {
       anomalies.push(`Symptom shift detected (${previousSymptoms} -> ${currentSymptoms}).`);
     }
   }
-
   return anomalies;
 };
 
@@ -247,13 +199,8 @@ const buildExecutionPlan = (system, latestSignals) => {
     constraints.push("Avoid high-load actions during low-recovery periods.");
   }
 
-  if ((system?.name || "").toLowerCase().includes("recovery")) {
-    leverage.push("Recovery system detected; prioritize stabilization and pacing.");
-  }
-
-  if (!leverage.length) {
-    leverage.push("Use routine sequencing to create momentum.");
-  }
+  if ((system?.name || "").toLowerCase().includes("recovery")) leverage.push("Recovery system detected; prioritize stabilization and pacing.");
+  if (!leverage.length) leverage.push("Use routine sequencing to create momentum.");
 
   const next_actions = routines.length
     ? routines.slice(0, 5).map((routine, index) => `Step ${index + 1}: ${routine}`)
@@ -263,37 +210,21 @@ const buildExecutionPlan = (system, latestSignals) => {
         "Step 3: Record a follow-up signal and reassess.",
       ];
 
-  return {
-    objectives,
-    constraints,
-    risks,
-    leverage,
-    next_actions,
-  };
+  return { objectives, constraints, risks, leverage, next_actions };
 };
 
 const requestGeminiJson = async (prompt) => {
-  const geminiResponse = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": process.env.Gemini_API_Key,
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }],
-          },
-        ],
-      }),
-    }
-  );
+  const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": process.env.Gemini_API_Key,
+    },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+  });
 
   if (!geminiResponse.ok) {
     const errorText = await geminiResponse.text();
-
     return {
       error: {
         objectives: ["Gemini HTTP error"],
@@ -307,7 +238,6 @@ const requestGeminiJson = async (prompt) => {
 
   const data = await geminiResponse.json();
   const modelText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
   let parsed;
   try {
     parsed = JSON.parse(modelText);
@@ -323,22 +253,13 @@ const requestGeminiJson = async (prompt) => {
     };
   }
 
-  const hasAllRequiredKeys =
-    parsed &&
-    typeof parsed === "object" &&
-    !Array.isArray(parsed) &&
-    REQUIRED_ANALYSIS_KEYS.every((key) => Object.prototype.hasOwnProperty.call(parsed, key));
-
-  if (!hasAllRequiredKeys) {
-    return { result: FALLBACK_ANALYSIS };
-  }
+  const hasAllRequiredKeys = parsed && typeof parsed === "object" && !Array.isArray(parsed) && REQUIRED_ANALYSIS_KEYS.every((key) => Object.prototype.hasOwnProperty.call(parsed, key));
+  if (!hasAllRequiredKeys) return { result: FALLBACK_ANALYSIS };
 
   const normalized = REQUIRED_ANALYSIS_KEYS.reduce((acc, key) => {
     const value = parsed[key];
     acc[key] = Array.isArray(value)
-      ? value
-          .map((item) => (typeof item === "string" ? item.trim() : String(item || "").trim()))
-          .filter(Boolean)
+      ? value.map((item) => (typeof item === "string" ? item.trim() : String(item || "").trim())).filter(Boolean)
       : [];
     return acc;
   }, {});
@@ -354,19 +275,12 @@ const buildSharedPromptContext = ({
   latestSignals,
   latestSystems,
   latestTasks,
+  strategicMemory,
 }) => {
   const signalContextLines = toContextLines(latestSignals, ["sleep", "stress", "symptoms", "notes"]);
-
-  const systemContextLines = toContextLines(latestSystems, [
-    "name",
-    "purpose",
-    "protocolType",
-    "inputs",
-    "outputs",
-    "routines",
-  ]);
-
+  const systemContextLines = toContextLines(latestSystems, ["name", "purpose", "protocolType", "inputs", "outputs", "routines"]);
   const taskContextLines = toContextLines(latestTasks, ["description", "status", "source"]);
+  const memoryContextLines = toContextLines(strategicMemory, ["title", "category", "content", "tags"]);
   const hasLastOverlayResult = lastOverlayResult && typeof lastOverlayResult === "object";
 
   return [
@@ -377,21 +291,21 @@ const buildSharedPromptContext = ({
     ...(signalContextLines.length ? signalContextLines : ["(none found)"]),
     "Latest systems (newest first, max 5):",
     ...(systemContextLines.length ? systemContextLines : ["(none found)"]),
-    "Latest tasks (newest first, max 5):",
+    "Latest tasks (newest first, max 10):",
     ...(taskContextLines.length ? taskContextLines : ["(none found)"]),
-    hasLastOverlayResult
-      ? `Last overlay result summary: ${JSON.stringify(lastOverlayResult)}`
-      : "Last overlay result summary: (none provided)",
+    "Latest strategic memory (newest first, max 5):",
+    ...(memoryContextLines.length ? memoryContextLines : ["(none found)"]),
+    hasLastOverlayResult ? `Last overlay result summary: ${JSON.stringify(lastOverlayResult)}` : "Last overlay result summary: (none provided)",
   ];
 };
 
-const buildAnalysisPrompt = ({ text, mode, modeInstruction, rawContext, latestSignals, latestSystems, latestTasks }) => {
+const buildAnalysisPrompt = ({ text, mode, modeInstruction, rawContext, latestSignals, latestSystems, latestTasks, strategicMemory }) => {
   const recentCommands = normalizeRecentCommands(rawContext);
   const activeRouteType = typeof rawContext?.activeRouteType === "string" ? rawContext.activeRouteType.trim() : "";
 
   return [
     "Reason like a strategic operating system.",
-    "Synthesize command + systems + signals + task queue + recent session context.",
+    "Synthesize command + systems + signals + task queue + strategic memory + recent session context.",
     "Return ONLY valid JSON.",
     "No markdown.",
     "No explanation outside JSON.",
@@ -410,8 +324,72 @@ const buildAnalysisPrompt = ({ text, mode, modeInstruction, rawContext, latestSi
       latestSignals,
       latestSystems,
       latestTasks,
+      strategicMemory,
     }),
   ].join("\n");
+};
+
+const selectAgentMode = (goalText, latestSignals) => {
+  const normalizedGoal = normalizeText(goalText);
+  if (["strategy", "priorit", "roadmap", "plan"].some((token) => normalizedGoal.includes(token))) return "strategic";
+  if (["build", "architect", "deploy", "code", "product"].some((token) => normalizedGoal.includes(token))) return "build";
+  if (["signal", "anomaly", "trend", "state"].some((token) => normalizedGoal.includes(token))) return "signal";
+  if (["health", "stress", "sleep", "symptom", "recovery"].some((token) => normalizedGoal.includes(token))) return "health";
+  const latestStress = typeof latestSignals?.[0]?.stress === "number" ? latestSignals[0].stress : null;
+  if (latestStress !== null && latestStress >= 7) return "health";
+  return "recommend";
+};
+
+const evaluateMonitorState = async () => {
+  const [latestSignals, latestTasks, enabledProtocols] = await Promise.all([
+    SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
+    Task.find({ status: "open" }).sort({ createdAt: -1 }).limit(50).lean(),
+    System.find({ automationEnabled: true }).sort({ updatedAt: -1 }).lean(),
+  ]);
+
+  const trends = computeSignalTrendBundle(latestSignals);
+  const anomalies = detectSignalAnomalies(latestSignals);
+  const alerts = [];
+  const risks = [];
+  const recommended_actions = [];
+
+  if (trends.stress.direction === "increasing") {
+    alerts.push("Stress is increasing across recent entries.");
+    risks.push("Operational strain may reduce execution quality.");
+    recommended_actions.push("Prioritize recovery protocol and reduce concurrent tasks.");
+  }
+
+  if (trends.sleep.direction === "decreasing") {
+    alerts.push("Sleep trend is declining.");
+    risks.push("Recovery deficit can cause compounding performance issues.");
+    recommended_actions.push("Run recovery-oriented system protocol and simplify commitments.");
+  }
+
+  if (latestTasks.length >= 8) {
+    alerts.push(`Task backlog elevated (${latestTasks.length} open tasks).`);
+    risks.push("Backlog may reduce focus and throughput.");
+    recommended_actions.push("Sequence top 3 tasks and defer low-leverage items.");
+  }
+
+  if (enabledProtocols.length) {
+    recommended_actions.push(`Review ${enabledProtocols.length} enabled protocol(s) for trigger alignment.`);
+  }
+
+  anomalies.forEach((anomaly) => alerts.push(anomaly));
+
+  const state_summary = `Signals=${latestSignals.length}, openTasks=${latestTasks.length}, enabledProtocols=${enabledProtocols.length}, alerts=${alerts.length}.`;
+  autonomyState.lastRunAt = new Date();
+  autonomyState.activeAlerts = alerts;
+
+  return {
+    alerts,
+    risks,
+    recommended_actions,
+    state_summary,
+    trends,
+    openTaskCount: latestTasks.length,
+    enabledProtocolCount: enabledProtocols.length,
+  };
 };
 
 /* CORE REASONING */
@@ -431,9 +409,7 @@ router.post("/analyze", async (req, res) => {
   const modeSpecificCommand = modeMatch ? modeMatch[2].trim() : text;
   const effectiveCommand = modeSpecificCommand || text;
 
-  if (!text) {
-    return res.status(400).json({ message: "Command text is required." });
-  }
+  if (!text) return res.status(400).json({ message: "Command text is required." });
 
   if (!process.env.Gemini_API_Key) {
     return res.json({
@@ -446,7 +422,7 @@ router.post("/analyze", async (req, res) => {
   }
 
   const rawContext = req.body?.context;
-  const { latestSignals, latestSystems, latestTasks } = await fetchStrategicContext();
+  const { latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
 
   const prompt = buildAnalysisPrompt({
     text: effectiveCommand,
@@ -456,29 +432,21 @@ router.post("/analyze", async (req, res) => {
     latestSignals,
     latestSystems,
     latestTasks,
+    strategicMemory,
   });
 
   try {
     const { error, result } = await requestGeminiJson(prompt);
-    if (error) {
-      return res.json(error);
-    }
-
+    if (error) return res.json(error);
     return res.json(result);
   } catch (error) {
-    return res.status(502).json({
-      message: "Gemini request failed.",
-      details: String(error?.message || error).slice(0, 500),
-    });
+    return res.status(502).json({ message: "Gemini request failed.", details: String(error?.message || error).slice(0, 500) });
   }
 });
 
 router.post("/recommend", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
-
-  if (!text) {
-    return res.status(400).json({ message: "Command text is required." });
-  }
+  if (!text) return res.status(400).json({ message: "Command text is required." });
 
   if (!process.env.Gemini_API_Key) {
     return res.json({
@@ -491,7 +459,7 @@ router.post("/recommend", async (req, res) => {
   }
 
   const rawContext = req.body?.context;
-  const { latestSignals, latestSystems, latestTasks } = await fetchStrategicContext();
+  const { latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
 
   const prompt = buildAnalysisPrompt({
     text,
@@ -501,21 +469,104 @@ router.post("/recommend", async (req, res) => {
     latestSignals,
     latestSystems,
     latestTasks,
+    strategicMemory,
   });
 
   try {
     const { error, result } = await requestGeminiJson(prompt);
-    if (error) {
-      return res.json(error);
-    }
-
+    if (error) return res.json(error);
     return res.json(result);
   } catch (error) {
-    return res.status(502).json({
-      message: "Gemini request failed.",
-      details: String(error?.message || error).slice(0, 500),
-    });
+    return res.status(502).json({ message: "Gemini request failed.", details: String(error?.message || error).slice(0, 500) });
   }
+});
+
+router.post("/agent", async (req, res) => {
+  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  if (!text) return res.status(400).json({ message: "Agent goal is required." });
+
+  const rawContext = req.body?.context;
+  const [latestSignals, latestSystems, latestTasks, strategicMemory] = await Promise.all([
+    SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
+    System.find().sort({ createdAt: -1 }).limit(5).lean(),
+    Task.find().sort({ createdAt: -1 }).limit(10).lean(),
+    StrategicMemory.find().sort({ updatedAt: -1 }).limit(5).lean(),
+  ]);
+
+  const mode_selected = selectAgentMode(text, latestSignals);
+  const recentCommands = normalizeRecentCommands(rawContext);
+  const actions_taken = [];
+  const recommended_tasks = [];
+  let objectives = [];
+  let constraints = [];
+  let risks = [];
+  let leverage = [];
+  let next_actions = [];
+
+  if (process.env.Gemini_API_Key) {
+    const prompt = buildAnalysisPrompt({
+      text,
+      mode: mode_selected,
+      modeInstruction: "Generate tactical objectives and next actions for execution planning.",
+      rawContext,
+      latestSignals,
+      latestSystems,
+      latestTasks,
+      strategicMemory,
+    });
+
+    const { error, result } = await requestGeminiJson(prompt);
+    const usedResult = result || error || FALLBACK_ANALYSIS;
+    objectives = usedResult.objectives || [];
+    constraints = usedResult.constraints || [];
+    risks = usedResult.risks || [];
+    leverage = usedResult.leverage || [];
+    next_actions = usedResult.next_actions || [];
+    actions_taken.push(mode_selected === "recommend" ? "recommend" : "analyze");
+  } else {
+    objectives = ["Gemini_API_Key is missing on the server."];
+    next_actions = ["Add Gemini_API_Key to enable full agent reasoning."];
+  }
+
+  if (/\b(execute|orchestrate|agent)\b/i.test(text) || /\b(task|todo|plan)\b/i.test(text)) {
+    recommended_tasks.push(...next_actions.slice(0, 3));
+  }
+
+  if (/\bexecute\b/i.test(text) && recommended_tasks.length) {
+    const created = await Promise.all(
+      recommended_tasks.map((description) => Task.create({ description, source: "agent-kernel" }))
+    );
+    actions_taken.push("create_tasks");
+    recommended_tasks.splice(0, recommended_tasks.length, ...created.map((task) => task.description));
+  }
+
+  const matchedSystem = latestSystems.find((system) => normalizeText(text).includes(normalizeText(system?.name)));
+  if (matchedSystem && /\b(run|execute|orchestrate|protocol)\b/i.test(text)) {
+    actions_taken.push("run_system_protocol");
+  }
+
+  if (!actions_taken.length) actions_taken.push("strategic_plan");
+
+  const summary = objectives[0] || `Agent reviewed ${latestSignals.length} signals, ${latestSystems.length} systems, and ${latestTasks.length} tasks.`;
+
+  return res.json({
+    summary,
+    mode_selected,
+    actions_taken,
+    recommended_tasks,
+    objectives,
+    constraints,
+    risks,
+    leverage,
+    next_actions,
+    context_scanned: {
+      signals: latestSignals.length,
+      systems: latestSystems.length,
+      tasks: latestTasks.length,
+      recent_commands: recentCommands,
+      has_last_overlay: Boolean(rawContext?.lastOverlayResult),
+    },
+  });
 });
 
 /* SYSTEM BUILDER */
@@ -555,8 +606,7 @@ router.get("/systems/map", async (req, res) => {
 
     const relatedSignals = latestSignals.filter((signal) => {
       const signalText = normalizeText(`${signal?.symptoms || ""} ${signal?.notes || ""}`);
-      return mapped.linkedSignals.some((key) => signalText.includes(key)) ||
-        [...keywordSet].some((keyword) => keyword && signalText.includes(keyword));
+      return mapped.linkedSignals.some((key) => signalText.includes(key)) || [...keywordSet].some((keyword) => keyword && signalText.includes(keyword));
     });
 
     return {
@@ -575,18 +625,10 @@ router.get("/systems/map", async (req, res) => {
 
 router.post("/systems/run", async (req, res) => {
   const rawName = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  if (!rawName) return res.status(400).json({ message: "System name is required." });
 
-  if (!rawName) {
-    return res.status(400).json({ message: "System name is required." });
-  }
-
-  const system = await System.findOne({
-    name: { $regex: `^${escapeRegex(rawName)}$`, $options: "i" },
-  }).lean();
-
-  if (!system) {
-    return res.status(404).json({ message: `System not found: ${rawName}` });
-  }
+  const system = await System.findOne({ name: { $regex: `^${escapeRegex(rawName)}$`, $options: "i" } }).lean();
+  if (!system) return res.status(404).json({ message: `System not found: ${rawName}` });
 
   const latestSignals = await SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean();
   const executionPlan = buildExecutionPlan(system, latestSignals);
@@ -621,6 +663,46 @@ router.post("/systems/run", async (req, res) => {
   });
 });
 
+router.post("/systems/automate", async (req, res) => {
+  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  if (!name) return res.status(400).json({ message: "System name is required." });
+
+  const system = await System.findOneAndUpdate(
+    { name: { $regex: `^${escapeRegex(name)}$`, $options: "i" } },
+    { automationEnabled: true },
+    { new: true }
+  );
+
+  if (!system) return res.status(404).json({ message: `System not found: ${name}` });
+  return res.json({ message: `Automation enabled for ${system.name}.`, system: mapSystemRecord(system) });
+});
+
+router.post("/systems/disable", async (req, res) => {
+  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  if (!name) return res.status(400).json({ message: "System name is required." });
+
+  const system = await System.findOneAndUpdate(
+    { name: { $regex: `^${escapeRegex(name)}$`, $options: "i" } },
+    { automationEnabled: false },
+    { new: true }
+  );
+
+  if (!system) return res.status(404).json({ message: `System not found: ${name}` });
+  return res.json({ message: `Automation disabled for ${system.name}.`, system: mapSystemRecord(system) });
+});
+
+router.get("/protocol/status", async (_req, res) => {
+  const systems = await System.find().sort({ name: 1 }).lean();
+  return res.json({
+    protocols: systems.map((system) => ({
+      system_name: system.name,
+      status: system.automationEnabled ? "enabled" : "disabled",
+      trigger_conditions: Array.isArray(system.triggerConditions) ? system.triggerConditions : [],
+      escalation_level: system.escalationLevel || "low",
+    })),
+  });
+});
+
 /* SIGNAL LOG */
 router.post("/signals", async (req, res) => {
   const entry = await SignalEntry.create(req.body);
@@ -640,11 +722,7 @@ router.get("/signals/trends", async (req, res) => {
 router.get("/signals/anomalies", async (req, res) => {
   const latestSignals = await SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean();
   const anomalies = detectSignalAnomalies(latestSignals);
-
-  res.json({
-    sampleSize: latestSignals.length,
-    anomalies,
-  });
+  res.json({ sampleSize: latestSignals.length, anomalies });
 });
 
 router.get("/signals/report", async (req, res) => {
@@ -663,54 +741,30 @@ router.get("/signals/report", async (req, res) => {
       trends.sleep.state === "improving" ? "Sleep trend is improving; use as momentum." : "Use consistent recovery routines.",
       trends.stress.state === "improving" ? "Stress trend is improving; expand execution window." : "Reduce complexity while stress is unstable.",
     ],
-    next_actions: [
-      "Log one additional signal after the next critical work block.",
-      "Run recommend next step to refresh tactical execution.",
-    ],
+    next_actions: ["Log one additional signal after the next critical work block.", "Run recommend next step to refresh tactical execution."],
   });
 });
 
-router.get("/alerts", async (req, res) => {
-  const latestSignals = await SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean();
-  const trends = computeSignalTrendBundle(latestSignals);
-  const anomalies = detectSignalAnomalies(latestSignals);
-  const alerts = [];
+router.post("/monitor/run", async (_req, res) => {
+  const report = await evaluateMonitorState();
+  return res.json({
+    alerts: report.alerts,
+    risks: report.risks,
+    recommended_actions: report.recommended_actions,
+    state_summary: report.state_summary,
+  });
+});
 
-  if (trends.stress.direction === "increasing") {
-    alerts.push({
-      type: "stress-rise",
-      severity: "high",
-      message: "Stress is rising across recent entries.",
-    });
-  }
+router.get("/alerts", async (_req, res) => {
+  if (!autonomyState.lastRunAt) await evaluateMonitorState();
+  return res.json({ alerts: autonomyState.activeAlerts });
+});
 
-  if (trends.sleep.direction === "decreasing") {
-    alerts.push({
-      type: "sleep-fall",
-      severity: "high",
-      message: "Sleep is falling across recent entries.",
-    });
-  }
-
-  const symptomHistory = latestSignals
-    .map((entry) => normalizeText(entry?.symptoms))
-    .filter(Boolean);
-  if (symptomHistory.length >= 3 && symptomHistory[0] !== "calm" && symptomHistory.slice(1).some((item) => item === "calm")) {
-    alerts.push({
-      type: "symptom-reappearance",
-      severity: "medium",
-      message: "Symptoms reappeared after a calm period.",
-    });
-  }
-
-  res.json({
-    alerts,
-    anomalies,
-    monitor: {
-      sleep: trends.sleep,
-      stress: trends.stress,
-      symptoms: trends.symptoms,
-    },
+router.get("/autonomy/status", async (_req, res) => {
+  return res.json({
+    monitoring_enabled: autonomyState.monitoringEnabled,
+    last_monitor_run: autonomyState.lastRunAt,
+    active_alerts_count: autonomyState.activeAlerts.length,
   });
 });
 
@@ -718,10 +772,7 @@ router.get("/alerts", async (req, res) => {
 router.post("/tasks", async (req, res) => {
   const description = typeof req.body?.description === "string" ? req.body.description.trim() : "";
   const source = typeof req.body?.source === "string" ? req.body.source.trim() : "";
-
-  if (!description) {
-    return res.status(400).json({ message: "Task description is required." });
-  }
+  if (!description) return res.status(400).json({ message: "Task description is required." });
 
   const task = await Task.create({ description, source });
   return res.json(task);
@@ -734,15 +785,11 @@ router.get("/tasks", async (req, res) => {
 
 router.post("/tasks/:id/complete", async (req, res) => {
   const task = await Task.findById(req.params.id);
-
-  if (!task) {
-    return res.status(404).json({ message: `Task not found: ${req.params.id}` });
-  }
+  if (!task) return res.status(404).json({ message: `Task not found: ${req.params.id}` });
 
   task.status = "done";
   task.completedAt = new Date();
   await task.save();
-
   return res.json(task);
 });
 
@@ -759,6 +806,69 @@ router.post("/tasks/save-recommendation", async (req, res) => {
   return res.json({ tasks: created });
 });
 
+/* STRATEGIC MEMORY */
+router.post("/memory/save", async (req, res) => {
+  const content = typeof req.body?.content === "string" ? req.body.content.trim() : "";
+  if (!content) return res.status(400).json({ message: "Memory content is required." });
+
+  const memory = await StrategicMemory.create({
+    title: content.split(".")[0].slice(0, 80) || "Strategic note",
+    category: typeof req.body?.category === "string" ? req.body.category.trim() : "general",
+    content,
+    sourceCommand: typeof req.body?.sourceCommand === "string" ? req.body.sourceCommand.trim() : "memory save",
+    tags: Array.isArray(req.body?.tags) ? req.body.tags.filter(Boolean) : [],
+  });
+
+  return res.json(memory);
+});
+
+router.get("/memory", async (_req, res) => {
+  const entries = await StrategicMemory.find().sort({ updatedAt: -1 }).limit(50).lean();
+  return res.json({ entries });
+});
+
+router.get("/memory/search", async (req, res) => {
+  const query = typeof req.query?.query === "string" ? req.query.query.trim() : "";
+  if (!query) return res.status(400).json({ message: "Search query is required." });
+
+  const regex = new RegExp(escapeRegex(query), "i");
+  const entries = await StrategicMemory.find({
+    $or: [{ title: regex }, { category: regex }, { content: regex }, { tags: regex }],
+  })
+    .sort({ updatedAt: -1 })
+    .limit(50)
+    .lean();
+
+  return res.json({ query, entries });
+});
+
+router.get("/summary", async (_req, res) => {
+  const [latestSignal] = await SignalEntry.find().sort({ createdAt: -1 }).limit(1).lean();
+  const [openTasks, memoryCount] = await Promise.all([
+    Task.countDocuments({ status: "open" }),
+    StrategicMemory.countDocuments(),
+  ]);
+  if (!autonomyState.lastRunAt) await evaluateMonitorState();
+
+  return res.json({
+    state_summary: latestSignal
+      ? `Sleep ${latestSignal.sleep ?? "n/a"}, Stress ${latestSignal.stress ?? "n/a"}, Symptoms ${latestSignal.symptoms || "n/a"}.`
+      : "No recent signal state available.",
+    high_priority_focus: autonomyState.activeAlerts.length ? "Address active alerts and stabilize signals." : "Continue strategic build execution.",
+    active_alerts: autonomyState.activeAlerts,
+    active_alerts_count: autonomyState.activeAlerts.length,
+    open_task_count: openTasks,
+    memory_status: memoryCount > 0 ? `ACTIVE (${memoryCount} entries)` : "EMPTY",
+    recommended_next_move: autonomyState.activeAlerts.length
+      ? "Run monitor run, then prioritize highest-severity alert."
+      : "Run agent with current objective to generate next actions.",
+    autonomy_status: {
+      monitoring_enabled: autonomyState.monitoringEnabled,
+      last_monitor_run: autonomyState.lastRunAt,
+    },
+  });
+});
+
 /* legacy routes kept for compatibility */
 router.get("/map/systems", async (req, res) => res.redirect(307, "/api/core/systems/map"));
 router.get("/trends/signals", async (req, res) => res.redirect(307, "/api/core/signals/trends"));
@@ -766,14 +876,10 @@ router.post("/task/create", async (req, res) => res.redirect(307, "/api/core/tas
 router.get("/task/list", async (req, res) => res.redirect(307, "/api/core/tasks"));
 router.post("/task/complete", async (req, res) => {
   const taskId = typeof req.body?.id === "string" ? req.body.id.trim() : "";
-  if (!taskId) {
-    return res.status(400).json({ message: "Task id is required." });
-  }
+  if (!taskId) return res.status(400).json({ message: "Task id is required." });
 
   const task = await Task.findById(taskId);
-  if (!task) {
-    return res.status(404).json({ message: `Task not found: ${taskId}` });
-  }
+  if (!task) return res.status(404).json({ message: `Task not found: ${taskId}` });
 
   task.status = "done";
   task.completedAt = new Date();

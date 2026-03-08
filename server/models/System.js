@@ -10,6 +10,9 @@ const systemSchema = new mongoose.Schema(
     inputs: [String],
     outputs: [String],
     routines: [String],
+    triggerConditions: { type: [String], default: [] },
+    automationEnabled: { type: Boolean, default: false },
+    escalationLevel: { type: String, default: "low" },
   },
   { timestamps: true }
 );
