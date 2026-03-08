@@ -4,11 +4,11 @@ const SignalEntry = require("../../models/SignalEntry");
 
 router.post("/analyze", async (req, res) => {
   const fallbackAnalysis = {
-    objectives: ["Clarify the main objective"],
-    constraints: ["Identify current limitations"],
-    risks: ["Evaluate potential obstacles"],
-    leverage: ["Identify strategic advantages"],
-    next_actions: ["Define the first executable step"],
+    objectives: ["Gemini JSON missing required keys"],
+    constraints: [],
+    risks: [],
+    leverage: [],
+    next_actions: [],
   };
 
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
@@ -17,11 +17,13 @@ router.post("/analyze", async (req, res) => {
     return res.status(400).json({ message: "Command text is required." });
   }
 
-  const apiKey = process.env.Gemini_API_Key;
+  const hasGeminiKey = Boolean(process.env.Gemini_API_Key);
 
-  if (!apiKey) {
-    return res.json(fallbackAnalysis);
+  if (!hasGeminiKey) {
+    return res.status(500).json({ message: "Gemini_API_Key is missing on the server." });
   }
+
+  const apiKey = process.env.Gemini_API_Key;
 
   const prompt = [
     "Analyze the user input like a strategic systems architect.",
@@ -36,7 +38,7 @@ router.post("/analyze", async (req, res) => {
   ].join("\n");
 
   try {
-    console.log("Gemini key exists:", !!process.env.Gemini_API_Key);
+    console.log("Gemini key exists:", hasGeminiKey);
 
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
@@ -58,21 +60,45 @@ router.post("/analyze", async (req, res) => {
       }
     );
 
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text();
+      return res.status(502).json({
+        message: "Gemini HTTP error",
+        status: geminiResponse.status,
+        details: (errorText || "").slice(0, 500),
+      });
+    }
+
     const data = await geminiResponse.json();
     const modelText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (!modelText) {
+    let parsed;
+    try {
+      parsed = JSON.parse(modelText);
+    } catch (error) {
+      return res.status(502).json({
+        message: "Gemini returned non-JSON output.",
+        raw: String(modelText || "").slice(0, 500),
+      });
+    }
+
+    const requiredKeys = ["objectives", "constraints", "risks", "leverage", "next_actions"];
+    const hasAllRequiredKeys =
+      parsed &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed) &&
+      requiredKeys.every((key) => Object.prototype.hasOwnProperty.call(parsed, key));
+
+    if (!hasAllRequiredKeys) {
       return res.json(fallbackAnalysis);
     }
 
-    try {
-      const parsed = JSON.parse(modelText);
-      return res.json(parsed);
-    } catch (error) {
-      return res.json(fallbackAnalysis);
-    }
+    return res.json(parsed);
   } catch (error) {
-    return res.json(fallbackAnalysis);
+    return res.status(502).json({
+      message: "Gemini request failed.",
+      details: String(error?.message || error).slice(0, 500),
+    });
   }
 });
 
