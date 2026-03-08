@@ -10,12 +10,20 @@ const HELP_LINES = [
   '• show systems',
   '• create system <name>',
   '• log signal key=value key=value',
+  '• history',
+  '• context',
   '• help',
 ];
 const UNKNOWN_COMMAND_MESSAGE =
   'Unknown command. Type help to view supported commands.';
-const COMMAND_HISTORY_KEY = 'syzmeku.commandHistory';
-const MAX_COMMAND_HISTORY = 20;
+const SESSION_MEMORY_KEY = 'syzmeku.sessionMemory';
+const MAX_COMMAND_HISTORY = 10;
+
+const DEFAULT_SESSION_MEMORY = {
+  recentCommands: [],
+  lastOverlayResult: null,
+  activeRouteType: 'analyze',
+};
 
 const parseValue = (value) => {
   if (/^-?\d+(\.\d+)?$/.test(value)) {
@@ -122,6 +130,24 @@ const getCommandRoute = (rawCommand) => {
     };
   }
 
+  if (lowered === 'history') {
+    return {
+      type: 'history',
+      routeLabel: 'history',
+      title: 'COMMAND HISTORY',
+      request: null,
+    };
+  }
+
+  if (lowered === 'context') {
+    return {
+      type: 'context',
+      routeLabel: 'context',
+      title: 'SESSION CONTEXT',
+      request: null,
+    };
+  }
+
   return {
     type: 'unknown',
     routeLabel: 'unknown',
@@ -213,13 +239,28 @@ const Dashboard = ({ user }) => {
   const [showOverlay, setShowOverlay] = useState(false);
   const [commandHistory, setCommandHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [activeRouteType, setActiveRouteType] = useState(DEFAULT_SESSION_MEMORY.activeRouteType);
+  const [lastOverlayResult, setLastOverlayResult] = useState(DEFAULT_SESSION_MEMORY.lastOverlayResult);
 
   useEffect(() => {
     try {
-      const rawHistory = localStorage.getItem(COMMAND_HISTORY_KEY);
-      const parsedHistory = JSON.parse(rawHistory || '[]');
-      if (Array.isArray(parsedHistory)) {
-        setCommandHistory(parsedHistory.slice(0, MAX_COMMAND_HISTORY));
+      const rawSessionMemory = localStorage.getItem(SESSION_MEMORY_KEY);
+      const parsedSessionMemory = JSON.parse(rawSessionMemory || 'null');
+
+      if (parsedSessionMemory && typeof parsedSessionMemory === 'object') {
+        const recentCommands = Array.isArray(parsedSessionMemory.recentCommands)
+          ? parsedSessionMemory.recentCommands.slice(0, MAX_COMMAND_HISTORY)
+          : [];
+
+        setCommandHistory(recentCommands);
+        setActiveRouteType(
+          typeof parsedSessionMemory.activeRouteType === 'string'
+            ? parsedSessionMemory.activeRouteType
+            : DEFAULT_SESSION_MEMORY.activeRouteType
+        );
+        setLastOverlayResult(parsedSessionMemory.lastOverlayResult || null);
+      } else {
+        setCommandHistory([]);
       }
     } catch {
       setCommandHistory([]);
@@ -227,8 +268,14 @@ const Dashboard = ({ user }) => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(COMMAND_HISTORY_KEY, JSON.stringify(commandHistory));
-  }, [commandHistory]);
+    const sessionMemory = {
+      recentCommands: commandHistory,
+      lastOverlayResult,
+      activeRouteType,
+    };
+
+    localStorage.setItem(SESSION_MEMORY_KEY, JSON.stringify(sessionMemory));
+  }, [commandHistory, lastOverlayResult, activeRouteType]);
 
   const addCommandToHistory = (rawCommand) => {
     setCommandHistory((previous) => {
@@ -240,6 +287,12 @@ const Dashboard = ({ user }) => {
       return updated.slice(0, MAX_COMMAND_HISTORY);
     });
     setHistoryIndex(-1);
+  };
+
+  const updateSessionMemory = ({ rawCommand, routeType, overlayResult }) => {
+    addCommandToHistory(rawCommand);
+    setActiveRouteType(routeType);
+    setLastOverlayResult(overlayResult);
   };
 
   const submitCommand = async () => {
@@ -265,10 +318,40 @@ const Dashboard = ({ user }) => {
     }
 
     if (route.type === 'help') {
+      const helpResult = { lines: HELP_LINES };
+
       setOutputMode('help');
-      setResult({ lines: HELP_LINES });
+      setResult(helpResult);
       setShowOverlay(true);
-      addCommandToHistory(rawCommand);
+      updateSessionMemory({ rawCommand, routeType: route.type, overlayResult: helpResult });
+      setCommand('');
+      setLoading(false);
+      return;
+    }
+
+    if (route.type === 'history') {
+      const historyResult = { commands: commandHistory };
+
+      setOutputMode('history');
+      setResult(historyResult);
+      setShowOverlay(true);
+      updateSessionMemory({ rawCommand, routeType: route.type, overlayResult: historyResult });
+      setCommand('');
+      setLoading(false);
+      return;
+    }
+
+    if (route.type === 'context') {
+      const contextResult = {
+        activeRoute: activeRouteType,
+        savedRecentCommands: commandHistory.length,
+        hasLastResult: Boolean(lastOverlayResult),
+      };
+
+      setOutputMode('context');
+      setResult(contextResult);
+      setShowOverlay(true);
+      updateSessionMemory({ rawCommand, routeType: route.type, overlayResult: contextResult });
       setCommand('');
       setLoading(false);
       return;
@@ -296,7 +379,7 @@ const Dashboard = ({ user }) => {
       }
 
       setShowOverlay(true);
-      addCommandToHistory(rawCommand);
+      updateSessionMemory({ rawCommand, routeType: route.type, overlayResult: data });
       setCommand('');
     } catch (err) {
       const message = err?.response?.data?.message || err.message || 'Command execution failed.';
@@ -503,6 +586,33 @@ const Dashboard = ({ user }) => {
                     {line}
                   </p>
                 ))}
+              </div>
+            )}
+
+            {outputMode === 'history' && (
+              <div>
+                {!(result?.commands || []).length && (
+                  <p style={{ margin: 0, fontSize: '0.84rem' }}>No recent commands saved yet.</p>
+                )}
+                {(result?.commands || []).map((entry, index) => (
+                  <p key={`${entry}-${index}`} style={{ margin: '0.18rem 0', fontSize: '0.82rem', opacity: 0.88 }}>
+                    {index + 1}. {entry}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {outputMode === 'context' && (
+              <div>
+                <p style={{ margin: '0.18rem 0', fontSize: '0.82rem', opacity: 0.88 }}>
+                  ACTIVE ROUTE: {result?.activeRoute || 'unknown'}
+                </p>
+                <p style={{ margin: '0.18rem 0', fontSize: '0.82rem', opacity: 0.88 }}>
+                  SAVED RECENT COMMANDS: {result?.savedRecentCommands || 0}
+                </p>
+                <p style={{ margin: '0.18rem 0', fontSize: '0.82rem', opacity: 0.88 }}>
+                  LAST RESULT EXISTS: {result?.hasLastResult ? 'YES' : 'NO'}
+                </p>
               </div>
             )}
 
