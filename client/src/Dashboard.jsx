@@ -19,6 +19,7 @@ const HELP_LINES = [
   'agent <goal> | execute <goal> | orchestrate <goal> | plan <goal> | build <goal>',
   'mentor <text> | reflect <text> | reframe <text>',
   'monitor run | alerts | autonomy status',
+  'loop status | loop start | loop stop',
   'analyze file | analyze image | voice on | voice off | clear | help',
 ];
 
@@ -360,6 +361,21 @@ const Dashboard = ({ user }) => {
         nextRoute = 'autonomy status';
         response = await axios.get('/api/core/autonomy/status');
         setOutputMode('status');
+      } else if (lowered === 'loop status') {
+        setOutputTitle('AGENT LOOP STATUS');
+        nextRoute = 'loop status';
+        response = await axios.get('/api/core/loop/status');
+        setOutputMode('loop');
+      } else if (lowered === 'loop start') {
+        setOutputTitle('AGENT LOOP ACTIVE');
+        nextRoute = 'loop start';
+        response = await axios.post('/api/core/loop/start');
+        setOutputMode('loop');
+      } else if (lowered === 'loop stop') {
+        setOutputTitle('AGENT LOOP STOPPED');
+        nextRoute = 'loop stop';
+        response = await axios.post('/api/core/loop/stop');
+        setOutputMode('loop');
       } else if (lowered === 'summary') {
         setOutputTitle('OPERATOR SUMMARY');
         nextRoute = 'summary';
@@ -464,6 +480,7 @@ const Dashboard = ({ user }) => {
         <span className="state-badge">ALERTS: {alertsCount}</span>
         <span className="state-badge">TASKS: {taskCount}</span>
         <span className="state-badge">AUTONOMY: {operatorSummary?.autonomy_status?.monitoring_enabled ? 'ON' : 'OFF'}</span>
+        <span className="state-badge">AGENT LOOP: {operatorSummary?.loop_status?.active ? 'ACTIVE' : 'STOPPED'}</span>
       </div>
 
       <div className="summary-strip">
@@ -495,6 +512,7 @@ const Dashboard = ({ user }) => {
             {outputMode === 'monitor' && <div><p><strong>State:</strong> {result?.state_summary}</p><p><strong>Alerts:</strong> {(result?.alerts || []).join(' | ') || '-'}</p><p><strong>Risks:</strong> {(result?.risks || []).join(' | ') || '-'}</p><p><strong>Recommended:</strong> {(result?.recommended_actions || []).join(' | ') || '-'}</p></div>}
             {outputMode === 'alerts' && <div>{(result?.alerts || []).map((a, i) => <p key={`${a}-${i}`}>{typeof a === 'string' ? a : `${a?.severity || ''}: ${a?.message || ''}`}</p>)}</div>}
             {outputMode === 'status' && <div><p>Monitoring enabled: {String(result?.monitoring_enabled)}</p><p>Last run: {formatRecordedAt(result?.last_monitor_run)}</p><p>Active alerts: {result?.active_alerts_count ?? 0}</p></div>}
+            {outputMode === 'loop' && <div><p><strong>State:</strong> {result?.active ? 'ACTIVE' : 'STOPPED'}</p><p><strong>Interval:</strong> {result?.interval_ms ?? '-'} ms</p><p><strong>Last run:</strong> {formatRecordedAt(result?.last_run_at)}</p><p><strong>Run count:</strong> {result?.run_count ?? 0}</p><p><strong>Last error:</strong> {result?.last_error || '-'}</p></div>}
             {outputMode === 'summary' && <div><p><strong>state_summary:</strong> {result?.state_summary}</p><p><strong>high_priority_focus:</strong> {result?.high_priority_focus}</p><p><strong>active_alerts:</strong> {(result?.active_alerts || []).join(' | ')}</p><p><strong>recommended_next_move:</strong> {result?.recommended_next_move}</p></div>}
             {outputMode === 'help' && (result?.lines || []).map((line) => <p key={line}>{line}</p>)}
             {outputMode === 'history' && (result?.commands || []).map((line, i) => <p key={`${line}-${i}`}>{i + 1}. {line}</p>)}

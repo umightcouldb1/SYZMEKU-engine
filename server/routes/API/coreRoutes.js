@@ -22,6 +22,23 @@ const autonomyState = {
   activeAlerts: [],
 };
 
+const LOOP_INTERVAL_MS = Number(process.env.AGENT_LOOP_INTERVAL_MS) > 0 ? Number(process.env.AGENT_LOOP_INTERVAL_MS) : 6 * 60 * 60 * 1000;
+const loopState = {
+  active: false,
+  intervalMs: LOOP_INTERVAL_MS,
+  timer: null,
+  startedAt: null,
+  lastRunAt: null,
+  runCount: 0,
+  lastReport: null,
+  eventLog: [],
+  lastError: null,
+};
+
+const appendLoopEvent = (event) => {
+  loopState.eventLog = [{ recordedAt: new Date().toISOString(), ...event }, ...loopState.eventLog].slice(0, 50);
+};
+
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -391,6 +408,79 @@ const evaluateMonitorState = async () => {
     enabledProtocolCount: enabledProtocols.length,
   };
 };
+
+const runAgentLoopCycle = async () => {
+  const report = await evaluateMonitorState();
+  const enabledProtocols = await System.find({ automationEnabled: true }).sort({ updatedAt: -1 }).lean();
+  const protocolTriggers = enabledProtocols
+    .flatMap((system) => (Array.isArray(system?.triggerConditions) ? system.triggerConditions : []))
+    .map((trigger) => String(trigger || "").trim())
+    .filter(Boolean);
+
+  const event = {
+    type: "loop-cycle",
+    alerts: report.alerts,
+    monitor_state: report.state_summary,
+    protocol_trigger_count: protocolTriggers.length,
+    protocol_triggers: protocolTriggers.slice(0, 10),
+    recommended_actions: report.recommended_actions,
+  };
+
+  loopState.lastRunAt = new Date();
+  loopState.runCount += 1;
+  loopState.lastError = null;
+  loopState.lastReport = event;
+  appendLoopEvent(event);
+
+  return event;
+};
+
+const startAgentLoop = async () => {
+  if (loopState.active && loopState.timer) return loopState;
+
+  loopState.active = true;
+  loopState.startedAt = new Date();
+  loopState.lastError = null;
+
+  try {
+    await runAgentLoopCycle();
+  } catch (error) {
+    loopState.lastError = String(error?.message || error);
+    appendLoopEvent({ type: "loop-cycle-error", error: loopState.lastError });
+  }
+
+  loopState.timer = setInterval(async () => {
+    try {
+      await runAgentLoopCycle();
+    } catch (error) {
+      loopState.lastError = String(error?.message || error);
+      appendLoopEvent({ type: "loop-cycle-error", error: loopState.lastError });
+    }
+  }, loopState.intervalMs);
+
+  return loopState;
+};
+
+const stopAgentLoop = () => {
+  if (loopState.timer) {
+    clearInterval(loopState.timer);
+    loopState.timer = null;
+  }
+  loopState.active = false;
+  appendLoopEvent({ type: "loop-stopped" });
+  return loopState;
+};
+
+const loopStatusPayload = () => ({
+  active: loopState.active,
+  interval_ms: loopState.intervalMs,
+  started_at: loopState.startedAt,
+  last_run_at: loopState.lastRunAt,
+  run_count: loopState.runCount,
+  last_error: loopState.lastError,
+  last_report: loopState.lastReport,
+  recent_events: loopState.eventLog.slice(0, 10),
+});
 
 /* CORE REASONING */
 router.post("/analyze", async (req, res) => {
@@ -815,6 +905,20 @@ router.get("/autonomy/status", async (_req, res) => {
   });
 });
 
+router.get("/loop/status", async (_req, res) => {
+  return res.json(loopStatusPayload());
+});
+
+router.post("/loop/start", async (_req, res) => {
+  await startAgentLoop();
+  return res.json({ message: "Agent loop started.", ...loopStatusPayload() });
+});
+
+router.post("/loop/stop", async (_req, res) => {
+  stopAgentLoop();
+  return res.json({ message: "Agent loop stopped.", ...loopStatusPayload() });
+});
+
 /* TASKS */
 router.post("/tasks", async (req, res) => {
   const description = typeof req.body?.description === "string" ? req.body.description.trim() : "";
@@ -912,6 +1016,12 @@ router.get("/summary", async (_req, res) => {
     autonomy_status: {
       monitoring_enabled: autonomyState.monitoringEnabled,
       last_monitor_run: autonomyState.lastRunAt,
+    },
+    loop_status: {
+      active: loopState.active,
+      interval_ms: loopState.intervalMs,
+      last_run_at: loopState.lastRunAt,
+      run_count: loopState.runCount,
     },
   });
 });
