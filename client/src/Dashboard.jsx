@@ -155,6 +155,52 @@ const renderCompactJson = (data, keyPrefix = 'json') => (
   </div>
 );
 
+const formatRecordedAt = (value) => {
+  if (!value) {
+    return 'Unknown';
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return 'Unknown';
+  }
+
+  return parsed.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
+const renderSignalCard = (signal, keyPrefix = 'signal') => {
+  const signalEntries = Object.entries(signal || {}).filter(
+    ([key]) => !['_id', '__v', 'createdAt', 'updatedAt'].includes(key)
+  );
+
+  return (
+    <div
+      key={keyPrefix}
+      style={{
+        marginBottom: '0.5rem',
+        border: '1px solid rgba(120, 180, 255, 0.2)',
+        borderRadius: '8px',
+        padding: '0.45rem 0.55rem',
+      }}
+    >
+      {signalEntries.map(([key, value]) => (
+        <p key={`${keyPrefix}-${key}`} style={{ margin: '0.14rem 0', fontSize: '0.82rem' }}>
+          <strong style={{ textTransform: 'capitalize' }}>{key}:</strong> {String(value)}
+        </p>
+      ))}
+      <p style={{ margin: '0.2rem 0 0', fontSize: '0.75rem', opacity: 0.84 }}>
+        Recorded: {formatRecordedAt(signal?.createdAt)}
+      </p>
+    </div>
+  );
+};
+
 const Dashboard = ({ user }) => {
   const [command, setCommand] = useState('');
   const [loading, setLoading] = useState(false);
@@ -431,7 +477,7 @@ const Dashboard = ({ user }) => {
             {outputMode === 'signals' && (
               <div>
                 {!result.length && <p style={{ margin: 0, fontSize: '0.84rem' }}>No signals recorded yet.</p>}
-                {result.map((item, index) => renderCompactJson(item, `signal-${item?._id || index}`))}
+                {result.map((item, index) => renderSignalCard(item, `signal-${item?._id || index}`))}
               </div>
             )}
 
@@ -442,7 +488,9 @@ const Dashboard = ({ user }) => {
               </div>
             )}
 
-            {(outputMode === 'created' || outputMode === 'logged') && renderCompactJson(result)}
+            {outputMode === 'created' && renderCompactJson(result)}
+
+            {outputMode === 'logged' && renderSignalCard(result, `logged-${result?._id || 'new'}`)}
 
             {outputMode === 'unknown' && (
               <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', opacity: 0.88 }}>{result.message}</p>
