@@ -4,11 +4,11 @@ const SignalEntry = require("../../models/SignalEntry");
 
 router.post("/analyze", async (req, res) => {
   const fallbackAnalysis = {
-    objectives: ["Gemini JSON missing required keys"],
+    objectives: ["Gemini JSON missing required keys."],
     constraints: [],
     risks: [],
     leverage: [],
-    next_actions: [],
+    next_actions: ["Adjust model prompt to always return the required schema."],
   };
 
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
@@ -20,7 +20,13 @@ router.post("/analyze", async (req, res) => {
   const hasGeminiKey = Boolean(process.env.Gemini_API_Key);
 
   if (!hasGeminiKey) {
-    return res.status(500).json({ message: "Gemini_API_Key is missing on the server." });
+    return res.json({
+      objectives: ["Gemini_API_Key is missing on the server."],
+      constraints: [],
+      risks: [],
+      leverage: [],
+      next_actions: ["Add Gemini_API_Key to Render environment variables."],
+    });
   }
 
   const prompt = [
@@ -57,10 +63,12 @@ router.post("/analyze", async (req, res) => {
 
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
-      return res.status(502).json({
-        message: "Gemini HTTP error",
-        status: geminiResponse.status,
-        details: (errorText || "").slice(0, 500),
+      return res.json({
+        objectives: ["Gemini HTTP error"],
+        constraints: [`HTTP status: ${geminiResponse.status}`],
+        risks: [String(errorText || "").slice(0, 300)],
+        leverage: ["Check Gemini_API_Key, API enablement, endpoint, and model name."],
+        next_actions: ["Fix the reported HTTP error and retry analyze."],
       });
     }
 
@@ -71,9 +79,12 @@ router.post("/analyze", async (req, res) => {
     try {
       parsed = JSON.parse(modelText);
     } catch (error) {
-      return res.status(502).json({
-        message: "Gemini returned non-JSON output.",
-        raw: String(modelText || "").slice(0, 500),
+      return res.json({
+        objectives: ["Gemini returned non-JSON output."],
+        constraints: [],
+        risks: [String(modelText || "").slice(0, 300)],
+        leverage: [],
+        next_actions: ["Tighten the prompt or parsing logic."],
       });
     }
 
