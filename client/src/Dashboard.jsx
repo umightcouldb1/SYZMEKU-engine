@@ -6,6 +6,7 @@ const ANALYSIS_SECTIONS = ['objectives', 'constraints', 'risks', 'leverage', 'ne
 const HELP_LINES = [
   'Supported commands:',
   '• analyze <text>',
+  '• recommend <optional text>',
   '• show signals',
   '• show systems',
   '• create system <name>',
@@ -73,6 +74,25 @@ const getCommandRoute = (rawCommand, analyzeContext = DEFAULT_SESSION_MEMORY) =>
       request: () =>
         axios.post('/api/core/analyze', {
           text: trimmed.slice(8).trim(),
+          context: {
+            recentCommands: analyzeContext.recentCommands,
+            lastOverlayResult: analyzeContext.lastOverlayResult,
+            activeRouteType: analyzeContext.activeRouteType,
+          },
+        }),
+    };
+  }
+
+  if (lowered === 'recommend' || lowered.startsWith('recommend ')) {
+    const recommendationText = trimmed.length > 9 ? trimmed.slice(9).trim() : '';
+
+    return {
+      type: 'recommend',
+      routeLabel: 'recommend',
+      title: 'RECOMMENDATION ENGINE',
+      request: () =>
+        axios.post('/api/core/recommend', {
+          text: recommendationText || 'based on current state',
           context: {
             recentCommands: analyzeContext.recentCommands,
             lastOverlayResult: analyzeContext.lastOverlayResult,
@@ -373,7 +393,7 @@ const Dashboard = ({ user }) => {
       const response = await route.request();
       const data = response?.data;
 
-      if (route.type === 'analyze') {
+      if (route.type === 'analyze' || route.type === 'recommend') {
         setOutputMode('analyze');
         setResult(data);
       } else if (route.type === 'show-signals') {
