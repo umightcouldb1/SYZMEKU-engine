@@ -160,6 +160,7 @@ const Dashboard = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [outputMode, setOutputMode] = useState('analyze');
   const [outputTitle, setOutputTitle] = useState('TACTICAL READOUT');
+  const [commandLabel, setCommandLabel] = useState('analyze');
   const [routeLabel, setRouteLabel] = useState('analyze');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -206,6 +207,7 @@ const Dashboard = ({ user }) => {
     setLoading(true);
     setError('');
     setOutputTitle(route.title);
+    setCommandLabel(rawCommand);
     setRouteLabel(route.routeLabel);
 
     if (route.type === 'unknown') {
@@ -403,9 +405,10 @@ const Dashboard = ({ user }) => {
               </button>
             </div>
 
-            <p style={{ margin: '0 0 0.6rem', fontSize: '0.72rem', letterSpacing: '0.08em', opacity: 0.9 }}>
-              ROUTE: {routeLabel}
-            </p>
+            <div style={{ margin: '0 0 0.6rem', fontSize: '0.72rem', letterSpacing: '0.08em', opacity: 0.9 }}>
+              <p style={{ margin: 0 }}>&gt; COMMAND: {commandLabel}</p>
+              <p style={{ margin: 0 }}>&gt; ROUTE: {routeLabel}</p>
+            </div>
 
             {outputMode === 'analyze' &&
               ANALYSIS_SECTIONS.map((section) => {
