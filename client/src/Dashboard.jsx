@@ -9,16 +9,16 @@ const MAX_COMMAND_HISTORY = 20;
 const HELP_LINES = [
   'analyze <text>',
   'analyze strategic|health|build|signal <text>',
-  'recommend | recommend next step | recommend based on current state',
+  'recommend | recommend based on current state | summary',
   'log signal sleep=6 stress=3 symptoms=calm',
   'show signals | trend signals | signal anomaly | signal report',
   'create system <name> | show systems | map systems | run system <name>',
-  'task create <description> | task show | task complete <id>',
-  'save recommendation',
-  'plan <goal> | build <goal> | execute <goal>',
-  'analyze file | analyze image | voice on | voice off',
-  'alerts | monitor state',
-  'history | context | clear | help',
+  'automate system <name> | disable system <name> | protocol status',
+  'task create <description> | task show | task complete <id> | save recommendation',
+  'memory save <text> | memory show | memory search <query> | history | context',
+  'agent <goal> | execute <goal> | orchestrate <goal> | plan <goal> | build <goal>',
+  'monitor run | alerts | autonomy status',
+  'analyze file | analyze image | voice on | voice off | clear | help',
 ];
 
 const DEFAULT_SESSION_MEMORY = {
@@ -45,9 +45,7 @@ const parseSignalPayload = (rawText) => {
       return;
     }
 
-    if (currentKey) {
-      payload[currentKey] = parseValue(`${payload[currentKey]} ${token}`.trim());
-    }
+    if (currentKey) payload[currentKey] = parseValue(`${payload[currentKey]} ${token}`.trim());
   });
 
   return payload;
@@ -67,31 +65,11 @@ const modeFromCommand = (commandText) => {
   if (lowered.startsWith('analyze build')) return 'BUILD';
   if (lowered.startsWith('analyze signal')) return 'SIGNAL';
   if (lowered.startsWith('recommend')) return 'RECOMMEND';
+  if (lowered.startsWith('agent')) return 'AGENT';
+  if (lowered.startsWith('execute')) return 'EXECUTION';
+  if (lowered.startsWith('orchestrate')) return 'ORCHESTRATION';
   return 'GENERAL';
 };
-
-const renderTaskCard = (task, keyPrefix = 'task') => (
-  <div key={keyPrefix} style={{ marginBottom: '0.5rem', border: '1px solid rgba(120, 180, 255, 0.2)', borderRadius: '8px', padding: '0.45rem 0.55rem' }}>
-    <p style={{ margin: '0.12rem 0', fontSize: '0.83rem' }}><strong>ID:</strong> {task?._id || 'unknown'}</p>
-    <p style={{ margin: '0.12rem 0', fontSize: '0.83rem' }}><strong>Description:</strong> {task?.description || '(empty)'}</p>
-    <p style={{ margin: '0.12rem 0', fontSize: '0.83rem' }}><strong>Status:</strong> {task?.status || 'open'}</p>
-    <p style={{ margin: '0.12rem 0', fontSize: '0.83rem' }}><strong>Source:</strong> {task?.source || '-'}</p>
-    <p style={{ margin: '0.12rem 0', fontSize: '0.77rem', opacity: 0.84 }}><strong>Created:</strong> {formatRecordedAt(task?.createdAt)}</p>
-    {task?.completedAt && <p style={{ margin: '0.12rem 0', fontSize: '0.77rem', opacity: 0.84 }}><strong>Completed:</strong> {formatRecordedAt(task?.completedAt)}</p>}
-  </div>
-);
-
-const renderSystemCard = (item, key) => (
-  <div key={key} style={{ marginBottom: '0.5rem', border: '1px solid rgba(120, 180, 255, 0.2)', borderRadius: '8px', padding: '0.45rem 0.55rem' }}>
-    <p style={{ margin: '0.12rem 0', fontSize: '0.85rem' }}><strong>{item?.name || 'Unnamed System'}</strong></p>
-    <p style={{ margin: '0.12rem 0', fontSize: '0.8rem' }}>Purpose: {item?.purpose || '-'}</p>
-    <p style={{ margin: '0.12rem 0', fontSize: '0.8rem' }}>Type: {item?.protocolType || 'generic'}</p>
-    <p style={{ margin: '0.12rem 0', fontSize: '0.8rem' }}>Inputs: {(item?.inputs || []).join(', ') || 'none'}</p>
-    <p style={{ margin: '0.12rem 0', fontSize: '0.8rem' }}>Outputs: {(item?.outputs || []).join(', ') || 'none'}</p>
-    <p style={{ margin: '0.12rem 0', fontSize: '0.8rem' }}>Routines: {(item?.routines || []).join(', ') || 'none'}</p>
-    {item?.relatedSignals && <p style={{ margin: '0.12rem 0', fontSize: '0.8rem' }}>Related signals: {item.relatedSignals.length}</p>}
-  </div>
-);
 
 const Dashboard = ({ user }) => {
   const [command, setCommand] = useState('');
@@ -101,7 +79,6 @@ const Dashboard = ({ user }) => {
   const [commandLabel, setCommandLabel] = useState('analyze');
   const [routeLabel, setRouteLabel] = useState('analyze');
   const [result, setResult] = useState(null);
-  const [error, setError] = useState('');
   const [showOverlay, setShowOverlay] = useState(false);
   const [commandHistory, setCommandHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -110,7 +87,24 @@ const Dashboard = ({ user }) => {
   const [voiceActive, setVoiceActive] = useState(false);
   const [uploadedFileText, setUploadedFileText] = useState('');
   const [uploadedImageInfo, setUploadedImageInfo] = useState('');
+  const [operatorSummary, setOperatorSummary] = useState(null);
   const recognitionRef = useRef(null);
+
+  const saveSessionMemory = useMemo(
+    () => (nextMemory) => {
+      localStorage.setItem(SESSION_MEMORY_KEY, JSON.stringify(nextMemory));
+    },
+    []
+  );
+
+  const fetchSummary = async () => {
+    try {
+      const response = await axios.get('/api/core/summary');
+      setOperatorSummary(response.data);
+    } catch {
+      setOperatorSummary(null);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -124,182 +118,242 @@ const Dashboard = ({ user }) => {
         setLastOverlayResult(parsedSessionMemory.lastOverlayResult || null);
       }
     } catch {
-      setCommandHistory([]);
+      saveSessionMemory(DEFAULT_SESSION_MEMORY);
     }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(SESSION_MEMORY_KEY, JSON.stringify({ recentCommands: commandHistory, lastOverlayResult, activeRouteType }));
-  }, [commandHistory, lastOverlayResult, activeRouteType]);
+    fetchSummary();
+  }, [saveSessionMemory]);
 
   const addCommandToHistory = (rawCommand) => {
-    setCommandHistory((prev) => [rawCommand, ...prev.filter((entry) => entry.toLowerCase() !== rawCommand.toLowerCase())].slice(0, MAX_COMMAND_HISTORY));
+    const nextHistory = [rawCommand, ...commandHistory.filter((entry) => entry !== rawCommand)].slice(0, MAX_COMMAND_HISTORY);
+    setCommandHistory(nextHistory);
+    saveSessionMemory({ recentCommands: nextHistory, activeRouteType, lastOverlayResult });
     setHistoryIndex(-1);
   };
 
   const startVoice = () => {
-    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) {
-      setError('Speech recognition not supported in this browser.');
-      return;
-    }
+    const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Speech) return;
     if (!recognitionRef.current) {
-      const recognition = new Recognition();
+      const recognition = new Speech();
       recognition.lang = 'en-US';
       recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
       recognition.onresult = (event) => {
-        const transcript = event?.results?.[0]?.[0]?.transcript || '';
+        const transcript = event.results?.[0]?.[0]?.transcript || '';
         if (transcript) setCommand(transcript);
       };
       recognition.onend = () => setVoiceActive(false);
-      recognition.onerror = () => setVoiceActive(false);
       recognitionRef.current = recognition;
     }
-    setVoiceActive(true);
     recognitionRef.current.start();
+    setVoiceActive(true);
   };
 
   const stopVoice = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
+    if (recognitionRef.current) recognitionRef.current.stop();
     setVoiceActive(false);
   };
 
-  const sessionContext = useMemo(
-    () => ({ recentCommands: commandHistory, lastOverlayResult, activeRouteType }),
-    [commandHistory, lastOverlayResult, activeRouteType]
-  );
+  const runLocal = (title, mode, payload, routeType = 'local') => {
+    setOutputTitle(title);
+    setOutputMode(mode);
+    setRouteLabel(routeType);
+    setResult(payload);
+    setShowOverlay(true);
+    setLastOverlayResult(payload);
+    setActiveRouteType(routeType);
+    saveSessionMemory({ recentCommands: commandHistory, activeRouteType: routeType, lastOverlayResult: payload });
+  };
 
   const submitCommand = async () => {
-    if (loading || !command.trim()) return;
     const rawCommand = command.trim();
+    if (!rawCommand || loading) return;
+
     const lowered = rawCommand.toLowerCase();
+    const sessionContext = {
+      recentCommands: commandHistory,
+      activeRouteType,
+      lastOverlayResult,
+    };
+
+    if (lowered === 'help') {
+      runLocal('COMMAND SURFACE', 'help', { lines: HELP_LINES }, 'help');
+      setCommand('');
+      return;
+    }
+    if (lowered === 'clear') {
+      setShowOverlay(false);
+      setResult(null);
+      setCommand('');
+      return;
+    }
+    if (lowered === 'history') {
+      runLocal('COMMAND HISTORY', 'history', { commands: commandHistory }, 'history');
+      return;
+    }
+    if (lowered === 'context') {
+      runLocal('SESSION CONTEXT', 'context', { activeRoute: activeRouteType, hasLastOverlay: Boolean(lastOverlayResult) }, 'context');
+      return;
+    }
+    if (lowered === 'voice on') {
+      startVoice();
+      runLocal('VOICE CHANNEL', 'context', { message: 'Voice capture activated.' }, 'voice on');
+      return;
+    }
+    if (lowered === 'voice off') {
+      stopVoice();
+      runLocal('VOICE CHANNEL', 'context', { message: 'Voice capture stopped.' }, 'voice off');
+      return;
+    }
 
     setLoading(true);
-    setError('');
     setCommandLabel(rawCommand);
 
-    const contextPayload = {
-      text: rawCommand.replace(/^analyze\s+/i, '').trim(),
-      context: sessionContext,
-    };
-
-    const runLocal = (title, mode, payload, route) => {
-      setOutputTitle(title);
-      setOutputMode(mode);
-      setRouteLabel(route);
-      setResult(payload);
-      setShowOverlay(true);
-      addCommandToHistory(rawCommand);
-      setActiveRouteType(route);
-      setLastOverlayResult(payload);
-      setCommand('');
-      setLoading(false);
-    };
-
     try {
-      if (lowered === 'help') return runLocal('COMMAND REFERENCE', 'help', { lines: HELP_LINES }, 'help');
-      if (lowered === 'history') return runLocal('COMMAND HISTORY', 'history', { commands: commandHistory }, 'history');
-      if (lowered === 'context') return runLocal('SESSION CONTEXT', 'context', { activeRoute: activeRouteType, savedRecentCommands: commandHistory.length, hasLastResult: Boolean(lastOverlayResult) }, 'context');
-      if (lowered === 'clear') return runLocal('CONSOLE CLEARED', 'context', { activeRoute: 'clear', savedRecentCommands: 0, hasLastResult: false }, 'clear');
-      if (lowered === 'voice on') return runLocal('VOICE CONTROL', 'context', { message: 'VOICE: ACTIVE' }, 'voice on') && startVoice();
-      if (lowered === 'voice off') return runLocal('VOICE CONTROL', 'context', { message: 'VOICE: OFF' }, 'voice off') && stopVoice();
-
       let response;
+      let nextRoute = lowered.split(' ')[0];
+
       if (lowered.startsWith('analyze ')) {
         setOutputTitle(lowered.startsWith('analyze image') ? 'IMAGE ANALYSIS' : lowered.startsWith('analyze file') ? 'FILE ANALYSIS' : 'TACTICAL READOUT');
-        setRouteLabel('analyze');
+        nextRoute = 'analyze';
         response = await axios.post('/api/core/analyze', {
-          ...contextPayload,
           text: lowered === 'analyze file' ? uploadedFileText || 'No file text loaded.' : lowered === 'analyze image' ? uploadedImageInfo || 'No image loaded.' : rawCommand.slice(8).trim(),
+          context: sessionContext,
         });
         setOutputMode('analyze');
       } else if (lowered === 'recommend' || lowered.startsWith('recommend ')) {
         setOutputTitle('RECOMMENDATION ENGINE');
-        setRouteLabel('recommend');
+        nextRoute = 'recommend';
         response = await axios.post('/api/core/recommend', { text: rawCommand.length > 9 ? rawCommand.slice(9).trim() : 'based on current state', context: sessionContext });
         setOutputMode('analyze');
+      } else if (lowered.startsWith('agent ') || lowered.startsWith('execute ') || lowered.startsWith('orchestrate ')) {
+        const goal = rawCommand.split(/\s+/).slice(1).join(' ').trim();
+        setOutputTitle(lowered.startsWith('agent ') ? 'AGENT KERNEL' : lowered.startsWith('execute ') ? 'EXECUTION KERNEL' : 'ORCHESTRATION ENGINE');
+        nextRoute = lowered.startsWith('agent ') ? 'agent' : lowered.startsWith('execute ') ? 'execute' : 'orchestrate';
+        response = await axios.post('/api/core/agent', { text: `${nextRoute} ${goal}`.trim(), context: sessionContext });
+        setOutputMode('agent');
       } else if (lowered === 'show signals') {
         setOutputTitle('SIGNAL LOG');
-        setRouteLabel('show signals');
+        nextRoute = 'show signals';
         response = await axios.get('/api/core/signals');
         setOutputMode('signals');
       } else if (lowered === 'trend signals') {
         setOutputTitle('SIGNAL TRENDS');
-        setRouteLabel('trend signals');
+        nextRoute = 'trend signals';
         response = await axios.get('/api/core/signals/trends');
         setOutputMode('signal-trends');
       } else if (lowered === 'signal anomaly') {
         setOutputTitle('SIGNAL ANOMALY');
-        setRouteLabel('signal anomaly');
+        nextRoute = 'signal anomaly';
         response = await axios.get('/api/core/signals/anomalies');
         setOutputMode('signal-anomaly');
       } else if (lowered === 'signal report') {
         setOutputTitle('SIGNAL REPORT');
-        setRouteLabel('signal report');
+        nextRoute = 'signal report';
         response = await axios.get('/api/core/signals/report');
         setOutputMode('analyze');
       } else if (lowered.startsWith('log signal ')) {
         setOutputTitle('SIGNAL RECORDED');
-        setRouteLabel('log signal');
+        nextRoute = 'log signal';
         response = await axios.post('/api/core/signals', parseSignalPayload(rawCommand.slice(11).trim()));
         setOutputMode('signals');
       } else if (lowered === 'show systems') {
         setOutputTitle('SYSTEM REGISTRY');
-        setRouteLabel('show systems');
+        nextRoute = 'show systems';
         response = await axios.get('/api/core/systems');
         setOutputMode('systems');
       } else if (lowered === 'map systems') {
         setOutputTitle('SYSTEM MAP');
-        setRouteLabel('map systems');
+        nextRoute = 'map systems';
         response = await axios.get('/api/core/systems/map');
         setOutputMode('system-map');
       } else if (lowered.startsWith('create system ')) {
         setOutputTitle('SYSTEM CREATED');
-        setRouteLabel('create system');
+        nextRoute = 'create system';
         response = await axios.post('/api/core/systems', { name: rawCommand.slice(14).trim(), purpose: '', inputs: [], outputs: [], routines: [] });
         setOutputMode('systems');
       } else if (lowered.startsWith('run system ')) {
         setOutputTitle('SYSTEM PROTOCOL');
-        setRouteLabel('run system');
+        nextRoute = 'run system';
         response = await axios.post('/api/core/systems/run', { name: rawCommand.slice(11).trim() });
         setOutputMode('analyze');
+      } else if (lowered.startsWith('automate system ')) {
+        setOutputTitle('PROTOCOL AUTOMATION');
+        nextRoute = 'automate system';
+        response = await axios.post('/api/core/systems/automate', { name: rawCommand.slice(16).trim() });
+        setOutputMode('systems');
+      } else if (lowered.startsWith('disable system ')) {
+        setOutputTitle('PROTOCOL DISABLED');
+        nextRoute = 'disable system';
+        response = await axios.post('/api/core/systems/disable', { name: rawCommand.slice(15).trim() });
+        setOutputMode('systems');
+      } else if (lowered === 'protocol status') {
+        setOutputTitle('PROTOCOL STATUS');
+        nextRoute = 'protocol status';
+        response = await axios.get('/api/core/protocol/status');
+        setOutputMode('protocols');
       } else if (lowered.startsWith('task create ')) {
         setOutputTitle('TASK CREATED');
-        setRouteLabel('task create');
+        nextRoute = 'task create';
         response = await axios.post('/api/core/tasks', { description: rawCommand.slice(12).trim() });
         setOutputMode('task-card');
       } else if (lowered === 'task show') {
         setOutputTitle('TASK LIST');
-        setRouteLabel('task show');
+        nextRoute = 'task show';
         response = await axios.get('/api/core/tasks');
         setOutputMode('tasks');
       } else if (lowered.startsWith('task complete ')) {
         setOutputTitle('TASK COMPLETED');
-        setRouteLabel('task complete');
+        nextRoute = 'task complete';
         response = await axios.post(`/api/core/tasks/${rawCommand.slice(14).trim()}/complete`);
         setOutputMode('task-card');
       } else if (lowered === 'save recommendation') {
         const nextActions = Array.isArray(lastOverlayResult?.next_actions) ? lastOverlayResult.next_actions : [];
         setOutputTitle('RECOMMENDATION SAVED');
-        setRouteLabel('save recommendation');
+        nextRoute = 'save recommendation';
         response = await axios.post('/api/core/tasks/save-recommendation', { nextActions });
         setOutputMode('tasks');
-      } else if (lowered.startsWith('plan ') || lowered.startsWith('build ') || lowered.startsWith('execute ')) {
+      } else if (lowered.startsWith('memory save ')) {
+        setOutputTitle('STRATEGIC MEMORY');
+        nextRoute = 'memory save';
+        response = await axios.post('/api/core/memory/save', { content: rawCommand.slice(12).trim(), sourceCommand: rawCommand });
+        setOutputMode('memory');
+      } else if (lowered === 'memory show') {
+        setOutputTitle('STRATEGIC MEMORY');
+        nextRoute = 'memory show';
+        response = await axios.get('/api/core/memory');
+        setOutputMode('memory-list');
+      } else if (lowered.startsWith('memory search ')) {
+        setOutputTitle('MEMORY SEARCH');
+        nextRoute = 'memory search';
+        response = await axios.get('/api/core/memory/search', { params: { query: rawCommand.slice(14).trim() } });
+        setOutputMode('memory-list');
+      } else if (lowered.startsWith('plan ') || lowered.startsWith('build ')) {
         const goal = rawCommand.split(/\s+/).slice(1).join(' ').trim();
-        setOutputTitle(lowered.startsWith('plan ') ? 'STRATEGIC PLAN' : lowered.startsWith('build ') ? 'BUILD PLAN' : 'EXECUTION PLAN');
-        setRouteLabel(lowered.startsWith('plan ') ? 'plan' : lowered.startsWith('build ') ? 'build' : 'execute');
+        setOutputTitle(lowered.startsWith('plan ') ? 'STRATEGIC PLAN' : 'BUILD PLAN');
+        nextRoute = lowered.startsWith('plan ') ? 'plan' : 'build';
         response = await axios.post('/api/core/analyze', { text: `strategic goal: ${goal}`, context: sessionContext });
-        if (lowered.startsWith('execute ') && Array.isArray(response?.data?.next_actions)) {
-          await axios.post('/api/core/tasks/save-recommendation', { nextActions: response.data.next_actions });
-        }
         setOutputMode('analyze');
-      } else if (lowered === 'alerts' || lowered === 'monitor state') {
-        setOutputTitle(lowered === 'alerts' ? 'SYSTEM ALERTS' : 'STATE MONITOR');
-        setRouteLabel(lowered);
+      } else if (lowered === 'monitor run') {
+        setOutputTitle('AUTONOMOUS MONITOR');
+        nextRoute = 'monitor run';
+        response = await axios.post('/api/core/monitor/run');
+        setOutputMode('monitor');
+      } else if (lowered === 'alerts') {
+        setOutputTitle('SYSTEM ALERTS');
+        nextRoute = 'alerts';
         response = await axios.get('/api/core/alerts');
         setOutputMode('alerts');
+      } else if (lowered === 'autonomy status') {
+        setOutputTitle('AUTONOMY STATUS');
+        nextRoute = 'autonomy status';
+        response = await axios.get('/api/core/autonomy/status');
+        setOutputMode('status');
+      } else if (lowered === 'summary') {
+        setOutputTitle('OPERATOR SUMMARY');
+        nextRoute = 'summary';
+        response = await axios.get('/api/core/summary');
+        setOutputMode('summary');
       } else {
         runLocal('COMMAND ERROR', 'error', { message: 'Unknown command. Type help.' }, 'unknown');
         return;
@@ -309,12 +363,14 @@ const Dashboard = ({ user }) => {
       setResult(data);
       setShowOverlay(true);
       addCommandToHistory(rawCommand);
-      setActiveRouteType(routeLabel || rawCommand.split(' ')[0]);
+      setRouteLabel(nextRoute);
+      setActiveRouteType(nextRoute);
       setLastOverlayResult(data);
+      saveSessionMemory({ recentCommands: [rawCommand, ...commandHistory].slice(0, MAX_COMMAND_HISTORY), activeRouteType: nextRoute, lastOverlayResult: data });
       setCommand('');
+      await fetchSummary();
     } catch (err) {
       const message = err?.response?.data?.message || err.message || 'Command execution failed.';
-      setError(message);
       setOutputMode('error');
       setOutputTitle('COMMAND ERROR');
       setRouteLabel('error');
@@ -331,6 +387,7 @@ const Dashboard = ({ user }) => {
       await submitCommand();
       return;
     }
+
     if (event.key === 'ArrowUp') {
       event.preventDefault();
       if (!commandHistory.length) return;
@@ -339,6 +396,7 @@ const Dashboard = ({ user }) => {
       setCommand(commandHistory[nextIndex]);
       return;
     }
+
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       if (!commandHistory.length || historyIndex < 0) return;
@@ -368,6 +426,10 @@ const Dashboard = ({ user }) => {
 
   if (!user) return <div className="portal-text">CALIBRATING DASHBOARD...</div>;
 
+  const memoryStatus = operatorSummary?.memory_status || 'UNKNOWN';
+  const alertsCount = operatorSummary?.active_alerts_count ?? 0;
+  const taskCount = operatorSummary?.open_task_count ?? 0;
+
   return (
     <div className="crystalline-container">
       <div className="nebula-1" />
@@ -380,28 +442,49 @@ const Dashboard = ({ user }) => {
         <div className="crystal-status">
           <p>CORE RESONANCE: 528Hz</p>
           <p className="light-status">VOICE: {voiceActive ? 'ACTIVE' : 'OFF'}</p>
-          <p className="light-status">MEMORY: ACTIVE | ROUTE: {routeLabel} | CONTEXT: LOADED</p>
-          <p className="light-status">MODE: {modeFromCommand(commandLabel)}</p>
+          <p className="light-status">MODE: {modeFromCommand(commandLabel)} | ROUTE: {routeLabel}</p>
         </div>
       </header>
+
+      <div className="operator-strip">
+        <span className="state-badge">MEMORY ACTIVE: {memoryStatus}</span>
+        <span className="state-badge">CONTEXT LOADED</span>
+        <span className="state-badge">MODE: {modeFromCommand(commandLabel)}</span>
+        <span className="state-badge">ALERTS: {alertsCount}</span>
+        <span className="state-badge">TASKS: {taskCount}</span>
+        <span className="state-badge">AUTONOMY: {operatorSummary?.autonomy_status?.monitoring_enabled ? 'ON' : 'OFF'}</span>
+      </div>
+
+      <div className="summary-strip">
+        <p><strong>Current mode:</strong> {modeFromCommand(commandLabel)}</p>
+        <p><strong>Active route:</strong> {routeLabel}</p>
+        <p><strong>Latest signal state:</strong> {operatorSummary?.state_summary || 'No summary available.'}</p>
+      </div>
 
       <main className="crystal-grid"><section className="crystal-heart-section"><div className="crystal-prism"><div className="prism-inner"><span className="prism-label">SYZMEKU</span></div><div className="geo-ring ring-1" /><div className="geo-ring ring-2" /></div></section></main>
 
       <footer className="crystal-footer" style={{ position: 'relative' }}>
         {showOverlay && result && (
-          <div style={{ position: 'absolute', bottom: 'calc(100% + 12px)', left: '50%', transform: 'translateX(-50%)', width: 'min(840px, 92vw)', maxHeight: '46vh', overflowY: 'auto', background: 'rgba(8, 14, 28, 0.8)', border: '1px solid rgba(120, 180, 255, 0.35)', borderRadius: '12px', boxShadow: '0 0 22px rgba(61, 142, 255, 0.2)', backdropFilter: 'blur(10px)', padding: '0.9rem 1rem', zIndex: 15 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}><p style={{ margin: 0, fontSize: '0.74rem', letterSpacing: '0.12em', opacity: 0.84 }}>{outputTitle}</p><button type="button" onClick={() => setShowOverlay(false)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#d6e6ff', borderRadius: '8px', fontSize: '0.68rem', padding: '0.2rem 0.5rem', cursor: 'pointer' }}>DISMISS</button></div>
-            <div style={{ margin: '0 0 0.6rem', fontSize: '0.72rem', letterSpacing: '0.08em', opacity: 0.9 }}><p style={{ margin: 0 }}>&gt; COMMAND: {commandLabel}</p><p style={{ margin: 0 }}>&gt; ROUTE: {routeLabel}</p></div>
+          <div className="overlay-panel">
+            <div className="overlay-top"><p>{outputTitle}</p><button type="button" onClick={() => setShowOverlay(false)}>DISMISS</button></div>
+            <div className="overlay-meta"><p>&gt; COMMAND: {commandLabel}</p><p>&gt; ROUTE: {routeLabel}</p></div>
 
-            {outputMode === 'analyze' && (<div><p style={{ margin: '0.2rem 0', fontWeight: 600 }}>Summary: {(result?.objectives || [])[0] || 'No summary available.'}</p>{ANALYSIS_SECTIONS.map((section) => <div key={section} style={{ marginBottom: '0.55rem' }}><p style={{ margin: 0, fontSize: '0.72rem', letterSpacing: '0.08em', opacity: 0.9 }}>{section.toUpperCase()}</p><ul style={{ margin: '0.25rem 0 0', paddingLeft: '1rem' }}>{(Array.isArray(result?.[section]) ? result[section] : []).map((item, index) => <li key={`${section}-${index}`} style={{ fontSize: '0.84rem', lineHeight: 1.45 }}>{item}</li>)}</ul></div>)}</div>)}
-            {outputMode === 'signals' && <div>{(Array.isArray(result) ? result : []).map((item, index) => <div key={index} style={{ marginBottom: '0.4rem', fontSize: '0.82rem' }}>Sleep {item?.sleep ?? 'n/a'} | Stress {item?.stress ?? 'n/a'} | Symptoms {item?.symptoms || '-'} | {formatRecordedAt(item?.createdAt)}</div>)}</div>}
-            {outputMode === 'systems' && <div>{(Array.isArray(result) ? result : []).map((item, i) => renderSystemCard(item, `sys-${i}`))}</div>}
-            {outputMode === 'system-map' && <div>{(result?.systems || []).map((item, i) => renderSystemCard(item, `map-${i}`))}</div>}
-            {outputMode === 'tasks' && <div>{((result?.tasks || result || [])).map((task, i) => renderTaskCard(task, `task-${i}`))}</div>}
-            {outputMode === 'task-card' && renderTaskCard(result, 'single-task')}
+            {outputMode === 'analyze' && (<div><p><strong>Summary:</strong> {(result?.objectives || [])[0] || 'No summary available.'}</p>{ANALYSIS_SECTIONS.map((section) => <div key={section}><p>{section.toUpperCase()}</p><ul>{(Array.isArray(result?.[section]) ? result[section] : []).map((item, index) => <li key={`${section}-${index}`}>{item}</li>)}</ul></div>)}</div>)}
+            {outputMode === 'agent' && (<div><p><strong>Summary:</strong> {result?.summary || 'No summary available.'}</p><p><strong>Mode selected:</strong> {result?.mode_selected || '-'}</p><p><strong>Actions taken:</strong> {(result?.actions_taken || []).join(', ') || '-'}</p><p><strong>Recommended tasks:</strong> {(result?.recommended_tasks || []).join(' | ') || '-'}</p>{ANALYSIS_SECTIONS.map((section) => <div key={section}><p>{section.toUpperCase()}</p><ul>{(Array.isArray(result?.[section]) ? result[section] : []).map((item, index) => <li key={`${section}-${index}`}>{item}</li>)}</ul></div>)}</div>)}
+            {outputMode === 'signals' && <div>{(Array.isArray(result) ? result : []).map((item, index) => <div key={index}>Sleep {item?.sleep ?? 'n/a'} | Stress {item?.stress ?? 'n/a'} | Symptoms {item?.symptoms || '-'} | {formatRecordedAt(item?.createdAt)}</div>)}</div>}
+            {outputMode === 'systems' && <div>{(Array.isArray(result) ? result : [result?.system]).filter(Boolean).map((item, i) => <div key={`sys-${i}`} className="item-card system-card"><p><strong>{item?.name || 'Unnamed System'}</strong></p><p>Automation: {item?.automationEnabled ? 'enabled' : 'disabled'}</p><p>Escalation: {item?.escalationLevel || 'low'}</p></div>)}</div>}
+            {outputMode === 'system-map' && <div>{(result?.systems || []).map((item, i) => <div key={`map-${i}`} className="item-card system-card"><p><strong>{item?.name || 'Unnamed System'}</strong></p><p>Purpose: {item?.purpose || '-'}</p></div>)}</div>}
+            {outputMode === 'tasks' && <div>{((result?.tasks || result || [])).map((task, i) => <div key={`task-${i}`} className="item-card task-card"><p><strong>{task?.description || '(empty)'}</strong></p><p>ID: {task?._id || 'unknown'} | Status: {task?.status || 'open'}</p></div>)}</div>}
+            {outputMode === 'task-card' && <div className="item-card task-card"><p><strong>{result?.description}</strong></p><p>Status: {result?.status || 'open'}</p></div>}
             {outputMode === 'signal-trends' && <div><p>Sleep: {result?.sleep?.state}</p><p>Stress: {result?.stress?.state}</p><p>Symptoms: {result?.symptoms?.state}</p></div>}
             {outputMode === 'signal-anomaly' && <div>{(result?.anomalies || []).map((a) => <p key={a}>{a}</p>)}</div>}
-            {outputMode === 'alerts' && <div>{(result?.alerts || []).map((a, i) => <p key={`${a.type}-${i}`}>{a.severity.toUpperCase()}: {a.message}</p>)}</div>}
+            {outputMode === 'protocols' && <div>{(result?.protocols || []).map((item) => <div key={item.system_name} className="item-card system-card"><p><strong>{item.system_name}</strong></p><p>Status: {item.status}</p><p>Triggers: {(item.trigger_conditions || []).join(', ') || 'none'}</p><p>Escalation: {item.escalation_level}</p></div>)}</div>}
+            {outputMode === 'memory' && <div className="item-card"><p><strong>{result?.title}</strong></p><p>{result?.content}</p></div>}
+            {outputMode === 'memory-list' && <div>{(result?.entries || []).map((entry) => <div key={entry._id} className="item-card"><p><strong>{entry.title}</strong> [{entry.category}]</p><p>{entry.content}</p></div>)}</div>}
+            {outputMode === 'monitor' && <div><p><strong>State:</strong> {result?.state_summary}</p><p><strong>Alerts:</strong> {(result?.alerts || []).join(' | ') || '-'}</p><p><strong>Risks:</strong> {(result?.risks || []).join(' | ') || '-'}</p><p><strong>Recommended:</strong> {(result?.recommended_actions || []).join(' | ') || '-'}</p></div>}
+            {outputMode === 'alerts' && <div>{(result?.alerts || []).map((a, i) => <p key={`${a}-${i}`}>{typeof a === 'string' ? a : `${a?.severity || ''}: ${a?.message || ''}`}</p>)}</div>}
+            {outputMode === 'status' && <div><p>Monitoring enabled: {String(result?.monitoring_enabled)}</p><p>Last run: {formatRecordedAt(result?.last_monitor_run)}</p><p>Active alerts: {result?.active_alerts_count ?? 0}</p></div>}
+            {outputMode === 'summary' && <div><p><strong>state_summary:</strong> {result?.state_summary}</p><p><strong>high_priority_focus:</strong> {result?.high_priority_focus}</p><p><strong>active_alerts:</strong> {(result?.active_alerts || []).join(' | ')}</p><p><strong>recommended_next_move:</strong> {result?.recommended_next_move}</p></div>}
             {outputMode === 'help' && (result?.lines || []).map((line) => <p key={line}>{line}</p>)}
             {outputMode === 'history' && (result?.commands || []).map((line, i) => <p key={`${line}-${i}`}>{i + 1}. {line}</p>)}
             {outputMode === 'context' && <p>{result?.message || `active=${result?.activeRoute}`}</p>}
