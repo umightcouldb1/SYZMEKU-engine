@@ -36,6 +36,8 @@ router.post("/analyze", async (req, res) => {
   ].join("\n");
 
   try {
+    console.log("Gemini key exists:", !!process.env.Gemini_API_Key);
+
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
