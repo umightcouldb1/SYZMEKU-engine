@@ -481,6 +481,53 @@ router.post("/recommend", async (req, res) => {
   }
 });
 
+router.post("/mentor", async (req, res) => {
+  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  if (!text) return res.status(400).json({ message: "Mentor prompt text is required." });
+
+  if (!process.env.Gemini_API_Key) {
+    return res.json({
+      objectives: ["Gemini_API_Key is missing on the server."],
+      constraints: [],
+      risks: [],
+      leverage: [],
+      next_actions: ["Add Gemini_API_Key to Render environment variables."],
+    });
+  }
+
+  const rawContext = req.body?.context;
+  const { latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
+
+  const prompt = [
+    "You are Mentor Node: a high-trust AI mentor embedded in SYZMEKU.",
+    "Prioritize clarity, self-mastery, emotional intelligence, strategic reflection, and aligned action.",
+    "Provide coaching-style guidance, not diagnosis.",
+    "Do not imitate therapy.",
+    "Keep guidance concise, practical, and specific.",
+    "Respond using the exact JSON schema and no extra keys.",
+    "",
+    buildAnalysisPrompt({
+      text,
+      mode: "mentor",
+      modeInstruction:
+        "Deliver reflection, reframing, motivational clarity, and one internal alignment step grounded in the provided context.",
+      rawContext,
+      latestSignals,
+      latestSystems,
+      latestTasks,
+      strategicMemory,
+    }),
+  ].join("\n");
+
+  try {
+    const { error, result } = await requestGeminiJson(prompt);
+    if (error) return res.json(error);
+    return res.json(result);
+  } catch (error) {
+    return res.status(502).json({ message: "Gemini request failed.", details: String(error?.message || error).slice(0, 500) });
+  }
+});
+
 router.post("/agent", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
   if (!text) return res.status(400).json({ message: "Agent goal is required." });
