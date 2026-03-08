@@ -1,6 +1,8 @@
 const router = require("express").Router();
 const System = require("../../models/System");
 const SignalEntry = require("../../models/SignalEntry");
+const SystemExecution = require("../../models/SystemExecution");
+const Task = require("../../models/Task");
 
 const REQUIRED_ANALYSIS_KEYS = ["objectives", "constraints", "risks", "leverage", "next_actions"];
 
@@ -76,6 +78,112 @@ const fetchStrategicContext = async () => {
     console.warn("Failed to fetch strategic context:", dbError?.message || dbError);
     return { latestSignals: [], latestSystems: [] };
   }
+};
+
+const LINKABLE_SIGNAL_KEYS = ["sleep", "stress", "symptoms", "notes"];
+
+const normalizeText = (value) => String(value || "").trim().toLowerCase();
+const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const mapSystemRecord = (system) => {
+  const inputs = Array.isArray(system?.inputs) ? system.inputs.filter(Boolean) : [];
+  const outputs = Array.isArray(system?.outputs) ? system.outputs.filter(Boolean) : [];
+  const routines = Array.isArray(system?.routines) ? system.routines.filter(Boolean) : [];
+
+  const relationshipText = [
+    ...inputs,
+    ...outputs,
+    ...routines,
+    system?.purpose,
+    system?.name,
+  ]
+    .filter(Boolean)
+    .map(normalizeText)
+    .join(" ");
+
+  const linkedSignals = LINKABLE_SIGNAL_KEYS.filter((signalKey) => relationshipText.includes(signalKey));
+
+  return {
+    id: String(system?._id || ""),
+    name: system?.name || "Unnamed System",
+    purpose: system?.purpose || "",
+    inputs,
+    outputs,
+    routines,
+    linkedSignals,
+  };
+};
+
+const describeNumericTrend = (values) => {
+  if (!Array.isArray(values) || values.length < 2) {
+    return { direction: "insufficient-data", delta: 0, latest: null, previous: null };
+  }
+
+  const latest = values[0];
+  const previous = values[values.length - 1];
+  const delta = Number((latest - previous).toFixed(2));
+
+  if (delta > 0) {
+    return { direction: "increasing", delta, latest, previous };
+  }
+
+  if (delta < 0) {
+    return { direction: "decreasing", delta, latest, previous };
+  }
+
+  return { direction: "stable", delta, latest, previous };
+};
+
+const describeSymptomsTrend = (entries) => {
+  const normalized = entries
+    .map((entry) => normalizeText(entry?.symptoms))
+    .filter(Boolean);
+
+  if (!normalized.length) {
+    return { direction: "insufficient-data", latest: null };
+  }
+
+  if (normalized.length === 1) {
+    return { direction: "single-entry", latest: normalized[0] };
+  }
+
+  const uniqueRecent = new Set(normalized.slice(0, 3));
+
+  return {
+    direction: uniqueRecent.size === 1 ? "stabilizing" : "mixed",
+    latest: normalized[0],
+  };
+};
+
+const buildExecutionPlan = (system, latestSignal) => {
+  const routines = Array.isArray(system?.routines) ? system.routines.filter(Boolean) : [];
+  const steps = routines.length
+    ? routines.map((routine, index) => `Step ${index + 1}: ${routine}`)
+    : [
+        "Step 1: Review current signal state.",
+        "Step 2: Execute one stabilizing intervention.",
+        "Step 3: Log follow-up signal after completion.",
+      ];
+
+  const stress = typeof latestSignal?.stress === "number" ? latestSignal.stress : null;
+  const sleep = typeof latestSignal?.sleep === "number" ? latestSignal.sleep : null;
+  const riskFlags = [];
+
+  if (stress !== null && stress >= 7) {
+    riskFlags.push("High stress detected; prioritize recovery pacing.");
+  }
+
+  if (sleep !== null && sleep <= 5) {
+    riskFlags.push("Low sleep detected; avoid over-commitment.");
+  }
+
+  const readiness = riskFlags.length ? "guarded" : "ready";
+
+  return {
+    readiness,
+    riskFlags,
+    steps,
+  };
 };
 
 const requestGeminiJson = async (prompt) => {
@@ -372,5 +480,119 @@ router.get("/signals", async (req, res) => {
   const signals = await SignalEntry.find().sort({ createdAt: -1 });
   res.json(signals);
 });
+
+router.get("/map/systems", async (req, res) => {
+  const systems = await System.find().sort({ createdAt: -1 }).lean();
+  const mappedSystems = systems.map(mapSystemRecord);
+
+  res.json({
+    count: mappedSystems.length,
+    systems: mappedSystems,
+  });
+});
+
+router.get("/trends/signals", async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query?.limit) || 10, 2), 30);
+  const latestSignals = await SignalEntry.find().sort({ createdAt: -1 }).limit(limit).lean();
+
+  const sleepValues = latestSignals
+    .map((entry) => entry?.sleep)
+    .filter((value) => typeof value === "number");
+  const stressValues = latestSignals
+    .map((entry) => entry?.stress)
+    .filter((value) => typeof value === "number");
+
+  res.json({
+    sampleSize: latestSignals.length,
+    sleep: describeNumericTrend(sleepValues),
+    stress: describeNumericTrend(stressValues),
+    symptoms: describeSymptomsTrend(latestSignals),
+  });
+});
+
+router.post("/systems/run", async (req, res) => {
+  const rawName = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+
+  if (!rawName) {
+    return res.status(400).json({ message: "System name is required." });
+  }
+
+  const system = await System.findOne({
+    name: { $regex: `^${escapeRegex(rawName)}$`, $options: "i" },
+  }).lean();
+
+  if (!system) {
+    return res.status(404).json({ message: `System not found: ${rawName}` });
+  }
+
+  const latestSignal = await SignalEntry.findOne().sort({ createdAt: -1 }).lean();
+  const executionPlan = buildExecutionPlan(system, latestSignal);
+
+  const executionRecord = await SystemExecution.create({
+    systemId: system._id,
+    systemName: system.name,
+    readiness: executionPlan.readiness,
+    riskFlags: executionPlan.riskFlags,
+    actions: executionPlan.steps,
+    signalSnapshot: latestSignal
+      ? {
+          sleep: latestSignal.sleep,
+          stress: latestSignal.stress,
+          symptoms: latestSignal.symptoms,
+          notes: latestSignal.notes,
+          createdAt: latestSignal.createdAt,
+        }
+      : null,
+  });
+
+  return res.json({
+    system: mapSystemRecord(system),
+    execution: {
+      id: executionRecord._id,
+      readiness: executionRecord.readiness,
+      riskFlags: executionRecord.riskFlags,
+      actions: executionRecord.actions,
+      createdAt: executionRecord.createdAt,
+    },
+  });
+});
+
+
+router.post("/task/create", async (req, res) => {
+  const description = typeof req.body?.description === "string" ? req.body.description.trim() : "";
+
+  if (!description) {
+    return res.status(400).json({ message: "Task description is required." });
+  }
+
+  const task = await Task.create({ description });
+  return res.json(task);
+});
+
+router.get("/task/list", async (req, res) => {
+  const tasks = await Task.find().sort({ createdAt: -1 }).lean();
+  return res.json({ tasks });
+});
+
+router.post("/task/complete", async (req, res) => {
+  const taskId = typeof req.body?.id === "string" ? req.body.id.trim() : "";
+
+  if (!taskId) {
+    return res.status(400).json({ message: "Task id is required." });
+  }
+
+  const task = await Task.findById(taskId);
+
+  if (!task) {
+    return res.status(404).json({ message: `Task not found: ${taskId}` });
+  }
+
+  task.status = "completed";
+  task.completedAt = new Date();
+  await task.save();
+
+  return res.json(task);
+});
+
 
 module.exports = router;
