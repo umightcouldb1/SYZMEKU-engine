@@ -418,6 +418,11 @@
   margin: 0.3rem 0 0;
 }
 
+.mentor-subtitle {
+  color: #334d7c;
+  font-weight: 500;
+}
+
 .mentor-nav {
   display: flex;
   gap: 0.6rem;
@@ -499,6 +504,28 @@
   margin-top: 0.7rem;
   border-top: 1px solid #dde4f5;
   padding-top: 0.6rem;
+}
+
+.mentor-quick-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.mentor-chip {
+  border: 1px solid #ccd8f2;
+  background: #f5f8ff;
+  color: #1f4dbf;
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+}
+
+.mentor-path-list {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.35rem;
 }
 
 .mentor-top-toggle {

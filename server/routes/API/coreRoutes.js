@@ -427,6 +427,8 @@ const buildAnalysisPrompt = ({ text, mode, modeInstruction, rawContext, latestSi
 
   return [
     "Reason like a strategic operating system.",
+    "Treat emotions as indicators for pattern detection, not commands for reactive behavior.",
+    "Read emotional/symptom data as signal context and produce empathetic, practical guidance.",
     "Synthesize command + systems + signals + task queue + strategic memory + recent session context.",
     "Return ONLY valid JSON.",
     "No markdown.",

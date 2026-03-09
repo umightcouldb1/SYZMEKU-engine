@@ -16,6 +16,19 @@ const buildInsightMessage = (summary, analysis) => {
   return 'Your signals are stable. Focus on one high-leverage task before noon.';
 };
 
+const QUICK_PROMPTS = {
+  talk: "Tell me what's going on.",
+  reflect: 'Help me understand what I am feeling.',
+  plan: 'Help me decide what to do next.',
+};
+
+const PATH_STAGES = [
+  { name: 'Initiate', detail: 'Mentor chat, simple insights, and daily check-ins.' },
+  { name: 'Alignment', detail: 'Pattern-building with stronger recommendations.' },
+  { name: 'Ascension', detail: 'Strategic prediction and protocol-level guidance.' },
+  { name: 'Mastery', detail: 'Full pattern intelligence and advanced planning.' },
+];
+
 const normalizeFocusTasks = (tasks = []) => tasks.map((task) => task?.description).filter(Boolean);
 
 const Dashboard = ({ user }) => {
@@ -94,6 +107,10 @@ const Dashboard = ({ user }) => {
     }
   };
 
+  const applyQuickPrompt = (type) => {
+    setChatInput(QUICK_PROMPTS[type] || '');
+  };
+
   if (!user) return <div className="portal-text">CALIBRATING DASHBOARD...</div>;
 
   if (advancedMode) {
@@ -113,11 +130,12 @@ const Dashboard = ({ user }) => {
     <div className="mentor-shell">
       <header className="mentor-header">
         <div>
-          <h1>SYZMEKU Mentor</h1>
+          <h1>Big SYZ</h1>
+          <p className="mentor-subtitle">Your mentor for self-mastery. Powered by the SYZMEKU Engine.</p>
           <p>{DAILY_GREETING()}, {user.username}.</p>
         </div>
         <button type="button" className="mentor-button secondary" onClick={() => setAdvancedMode(true)}>
-          Advanced Mode
+          Architect Mode
         </button>
       </header>
 
@@ -137,6 +155,7 @@ const Dashboard = ({ user }) => {
           <section className="mentor-card">
             <h2>Today's Insight</h2>
             <p>{buildInsightMessage(summary, latestInsight)}</p>
+            <p className="mentor-muted">Emotions are indicators, not commands. We read emotional signals as pattern data and respond with empathy.</p>
             <button type="button" className="mentor-link" onClick={() => setShowReasoning((prev) => !prev)}>
               {showReasoning ? 'Hide reasoning' : 'Show reasoning'}
             </button>
@@ -152,6 +171,15 @@ const Dashboard = ({ user }) => {
             <label>Any symptoms?</label>
             <input type="text" value={signals.symptoms} onChange={(event) => setSignals((prev) => ({ ...prev, symptoms: event.target.value }))} />
             <button type="button" className="mentor-button" onClick={submitCheckIn} disabled={loading}>Analyze my state</button>
+          </section>
+
+          <section className="mentor-card">
+            <h2>Development Path</h2>
+            <ul className="mentor-path-list">
+              {PATH_STAGES.map((path) => (
+                <li key={path.name}><strong>{path.name}:</strong> {path.detail}</li>
+              ))}
+            </ul>
           </section>
 
           <section className="mentor-card">
@@ -177,8 +205,14 @@ const Dashboard = ({ user }) => {
 
       {activeScreen === 'ask' && (
         <section className="mentor-card">
-          <h2>Ask SYZMEKU</h2>
-          <p>Ask anything about your patterns, productivity, or state.</p>
+          <h2>Ask Big SYZ</h2>
+          <p>Ask anything about your patterns, productivity, state, or next decision.</p>
+          <div className="mentor-quick-actions">
+            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('talk')}>Talk</button>
+            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('reflect')}>Reflect</button>
+            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('plan')}>Plan</button>
+          </div>
+          <p className="mentor-muted">Examples: "I&apos;m overwhelmed." · "What should I focus on today?" · "I can&apos;t sleep." · "I feel stuck." · "Help me plan this week."</p>
           <div className="mentor-ask-row">
             <input type="text" value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder="I feel like my productivity collapses after lunch" />
             <button type="button" className="mentor-button" onClick={askMentor} disabled={loading}>Ask</button>
