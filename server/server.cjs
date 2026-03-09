@@ -38,7 +38,7 @@ app.use(
   }),
 );
 app.use(express.json({ limit: '1mb' }));
-app.use(cors());
+app.use(cors({ origin: process.env.CLIENT_ORIGIN || true, credentials: true }));
 
 // Serve static assets from the client/dist folder
 const distPath = path.resolve(__dirname, '../client/dist');
