@@ -172,8 +172,8 @@ const Dashboard = ({ user }) => {
     saveSessionMemory({ recentCommands: commandHistory, activeRouteType: routeType, lastOverlayResult: payload });
   };
 
-  const submitCommand = async () => {
-    const rawCommand = command.trim();
+  const submitCommand = async (overrideCommand = '') => {
+    const rawCommand = (overrideCommand || command).trim();
     if (!rawCommand || loading) return;
 
     const lowered = rawCommand.toLowerCase();
