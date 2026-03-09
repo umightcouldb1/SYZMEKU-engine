@@ -88,10 +88,6 @@ const persistLoopState = async (patch = {}) => {
       $set: payload,
       $setOnInsert: {
         singletonKey: "primary",
-        active: DEV_DEFAULT_ACTIVE,
-        interval_ms: LOOP_INTERVAL_MS,
-        run_count: 0,
-        last_error: "",
       },
     },
     { new: true, upsert: true }
