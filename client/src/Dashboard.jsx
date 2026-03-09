@@ -17,9 +17,11 @@ const buildInsightMessage = (summary, analysis) => {
 };
 
 const QUICK_PROMPTS = {
-  talk: "Tell me what's going on.",
-  reflect: 'Help me understand what I am feeling.',
-  plan: 'Help me decide what to do next.',
+  overwhelmed: 'I feel overwhelmed',
+  focus: 'Help me focus',
+  patterns: 'What patterns are you noticing?',
+  dayPlan: 'Help me plan my day',
+  off: 'I feel off today',
 };
 
 const PATH_STAGES = [
@@ -33,6 +35,7 @@ const normalizeFocusTasks = (tasks = []) => tasks.map((task) => task?.descriptio
 
 const Dashboard = ({ user }) => {
   const [advancedMode, setAdvancedMode] = useState(false);
+  const canAccessOperatorMode = ['founder', 'admin'].includes(String(user?.role || '').toLowerCase());
   const [activeScreen, setActiveScreen] = useState('dashboard');
   const [summary, setSummary] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -113,7 +116,7 @@ const Dashboard = ({ user }) => {
 
   if (!user) return <div className="portal-text">CALIBRATING DASHBOARD...</div>;
 
-  if (advancedMode) {
+  if (advancedMode && canAccessOperatorMode) {
     return (
       <div>
         <div className="mentor-top-toggle">
@@ -131,12 +134,15 @@ const Dashboard = ({ user }) => {
       <header className="mentor-header">
         <div>
           <h1>Big SYZ</h1>
-          <p className="mentor-subtitle">Your mentor for self-mastery. Powered by the SYZMEKU Engine.</p>
+          <p className="mentor-subtitle">Emotionally intelligent mentor platform.</p>
+          <p className="mentor-muted">Powered by the SYZMEKU Engine.</p>
           <p>{DAILY_GREETING()}, {user.username}.</p>
         </div>
-        <button type="button" className="mentor-button secondary" onClick={() => setAdvancedMode(true)}>
-          Architect Mode
-        </button>
+        {canAccessOperatorMode && (
+          <button type="button" className="mentor-button secondary" onClick={() => setAdvancedMode(true)}>
+            Operator Mode
+          </button>
+        )}
       </header>
 
       <nav className="mentor-nav">
@@ -163,7 +169,7 @@ const Dashboard = ({ user }) => {
           </section>
 
           <section className="mentor-card">
-            <h2>Daily Check-In</h2>
+            <h2>Quick Check-In</h2>
             <label>How did you sleep? ({signals.sleep} hours)</label>
             <input type="range" min="0" max="12" value={signals.sleep} onChange={(event) => setSignals((prev) => ({ ...prev, sleep: Number(event.target.value) }))} />
             <label>Stress level today? ({signals.stress})</label>
@@ -174,7 +180,7 @@ const Dashboard = ({ user }) => {
           </section>
 
           <section className="mentor-card">
-            <h2>Development Path</h2>
+            <h2>Progress Path</h2>
             <ul className="mentor-path-list">
               {PATH_STAGES.map((path) => (
                 <li key={path.name}><strong>{path.name}:</strong> {path.detail}</li>
@@ -183,7 +189,7 @@ const Dashboard = ({ user }) => {
           </section>
 
           <section className="mentor-card">
-            <h2>Today's Focus</h2>
+            <h2>Focus for Today</h2>
             {topFocus.length ? (
               <ol>{topFocus.map((task) => <li key={task}>{task}</li>)}</ol>
             ) : (
@@ -224,11 +230,13 @@ const Dashboard = ({ user }) => {
           <h2>Ask Big SYZ</h2>
           <p>Ask anything about your patterns, productivity, state, or next decision.</p>
           <div className="mentor-quick-actions">
-            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('talk')}>Talk</button>
-            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('reflect')}>Reflect</button>
-            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('plan')}>Plan</button>
+            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('overwhelmed')}>I feel overwhelmed</button>
+            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('focus')}>Help me focus</button>
+            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('patterns')}>What patterns are you noticing?</button>
+            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('dayPlan')}>Help me plan my day</button>
+            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('off')}>I feel off today</button>
           </div>
-          <p className="mentor-muted">Examples: "I&apos;m overwhelmed." · "What should I focus on today?" · "I can&apos;t sleep." · "I feel stuck." · "Help me plan this week."</p>
+          <p className="mentor-muted">Examples: "I feel overwhelmed" · "Help me focus" · "What patterns are you noticing?" · "Help me plan my day" · "I feel off today".</p>
           <div className="mentor-ask-row">
             <input type="text" value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder="I feel like my productivity collapses after lunch" />
             <button type="button" className="mentor-button" onClick={askMentor} disabled={loading}>Ask</button>

@@ -22,6 +22,7 @@ const HELP_LINES = [
   'loop start',
   'loop stop',
   'loop status | kernel status | kernel inspect | agent evaluate | actions',
+  'sentinel status | sentinel scan | sentinel report',
   'memory status | context status | mode status',
   'analyze file | analyze image | voice on | voice off | clear | help',
 ];
@@ -369,6 +370,21 @@ const Dashboard = ({ user }) => {
         nextRoute = 'kernel inspect';
         response = await axios.get('/api/core/kernel/inspect');
         setOutputMode('kernel-inspect');
+      } else if (lowered === 'sentinel status') {
+        setOutputTitle('SENTINEL STATUS');
+        nextRoute = 'sentinel status';
+        response = await axios.get('/api/core/sentinel/status');
+        setOutputMode('status');
+      } else if (lowered === 'sentinel scan') {
+        setOutputTitle('SENTINEL SCAN');
+        nextRoute = 'sentinel scan';
+        response = await axios.get('/api/core/sentinel/scan');
+        setOutputMode('monitor');
+      } else if (lowered === 'sentinel report') {
+        setOutputTitle('SENTINEL REPORT');
+        nextRoute = 'sentinel report';
+        response = await axios.get('/api/core/sentinel/report');
+        setOutputMode('monitor');
       } else if (lowered === 'actions') {
         setOutputTitle('ACTION HISTORY');
         nextRoute = 'actions';

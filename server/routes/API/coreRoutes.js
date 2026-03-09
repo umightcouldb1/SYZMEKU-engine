@@ -1068,6 +1068,10 @@ router.post("/mentor", async (req, res) => {
   const prompt = [
     "You are Mentor Node: a high-trust AI mentor embedded in SYZMEKU.",
     "Prioritize clarity, self-mastery, emotional intelligence, strategic reflection, and aligned action.",
+    "Apply emotional intelligence policy: emotions are indicators, not commands.",
+    "Use the response flow: acknowledge -> interpret -> guide.",
+    "Acknowledge emotion without making diagnosis or treatment claims.",
+    "Do not escalate harmful behavior and do not provide self-harm instructions.",
     "Provide coaching-style guidance, not diagnosis.",
     "Do not imitate therapy.",
     "Keep guidance concise, practical, and specific.",
@@ -1300,6 +1304,76 @@ router.get("/signals/report", async (req, res) => {
       trends.stress.state === "improving" ? "Stress trend is improving; expand execution window." : "Reduce complexity while stress is unstable.",
     ],
     next_actions: ["Log one additional signal after the next critical work block.", "Run recommend next step to refresh tactical execution."],
+  });
+});
+
+router.get("/sentinel/status", async (_req, res) => {
+  const [latestSignals, openAlerts, latestKernel] = await Promise.all([
+    SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
+    AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(50).lean(),
+    KernelSnapshot.findOne({ singletonKey: "primary" }).lean(),
+  ]);
+
+  const trends = computeSignalTrendBundle(latestSignals);
+  const anomalies = detectSignalAnomalies(latestSignals);
+
+  return res.json({
+    node: "Axiom Sentinel",
+    status: "active",
+    latest_kernel_node: latestKernel?.latest_output?.selected_node || "recommend",
+    latest_kernel_mode: latestKernel?.latest_output?.dominant_mode || "general",
+    open_alert_count: openAlerts.length,
+    anomaly_count: anomalies.length,
+    trend_states: {
+      sleep: trends.sleep?.state || "insufficient-data",
+      stress: trends.stress?.state || "insufficient-data",
+      symptoms: trends.symptoms?.state || "insufficient-data",
+    },
+    last_monitor_run: autonomyState.lastRunAt,
+  });
+});
+
+router.get("/sentinel/scan", async (_req, res) => {
+  const [monitorReport, anomaliesPayload, signalReport] = await Promise.all([
+    evaluateMonitorState(),
+    (async () => {
+      const latestSignals = await SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean();
+      return { sampleSize: latestSignals.length, anomalies: detectSignalAnomalies(latestSignals) };
+    })(),
+    (async () => {
+      const latestSignals = await SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean();
+      const trends = computeSignalTrendBundle(latestSignals);
+      return {
+        trends,
+        summary: `Sentinel scan completed on ${latestSignals.length} recent signal entries.`,
+      };
+    })(),
+  ]);
+
+  return res.json({
+    node: "Axiom Sentinel",
+    scan_completed_at: new Date().toISOString(),
+    monitor: monitorReport,
+    anomalies: anomaliesPayload,
+    signals: signalReport,
+  });
+});
+
+router.get("/sentinel/report", async (_req, res) => {
+  const [monitorReport, alerts, latestActions] = await Promise.all([
+    evaluateMonitorState(),
+    AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(10).lean(),
+    ActionExecution.find().sort({ timestamp: -1 }).limit(10).lean(),
+  ]);
+
+  return res.json({
+    sentinel: "Axiom Sentinel",
+    generated_at: new Date().toISOString(),
+    risk_summary: monitorReport.risks,
+    active_alerts: alerts,
+    recommended_actions: monitorReport.recommended_actions,
+    recent_action_history: latestActions,
+    state_summary: monitorReport.state_summary,
   });
 });
 
