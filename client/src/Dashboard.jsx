@@ -172,8 +172,8 @@ const Dashboard = ({ user }) => {
     saveSessionMemory({ recentCommands: commandHistory, activeRouteType: routeType, lastOverlayResult: payload });
   };
 
-  const submitCommand = async () => {
-    const rawCommand = command.trim();
+  const submitCommand = async (overrideCommand = '') => {
+    const rawCommand = (overrideCommand || command).trim();
     if (!rawCommand || loading) return;
 
     const lowered = rawCommand.toLowerCase();
@@ -480,10 +480,10 @@ const Dashboard = ({ user }) => {
         <span className="state-badge">MEMORY ACTIVE: {memoryStatus}</span>
         <span className="state-badge">CONTEXT LOADED</span>
         <span className="state-badge">MODE: {modeFromCommand(commandLabel)}</span>
-        <span className="state-badge">ALERTS: {alertsCount}</span>
-        <span className="state-badge">TASKS: {taskCount}</span>
-        <span className="state-badge">AUTONOMY: {operatorSummary?.autonomy_status?.monitoring_enabled ? 'ON' : 'OFF'}</span>
-        <span className="state-badge">AGENT LOOP: {operatorSummary?.loop_status?.active ? 'ACTIVE' : 'STOPPED'}</span>
+        <button type="button" className="state-badge state-badge-button" onClick={() => submitCommand('alerts')} disabled={loading}>ALERTS: {alertsCount}</button>
+        <button type="button" className="state-badge state-badge-button" onClick={() => submitCommand('task show')} disabled={loading}>TASKS: {taskCount}</button>
+        <button type="button" className="state-badge state-badge-button" onClick={() => submitCommand('autonomy status')} disabled={loading}>AUTONOMY: {operatorSummary?.autonomy_status?.monitoring_enabled ? 'ON' : 'OFF'}</button>
+        <button type="button" className="state-badge state-badge-button" onClick={() => submitCommand('loop status')} disabled={loading}>AGENT LOOP: {operatorSummary?.loop_status?.active ? 'ACTIVE' : 'STOPPED'}</button>
       </div>
 
       <div className="summary-strip">

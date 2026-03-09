@@ -24,7 +24,7 @@ const autonomyState = {
   activeAlerts: [],
 };
 
-const LOOP_INTERVAL_MS = Number(process.env.AGENT_LOOP_INTERVAL_MS) > 0 ? Number(process.env.AGENT_LOOP_INTERVAL_MS) : 60000;
+const LOOP_INTERVAL_MS = Number(process.env.AGENT_LOOP_INTERVAL_MS) > 0 ? Number(process.env.AGENT_LOOP_INTERVAL_MS) : 120000;
 const DEV_DEFAULT_ACTIVE =
   process.env.NODE_ENV === "development" && String(process.env.AGENT_LOOP_DEFAULT_ACTIVE || "false").toLowerCase() === "true";
 const loopState = {
