@@ -6,5 +6,9 @@
 - **Mirror Safeguard**: Hard-coded protection against mentor reflections.
 - **Axiom Audit**: Success targets calculated at 1.18 ratio.
 
+
+## 📘 Build Governance
+- Master build specification: `docs/master-build-spec.md`
+
 ## ⚖️ License
 Licensed under the **Sovereign Engine License (SEL)**. Unauthorized reckless use or coercion is strictly prohibited.
