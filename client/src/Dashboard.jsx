@@ -18,10 +18,11 @@ const HELP_LINES = [
   'memory save <text> | memory show | memory search <query> | history | context',
   'agent <goal> | execute <goal> | orchestrate <goal> | plan <goal> | build <goal>',
   'mentor <text> | reflect <text> | reframe <text>',
-  'monitor run | alerts | autonomy status',
+  'monitor run | alerts | tasks | autonomy status',
   'loop start',
   'loop stop',
-  'loop status',
+  'loop status | kernel status | kernel inspect | agent evaluate',
+  'memory status | context status | mode status',
   'analyze file | analyze image | voice on | voice off | clear | help',
 ];
 
@@ -353,6 +354,41 @@ const Dashboard = ({ user }) => {
         nextRoute = 'monitor run';
         response = await axios.post('/api/core/monitor/run');
         setOutputMode('monitor');
+      } else if (lowered === 'agent evaluate') {
+        setOutputTitle('AGENT EVALUATION');
+        nextRoute = 'agent evaluate';
+        response = await axios.post('/api/core/agent/evaluate', { text: rawCommand, context: sessionContext });
+        setOutputMode('kernel');
+      } else if (lowered === 'kernel status') {
+        setOutputTitle('KERNEL STATUS');
+        nextRoute = 'kernel status';
+        response = await axios.get('/api/core/kernel/status');
+        setOutputMode('kernel-status');
+      } else if (lowered === 'kernel inspect') {
+        setOutputTitle('KERNEL INSPECT');
+        nextRoute = 'kernel inspect';
+        response = await axios.get('/api/core/kernel/inspect');
+        setOutputMode('kernel-inspect');
+      } else if (lowered === 'tasks') {
+        setOutputTitle('TASK LIST');
+        nextRoute = 'tasks';
+        response = await axios.get('/api/core/tasks');
+        setOutputMode('tasks');
+      } else if (lowered === 'memory status') {
+        setOutputTitle('MEMORY STATUS');
+        nextRoute = 'memory status';
+        response = await axios.get('/api/core/memory');
+        setOutputMode('memory-list');
+      } else if (lowered === 'context status') {
+        runLocal('CONTEXT STATUS', 'context', {
+          message: operatorSummary?.state_summary || 'No context has been assembled yet.',
+          activeRoute: routeLabel,
+          hasLastOverlay: Boolean(lastOverlayResult),
+        }, 'context status');
+        return;
+      } else if (lowered === 'mode status') {
+        runLocal('MODE STATUS', 'context', { message: `Current mode ${modeFromCommand(commandLabel)} on route ${routeLabel}.` }, 'mode status');
+        return;
       } else if (lowered === 'alerts') {
         setOutputTitle('SYSTEM ALERTS');
         nextRoute = 'alerts';
@@ -533,11 +569,14 @@ const Dashboard = ({ user }) => {
         <p><strong>Latest signal state:</strong> {operatorSummary?.state_summary || 'No summary available.'}</p>
       </div>
       <div className="summary-strip operator-panel">
-        <p><strong>Latest alert summary:</strong> {(operatorSummary?.active_alerts || [])[0] || 'No active alerts.'}</p>
+        <p><strong>Latest reasoning summary:</strong> {operatorSummary?.latest_kernel_summary || 'No reasoning summary available.'}</p>
+        <p><strong>Dominant mode:</strong> {operatorSummary?.latest_kernel_mode || '-'}</p>
+        <p><strong>Selected node:</strong> {operatorSummary?.latest_kernel_node || '-'}</p>
+        <p><strong>Urgency score:</strong> {operatorSummary?.latest_kernel_urgency ?? 0}</p>
+        <p><strong>Latest next actions:</strong> {(operatorSummary?.latest_kernel_next_actions || []).join(' | ') || 'No actions proposed.'}</p>
+        <p><strong>Latest alert summary:</strong> {(operatorSummary?.active_alerts || [])[0]?.message || (operatorSummary?.active_alerts || [])[0] || 'No active alerts.'}</p>
         <p><strong>Open task count:</strong> {taskCount}</p>
-        <p><strong>Last agent decision:</strong> {operatorSummary?.loop_status?.latest_agent_summary || 'No loop decision yet.'}</p>
-        <p><strong>Last loop run:</strong> {formatRecordedAt(operatorSummary?.loop_status?.last_run_at)}</p>
-        <p><strong>Current mode:</strong> {operatorSummary?.loop_status?.latest_agent_mode || modeFromCommand(commandLabel)}</p>
+        <p><strong>Last loop run:</strong> {formatRecordedAt(operatorSummary?.latest_kernel_timestamp || operatorSummary?.loop_status?.last_run_at)}</p>
       </div>
 
       <main className="crystal-grid"><section className="crystal-heart-section"><div className="crystal-prism"><div className="prism-inner"><span className="prism-label">SYZMEKU</span></div><div className="geo-ring ring-1" /><div className="geo-ring ring-2" /></div></section></main>
@@ -553,15 +592,18 @@ const Dashboard = ({ user }) => {
             {outputMode === 'signals' && <div>{(Array.isArray(result) ? result : []).map((item, index) => <div key={index}>Sleep {item?.sleep ?? 'n/a'} | Stress {item?.stress ?? 'n/a'} | Symptoms {item?.symptoms || '-'} | {formatRecordedAt(item?.createdAt)}</div>)}</div>}
             {outputMode === 'systems' && <div>{(Array.isArray(result) ? result : [result?.system]).filter(Boolean).map((item, i) => <div key={`sys-${i}`} className="item-card system-card"><p><strong>{item?.name || 'Unnamed System'}</strong></p><p>Automation: {item?.automationEnabled ? 'enabled' : 'disabled'}</p><p>Escalation: {item?.escalationLevel || 'low'}</p></div>)}</div>}
             {outputMode === 'system-map' && <div>{(result?.systems || []).map((item, i) => <div key={`map-${i}`} className="item-card system-card"><p><strong>{item?.name || 'Unnamed System'}</strong></p><p>Purpose: {item?.purpose || '-'}</p></div>)}</div>}
-            {outputMode === 'tasks' && <div>{((result?.tasks || result || [])).map((task, i) => <div key={`task-${i}`} className="item-card task-card"><p><strong>{task?.description || '(empty)'}</strong></p><p>ID: {task?._id || 'unknown'} | Status: {task?.status || 'open'}</p></div>)}</div>}
+            {outputMode === 'tasks' && <div>{((result?.tasks || result || [])).length ? ((result?.tasks || result || [])).map((task, i) => <div key={`task-${i}`} className="item-card task-card"><p><strong>{task?.description || '(empty)'}</strong></p><p>ID: {task?._id || 'unknown'} | Status: {task?.status || 'open'}</p></div>) : <p>No tasks available.</p>}</div>}
             {outputMode === 'task-card' && <div className="item-card task-card"><p><strong>{result?.description}</strong></p><p>Status: {result?.status || 'open'}</p></div>}
             {outputMode === 'signal-trends' && <div><p>Sleep: {result?.sleep?.state}</p><p>Stress: {result?.stress?.state}</p><p>Symptoms: {result?.symptoms?.state}</p></div>}
             {outputMode === 'signal-anomaly' && <div>{(result?.anomalies || []).map((a) => <p key={a}>{a}</p>)}</div>}
             {outputMode === 'protocols' && <div>{(result?.protocols || []).map((item) => <div key={item.system_name} className="item-card system-card"><p><strong>{item.system_name}</strong></p><p>Status: {item.status}</p><p>Triggers: {(item.trigger_conditions || []).join(', ') || 'none'}</p><p>Escalation: {item.escalation_level}</p></div>)}</div>}
             {outputMode === 'memory' && <div className="item-card"><p><strong>{result?.title}</strong></p><p>{result?.content}</p></div>}
-            {outputMode === 'memory-list' && <div>{(result?.entries || []).map((entry) => <div key={entry._id} className="item-card"><p><strong>{entry.title}</strong> [{entry.category}]</p><p>{entry.content}</p></div>)}</div>}
+            {outputMode === 'memory-list' && <div>{(result?.entries || []).length ? (result?.entries || []).map((entry) => <div key={entry._id} className="item-card"><p><strong>{entry.title}</strong> [{entry.category}]</p><p>{entry.content}</p></div>) : <p>No memory entries available.</p>}</div>}
             {outputMode === 'monitor' && <div><p><strong>State:</strong> {result?.state_summary}</p><p><strong>Alerts:</strong> {(result?.alerts || []).join(' | ') || '-'}</p><p><strong>Risks:</strong> {(result?.risks || []).join(' | ') || '-'}</p><p><strong>Recommended:</strong> {(result?.recommended_actions || []).join(' | ') || '-'}</p></div>}
-            {outputMode === 'alerts' && <div>{(result?.alerts || []).map((a, i) => <p key={`${a}-${i}`}>{typeof a === 'string' ? a : `${a?.severity || ''}: ${a?.message || ''}`}</p>)}</div>}
+            {outputMode === 'alerts' && <div>{(result?.alerts || []).length ? (result?.alerts || []).map((a, i) => <p key={`${a?.message || a}-${i}`}>{typeof a === 'string' ? a : `${a?.severity || ''}: ${a?.message || ''}`}</p>) : <p>No active alerts.</p>}</div>}
+            {outputMode === 'kernel' && <div><p><strong>Summary:</strong> {result?.reasoning_summary || '-'}</p><p><strong>Mode:</strong> {result?.dominant_mode || '-'}</p><p><strong>Node:</strong> {result?.selected_node || '-'}</p><p><strong>Urgency:</strong> {result?.urgency_score ?? 0}</p><p><strong>Next actions:</strong> {(result?.next_actions || []).join(' | ') || '-'}</p></div>}
+            {outputMode === 'kernel-status' && <div><p><strong>Summary:</strong> {result?.latest?.reasoning_summary || 'No kernel output available.'}</p><p><strong>Mode:</strong> {result?.latest?.dominant_mode || '-'}</p><p><strong>Node:</strong> {result?.latest?.selected_node || '-'}</p><p><strong>Urgency:</strong> {result?.latest?.urgency_score ?? 0}</p></div>}
+            {outputMode === 'kernel-inspect' && <div><p><strong>Cycle count:</strong> {(result?.cycles || []).length}</p><p><strong>Protocol executions:</strong> {(result?.protocols || []).length}</p></div>}
             {outputMode === 'status' && <div><p>Monitoring enabled: {String(result?.monitoring_enabled)}</p><p>Last run: {formatRecordedAt(result?.last_monitor_run)}</p><p>Active alerts: {result?.active_alerts_count ?? 0}</p></div>}
             {outputMode === 'loop' && <div><p><strong>State:</strong> {result?.active ? 'ACTIVE' : 'STOPPED'}</p><p><strong>Interval:</strong> {result?.interval_ms ?? '-'} ms</p><p><strong>Last run:</strong> {formatRecordedAt(result?.last_run_at)}</p><p><strong>Run count:</strong> {result?.run_count ?? 0}</p><p><strong>Last error:</strong> {result?.last_error || '-'}</p><p><strong>Latest summary:</strong> {result?.latest_agent_summary || 'No summary yet.'}</p><p><strong>Latest mode:</strong> {result?.latest_agent_mode || '-'}</p><p><strong>Latest actions:</strong> {(result?.latest_agent_next_actions || []).join(' | ') || '-'}</p></div>}
             {outputMode === 'summary' && <div><p><strong>state_summary:</strong> {result?.state_summary}</p><p><strong>high_priority_focus:</strong> {result?.high_priority_focus}</p><p><strong>active_alerts:</strong> {(result?.active_alerts || []).join(' | ')}</p><p><strong>recommended_next_move:</strong> {result?.recommended_next_move}</p></div>}
