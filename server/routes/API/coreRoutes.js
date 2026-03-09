@@ -9,6 +9,8 @@ const KernelSnapshot = require("../../models/KernelSnapshot");
 const KernelCycle = require("../../models/KernelCycle");
 const ProtocolExecutionRecord = require("../../models/ProtocolExecutionRecord");
 const AlertRecord = require("../../models/AlertRecord");
+const ActionExecution = require("../../models/ActionExecution");
+const { buildActionPolicy, createToolRegistry, executeActionPlan } = require("../../logic/actionKernel");
 const mongoose = require("mongoose");
 
 const REQUIRED_ANALYSIS_KEYS = ["objectives", "constraints", "risks", "leverage", "next_actions"];
@@ -45,6 +47,7 @@ const loopState = {
   latestAgentSummary: "",
   latestAgentMode: "",
   latestAgentNextActions: [],
+  latestActionExecutions: [],
   eventLog: [],
   lastError: null,
 };
@@ -82,6 +85,12 @@ const syncLoopStateFromRecord = (record) => {
   loopState.latestAgentMode = record.latest_agent_mode || "";
   loopState.latestAgentNextActions = Array.isArray(record.latest_agent_next_actions) ? record.latest_agent_next_actions : [];
 };
+
+const buildKernelReport = ({ reasoningOutput, operatorState }) => ({
+  summary: `mode=${reasoningOutput?.dominant_mode || "general"} urgency=${reasoningOutput?.urgency_score ?? 0} tasks=${operatorState?.openTasksCount ?? 0}`,
+  recommendations: Array.isArray(reasoningOutput?.next_actions) ? reasoningOutput.next_actions.slice(0, 3) : [],
+  generated_at: new Date().toISOString(),
+});
 
 const persistLoopState = async (patch = {}) => {
   const nextPatch = { ...patch };
@@ -659,6 +668,8 @@ const runAutonomousReasoningKernel = async ({ trigger = "loop", text = "kernel e
     alerts_created: [],
     protocol_run: null,
     memory_saved: false,
+    action_policy: null,
+    action_results: [],
     timestamp: new Date().toISOString(),
     operator_context: {
       command_history_count: recentCommands.length,
@@ -668,47 +679,61 @@ const runAutonomousReasoningKernel = async ({ trigger = "loop", text = "kernel e
     },
   };
 
-  const openTaskNormalized = new Set(openTasks.map((task) => normalizeText(task.description)));
-  if (result.should_create_task) {
-    const taskDescriptions = next_actions.filter((action) => action && !openTaskNormalized.has(normalizeText(action))).slice(0, 2);
-    if (taskDescriptions.length) {
-      const created = await Promise.all(taskDescriptions.map((description) => Task.create({ description, source: "kernel" })));
-      result.tasks_created = created.map((task) => ({ id: task._id, description: task.description }));
-    }
-  }
-
-  if (result.should_create_alert) {
-    const alertMessage = `Kernel urgency ${urgency_score}: prioritize immediate stabilization.`;
-    const fingerprint = normalizeText(alertMessage);
-    const existing = await AlertRecord.findOne({ fingerprint });
-    if (existing) {
-      existing.count += 1;
-      existing.last_seen_at = new Date();
-      await existing.save();
-      result.alerts_created = [{ id: existing._id, message: existing.message, status: "updated" }];
-    } else {
-      const createdAlert = await AlertRecord.create({ fingerprint, message: alertMessage, severity: urgency_score >= 8 ? "high" : "medium", source: "kernel" });
-      result.alerts_created = [{ id: createdAlert._id, message: createdAlert.message, status: "created" }];
-    }
-  }
-
-  if (result.should_run_protocol && protocol_to_run) {
-    const protocolExecution = await runProtocolIfNeeded(protocol_to_run);
-    result.protocol_run = protocolExecution
-      ? { id: protocolExecution._id, protocol_name: protocolExecution.protocol_name, status: protocolExecution.status }
-      : null;
-  }
-
-  const memory = await StrategicMemory.create({
-    title: `Kernel ${result.dominant_mode} ${new Date().toISOString().slice(0, 19)}`,
-    category: "kernel",
-    content: `${result.reasoning_summary} | next_actions=${result.next_actions.join("; ")}`,
-    sourceCommand: text,
-    tags: ["kernel", result.selected_node, result.dominant_mode],
+  const repeatedPattern = strategicMemory.some((entry) => {
+    if (!entry?.content) return false;
+    const memoryText = normalizeText(entry.content);
+    return next_actions.some((action) => action && memoryText.includes(normalizeText(action)));
   });
-  result.memory_saved = Boolean(memory?._id);
+
+  const actionPolicy = buildActionPolicy({
+    reasoningOutput: result,
+    operatorState: {
+      openTasksCount: openTasks.length,
+      alertCount: currentAlerts.length,
+      strategicMemoryCount: strategicMemory.length,
+      isRepeatedPattern: repeatedPattern,
+    },
+  });
+
+  const toolRegistry = createToolRegistry({
+    runProtocolIfNeeded,
+    generateReport: ({ reasoningOutput, operatorState }) => buildKernelReport({ reasoningOutput, operatorState }),
+  });
+
+  const actionResults = await executeActionPlan({ policy: actionPolicy, toolRegistry });
+
+  result.action_policy = actionPolicy.mode;
+  result.action_results = actionResults;
+  result.tasks_created = actionResults
+    .filter((entry) => entry.action_name === "createTask" && entry.success && entry.result)
+    .map((entry) => ({ id: entry.result._id, description: entry.result.description }));
+  result.alerts_created = actionResults
+    .filter((entry) => entry.action_name === "createAlert" && entry.success && entry.result)
+    .map((entry) => ({ id: entry.result._id, message: entry.result.message, status: entry.result.status || "open" }));
+
+  const protocolAction = actionResults.find((entry) => entry.action_name === "runProtocol");
+  result.protocol_run = protocolAction?.success
+    ? {
+        id: protocolAction?.result?._id || null,
+        protocol_name: protocolAction?.result?.protocol_name || protocol_to_run,
+        status: protocolAction?.result?.status || "executed",
+      }
+    : null;
+  result.memory_saved = actionResults.some((entry) => entry.action_name === "saveMemory" && entry.success);
 
   const cycleRecord = await KernelCycle.create({ trigger, output: result, error_summary: "" });
+
+  await Promise.all(
+    actionResults.map((entry) =>
+      ActionExecution.create({
+        ...entry,
+        source: "action-kernel",
+        reasoning_cycle_id: cycleRecord._id,
+        timestamp: entry.timestamp ? new Date(entry.timestamp) : new Date(),
+      })
+    )
+  );
+
   await KernelSnapshot.findOneAndUpdate(
     { singletonKey: "primary" },
     { $set: { latest_output: result }, $setOnInsert: { singletonKey: "primary" } },
@@ -729,6 +754,7 @@ const runAgentLoopCycle = async () => {
     agent_next_actions: result.next_actions,
     tasks_created: result.tasks_created.length,
     alerts_created: result.alerts_created.length,
+    action_count: Array.isArray(result.action_results) ? result.action_results.length : 0,
     urgency_score: result.urgency_score,
     selected_node: result.selected_node,
   };
@@ -740,6 +766,7 @@ const runAgentLoopCycle = async () => {
   loopState.latestAgentSummary = event.agent_summary || "";
   loopState.latestAgentMode = event.agent_mode || "";
   loopState.latestAgentNextActions = event.agent_next_actions || [];
+  loopState.latestActionExecutions = (result.action_results || []).slice(0, 5);
   appendLoopEvent(event);
   await persistLoopState({
     last_run_at: loopState.lastRunAt,
@@ -904,6 +931,7 @@ const loopStatusPayload = () => ({
   latest_agent_summary: loopState.latestAgentSummary,
   latest_agent_mode: loopState.latestAgentMode,
   latest_agent_next_actions: loopState.latestAgentNextActions,
+  latest_action_executions: loopState.latestActionExecutions,
   last_report: loopState.lastReport,
   recent_events: loopState.eventLog.slice(0, 10),
 });
@@ -1092,6 +1120,11 @@ router.get("/kernel/inspect", async (_req, res) => {
   const cycles = await KernelCycle.find().sort({ createdAt: -1 }).limit(20).lean();
   const protocols = await ProtocolExecutionRecord.find().sort({ createdAt: -1 }).limit(20).lean();
   return res.json({ cycles, protocols });
+});
+
+router.get("/actions", async (_req, res) => {
+  const actions = await ActionExecution.find().sort({ timestamp: -1 }).limit(25).lean();
+  return res.json({ actions });
 });
 
 /* SYSTEM BUILDER */
@@ -1425,11 +1458,12 @@ router.get("/memory/search", async (req, res) => {
 
 router.get("/summary", async (_req, res) => {
   const [latestSignal] = await SignalEntry.find().sort({ createdAt: -1 }).limit(1).lean();
-  const [openTasks, memoryCount, openAlerts, snapshot] = await Promise.all([
+  const [openTasks, memoryCount, openAlerts, snapshot, recentActions] = await Promise.all([
     Task.countDocuments({ status: "open" }),
     StrategicMemory.countDocuments(),
     AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(20).lean(),
     KernelSnapshot.findOne({ singletonKey: "primary" }).lean(),
+    ActionExecution.find().sort({ timestamp: -1 }).limit(5).lean(),
   ]);
   if (!autonomyState.lastRunAt) await evaluateMonitorState();
   const loopRecord = await getLoopStateRecord();
@@ -1457,6 +1491,7 @@ router.get("/summary", async (_req, res) => {
     latest_kernel_task_outcomes: Array.isArray(kernel?.tasks_created) ? kernel.tasks_created : [],
     latest_kernel_alert_outcomes: Array.isArray(kernel?.alerts_created) ? kernel.alerts_created : [],
     latest_kernel_timestamp: kernel?.timestamp || null,
+    latest_actions: recentActions,
     autonomy_status: {
       monitoring_enabled: autonomyState.monitoringEnabled,
       last_monitor_run: autonomyState.lastRunAt,
