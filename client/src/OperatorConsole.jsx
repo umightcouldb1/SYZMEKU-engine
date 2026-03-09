@@ -79,7 +79,7 @@ const modeFromCommand = (commandText) => {
   return 'GENERAL';
 };
 
-const OperatorConsole = ({ user }) => {
+const Dashboard = ({ user }) => {
   const [command, setCommand] = useState('');
   const [loading, setLoading] = useState(false);
   const [outputMode, setOutputMode] = useState('analyze');
@@ -629,4 +629,4 @@ const OperatorConsole = ({ user }) => {
   );
 };
 
-export default OperatorConsole;
+export default Dashboard;

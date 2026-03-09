@@ -3,90 +3,92 @@ import axios from 'axios';
 import OperatorConsole from './OperatorConsole';
 import './dashboard.css';
 
-const FALLBACK_INSIGHT = 'No insight yet. Complete a check-in or ask SYZMEKU.';
+const DAILY_GREETING = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+};
+
+const buildInsightMessage = (summary, analysis) => {
+  if (analysis?.reasoning_summary) return analysis.reasoning_summary;
+  if (summary?.recommended_next_move) return summary.recommended_next_move;
+  return 'Your signals are stable. Focus on one high-leverage task before noon.';
+};
+
+const normalizeFocusTasks = (tasks = []) => tasks.map((task) => task?.description).filter(Boolean);
 
 const Dashboard = ({ user }) => {
-  const [activeView, setActiveView] = useState('mentor');
-  const [loading, setLoading] = useState(false);
+  const [advancedMode, setAdvancedMode] = useState(false);
+  const [activeScreen, setActiveScreen] = useState('dashboard');
   const [summary, setSummary] = useState(null);
   const [tasks, setTasks] = useState([]);
-  const [latestReasoning, setLatestReasoning] = useState('');
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [askInput, setAskInput] = useState('');
-  const [askResponse, setAskResponse] = useState('');
-  const [checkIn, setCheckIn] = useState({
-    sleep: 6,
-    stress: 3,
-    symptoms: '',
-    mood: '',
-  });
+  const [alerts, setAlerts] = useState([]);
+  const [signals, setSignals] = useState({ sleep: 6, stress: 3, symptoms: 'calm' });
+  const [chatInput, setChatInput] = useState('');
+  const [chatAnswer, setChatAnswer] = useState(null);
+  const [latestInsight, setLatestInsight] = useState(null);
+  const [showReasoning, setShowReasoning] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const refreshData = async () => {
-    const [summaryRes, tasksRes, signalsRes] = await Promise.all([
+  const refreshMentorData = async () => {
+    const [summaryRes, tasksRes, alertsRes, signalsRes] = await Promise.all([
       axios.get('/api/core/summary').catch(() => ({ data: null })),
       axios.get('/api/core/tasks').catch(() => ({ data: { tasks: [] } })),
+      axios.get('/api/core/alerts').catch(() => ({ data: { alerts: [] } })),
       axios.get('/api/core/signals').catch(() => ({ data: { entries: [] } })),
     ]);
 
     setSummary(summaryRes.data || null);
-    setTasks(tasksRes.data?.tasks || []);
+    const nextTasks = tasksRes.data?.tasks || [];
+    setTasks(nextTasks);
+    setAlerts(alertsRes.data?.alerts || []);
 
     const latestSignal = signalsRes.data?.entries?.[0];
     if (latestSignal) {
-      setCheckIn((prev) => ({
-        ...prev,
-        sleep: latestSignal.sleep ?? prev.sleep,
-        stress: latestSignal.stress ?? prev.stress,
-        symptoms: latestSignal.symptoms ?? prev.symptoms,
-        mood: latestSignal.mood ?? prev.mood,
-      }));
+      setSignals({
+        sleep: latestSignal.sleep ?? 6,
+        stress: latestSignal.stress ?? 3,
+        symptoms: latestSignal.symptoms ?? 'calm',
+      });
     }
   };
 
   useEffect(() => {
-    refreshData();
+    refreshMentorData();
   }, []);
 
-  const insightText = useMemo(
-    () => latestReasoning || summary?.reasoning_summary || FALLBACK_INSIGHT,
-    [latestReasoning, summary?.reasoning_summary]
-  );
+  const topFocus = useMemo(() => normalizeFocusTasks(tasks).slice(0, 3), [tasks]);
 
-  const focusItems = useMemo(
-    () => (tasks || []).map((task) => task?.description).filter(Boolean).slice(0, 3),
-    [tasks]
-  );
-
-  const analyzeState = async () => {
+  const submitCheckIn = async () => {
     setLoading(true);
     try {
-      await axios.post('/api/core/signals', checkIn);
+      await axios.post('/api/core/signals', signals);
       const analysis = await axios.post('/api/core/analyze', {
-        text: `sleep=${checkIn.sleep} stress=${checkIn.stress} symptoms=${checkIn.symptoms || 'none'} mood=${checkIn.mood || 'unspecified'}`,
+        text: `sleep=${signals.sleep} stress=${signals.stress} symptoms=${signals.symptoms}`,
       });
-      const reason = analysis.data?.reasoning_summary || analysis.data?.summary || '';
-      setLatestReasoning(reason);
-      setAskResponse('');
-      await refreshData();
+      setLatestInsight(analysis.data);
+      await refreshMentorData();
     } finally {
       setLoading(false);
     }
   };
 
   const askMentor = async () => {
-    if (!askInput.trim()) return;
+    if (!chatInput.trim()) return;
     setLoading(true);
     try {
-      const normalized = askInput.trim();
-      const useRecommend = /recommend|priority|next move|what should i do/i.test(normalized);
-      const response = useRecommend
-        ? await axios.post('/api/core/recommend', { text: normalized })
-        : await axios.post('/api/core/analyze', { text: normalized });
-
-      const answer = response.data?.reasoning_summary || response.data?.summary || response.data?.recommendation || 'I analyzed your state and prepared guidance.';
-      setAskResponse(answer);
-      setLatestReasoning(answer);
-      setAskInput('');
+      const internalCommand = `analyze ${chatInput.trim()}`;
+      const response = await axios.post('/api/core/analyze', {
+        text: internalCommand.replace(/^analyze\s+/i, ''),
+      });
+      setChatAnswer({
+        question: chatInput,
+        response: response.data,
+        internalCommand,
+      });
+      setLatestInsight(response.data);
+      setChatInput('');
     } finally {
       setLoading(false);
     }
@@ -94,12 +96,13 @@ const Dashboard = ({ user }) => {
 
   if (!user) return <div className="portal-text">CALIBRATING DASHBOARD...</div>;
 
-  if (activeView === 'operator') {
+  if (advancedMode) {
     return (
       <div>
-        <div className="mentor-view-toggle-shell">
-          <button type="button" className="mentor-view-toggle" onClick={() => setActiveView('mentor')}>Mentor View</button>
-          <button type="button" className="mentor-view-toggle active" onClick={() => setActiveView('operator')}>Operator View</button>
+        <div className="mentor-top-toggle">
+          <button type="button" className="mentor-button secondary" onClick={() => setAdvancedMode(false)}>
+            Back to Mentor Mode
+          </button>
         </div>
         <OperatorConsole user={user} />
       </div>
@@ -107,82 +110,102 @@ const Dashboard = ({ user }) => {
   }
 
   return (
-    <div className="crystalline-container mentor-mode-shell">
-      <div className="nebula-1" />
-      <div className="nebula-2" />
-
-      <header className="mentor-mode-header">
+    <div className="mentor-shell">
+      <header className="mentor-header">
         <div>
           <h1>SYZMEKU Mentor</h1>
-          <p>Good day, {user.username}. Here is your daily intelligence panel.</p>
+          <p>{DAILY_GREETING()}, {user.username}.</p>
         </div>
-        <div className="mentor-view-toggle-shell in-header">
-          <button type="button" className="mentor-view-toggle active" onClick={() => setActiveView('mentor')}>Mentor View</button>
-          <button type="button" className="mentor-view-toggle" onClick={() => setActiveView('operator')}>Operator View</button>
-        </div>
+        <button type="button" className="mentor-button secondary" onClick={() => setAdvancedMode(true)}>
+          Advanced Mode
+        </button>
       </header>
 
-      <main className="mentor-mode-grid">
-        <section className="crystal-shard mentor-section">
-          <h2>TODAY'S INSIGHT</h2>
-          <p>{insightText}</p>
-          <button type="button" className="mentor-link-button" onClick={() => setDetailsOpen(true)}>View details</button>
-        </section>
+      <nav className="mentor-nav">
+        {[
+          ['dashboard', 'Mentor Dashboard'],
+          ['ask', 'Ask SYZMEKU'],
+          ['focus', 'Focus Board'],
+          ['patterns', 'Pattern Intelligence'],
+        ].map(([key, label]) => (
+          <button key={key} type="button" className={`mentor-button ${activeScreen === key ? 'active' : ''}`} onClick={() => setActiveScreen(key)}>{label}</button>
+        ))}
+      </nav>
 
-        <section className="crystal-shard mentor-section">
-          <h2>QUICK CHECK-IN</h2>
-          <label>Sleep ({checkIn.sleep}h)</label>
-          <input type="range" min="0" max="12" value={checkIn.sleep} onChange={(event) => setCheckIn((prev) => ({ ...prev, sleep: Number(event.target.value) }))} />
-          <label>Stress ({checkIn.stress}/10)</label>
-          <input type="range" min="0" max="10" value={checkIn.stress} onChange={(event) => setCheckIn((prev) => ({ ...prev, stress: Number(event.target.value) }))} />
-          <label>Symptoms</label>
-          <input type="text" value={checkIn.symptoms} onChange={(event) => setCheckIn((prev) => ({ ...prev, symptoms: event.target.value }))} />
-          <label>Mood</label>
-          <input type="text" value={checkIn.mood} onChange={(event) => setCheckIn((prev) => ({ ...prev, mood: event.target.value }))} />
-          <button type="button" className="mentor-primary-button" onClick={analyzeState} disabled={loading}>Analyze my state</button>
-        </section>
+      {activeScreen === 'dashboard' && (
+        <main className="mentor-grid">
+          <section className="mentor-card">
+            <h2>Today's Insight</h2>
+            <p>{buildInsightMessage(summary, latestInsight)}</p>
+            <button type="button" className="mentor-link" onClick={() => setShowReasoning((prev) => !prev)}>
+              {showReasoning ? 'Hide reasoning' : 'Show reasoning'}
+            </button>
+            {showReasoning && <p className="mentor-muted">{latestInsight?.reasoning_summary || summary?.state_summary || 'No deeper reasoning yet.'}</p>}
+          </section>
 
-        <section className="crystal-shard mentor-section">
-          <h2>TODAY'S FOCUS</h2>
-          {focusItems.length ? (
-            <ol>
-              {focusItems.map((item) => <li key={item}>{item}</li>)}
-            </ol>
-          ) : (
-            <p>No focus items yet.</p>
+          <section className="mentor-card">
+            <h2>Daily Check-In</h2>
+            <label>How did you sleep? ({signals.sleep} hours)</label>
+            <input type="range" min="0" max="12" value={signals.sleep} onChange={(event) => setSignals((prev) => ({ ...prev, sleep: Number(event.target.value) }))} />
+            <label>Stress level today? ({signals.stress})</label>
+            <input type="range" min="0" max="10" value={signals.stress} onChange={(event) => setSignals((prev) => ({ ...prev, stress: Number(event.target.value) }))} />
+            <label>Any symptoms?</label>
+            <input type="text" value={signals.symptoms} onChange={(event) => setSignals((prev) => ({ ...prev, symptoms: event.target.value }))} />
+            <button type="button" className="mentor-button" onClick={submitCheckIn} disabled={loading}>Analyze my state</button>
+          </section>
+
+          <section className="mentor-card">
+            <h2>Today's Focus</h2>
+            {topFocus.length ? (
+              <ol>{topFocus.map((task) => <li key={task}>{task}</li>)}</ol>
+            ) : (
+              <p>No focus items yet.</p>
+            )}
+          </section>
+
+          <section className="mentor-card">
+            <h2>Recent Patterns</h2>
+            {alerts.length ? alerts.slice(0, 2).map((alert, index) => (
+              <div key={`${index}-${alert?.message || alert}`} className="mentor-warning">
+                <strong>⚠ Pattern detected</strong>
+                <p>{typeof alert === 'string' ? alert : alert?.message}</p>
+              </div>
+            )) : <p>No risk patterns detected.</p>}
+          </section>
+        </main>
+      )}
+
+      {activeScreen === 'ask' && (
+        <section className="mentor-card">
+          <h2>Ask SYZMEKU</h2>
+          <p>Ask anything about your patterns, productivity, or state.</p>
+          <div className="mentor-ask-row">
+            <input type="text" value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder="I feel like my productivity collapses after lunch" />
+            <button type="button" className="mentor-button" onClick={askMentor} disabled={loading}>Ask</button>
+          </div>
+          {chatAnswer && (
+            <div className="mentor-answer">
+              <p><strong>You:</strong> {chatAnswer.question}</p>
+              <p><strong>SYZMEKU:</strong> {chatAnswer.response?.reasoning_summary || chatAnswer.response?.summary || 'I analyzed your pattern and prepared recommendations.'}</p>
+            </div>
           )}
         </section>
+      )}
 
-        <section className="crystal-shard mentor-section">
-          <h2>ASK SYZMEKU</h2>
-          <div className="mentor-ask-row">
-            <input
-              type="text"
-              value={askInput}
-              placeholder="What do you need help with today?"
-              onChange={(event) => setAskInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  askMentor();
-                }
-              }}
-            />
-            <button type="button" className="mentor-primary-button" onClick={askMentor} disabled={loading}>Ask</button>
-          </div>
-          {askResponse ? <p className="mentor-ask-response">{askResponse}</p> : null}
+      {activeScreen === 'focus' && (
+        <section className="mentor-card">
+          <h2>Focus Board</h2>
+          {normalizeFocusTasks(tasks).length ? <ol>{normalizeFocusTasks(tasks).map((task) => <li key={task}>{task}</li>)}</ol> : <p>No focus items yet.</p>}
         </section>
-      </main>
+      )}
 
-      {detailsOpen ? (
-        <div className="mentor-details-backdrop" onClick={() => setDetailsOpen(false)}>
-          <div className="mentor-details-modal" onClick={(event) => event.stopPropagation()}>
-            <h3>Latest reasoning</h3>
-            <p>{latestReasoning || summary?.state_summary || FALLBACK_INSIGHT}</p>
-            <button type="button" className="mentor-view-toggle" onClick={() => setDetailsOpen(false)}>Close</button>
-          </div>
-        </div>
-      ) : null}
+      {activeScreen === 'patterns' && (
+        <section className="mentor-card">
+          <h2>Pattern Intelligence</h2>
+          <p>{summary?.state_summary || 'Not enough pattern data yet. Keep checking in daily.'}</p>
+          <p className="mentor-muted">Suggested next move: {summary?.recommended_next_move || 'Complete your daily check-in to generate a personalized recommendation.'}</p>
+        </section>
+      )}
     </div>
   );
 };
