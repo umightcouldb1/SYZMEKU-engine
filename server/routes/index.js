@@ -9,6 +9,7 @@ router.use('/scrolltones', require('./scrolltoneRoutes'));
 router.use('/crystalline', require('./crystallineRoutes'));
 router.use('/scroll-intake', require('./scrollIntakeRoutes'));
 router.use('/scroll-match', require('./scrollMatchRoutes'));
+router.use('/mentor-system', require('./mentorSystemRoutes'));
 
 router.use('/core', require('./API/coreRoutes'));
 
