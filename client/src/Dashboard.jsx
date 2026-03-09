@@ -454,6 +454,47 @@ const Dashboard = ({ user }) => {
     setUploadedImageInfo(`Image: ${file.name}, ${Math.round(file.size / 1024)}KB, type=${file.type}`);
   };
 
+  const openOperatorPanel = async (panelKey) => {
+    if (loading) return;
+
+    try {
+      setLoading(true);
+      if (panelKey === 'memory') {
+        const response = await axios.get('/api/core/memory');
+        const entries = response.data?.entries || [];
+        runLocal('MEMORY STATUS', 'memory-list', entries.length ? response.data : { entries: [] }, 'memory status');
+      } else if (panelKey === 'context') {
+        runLocal('CONTEXT STATUS', 'context', {
+          message: operatorSummary?.state_summary || 'No context has been assembled yet.',
+          activeRoute: routeLabel,
+          hasLastOverlay: Boolean(lastOverlayResult),
+        }, 'context status');
+      } else if (panelKey === 'mode') {
+        runLocal('MODE STATUS', 'context', {
+          message: `Current mode ${modeFromCommand(commandLabel)} on route ${routeLabel}.`,
+        }, 'mode status');
+      } else if (panelKey === 'alerts') {
+        const response = await axios.get('/api/core/alerts');
+        const alerts = response.data?.alerts || [];
+        runLocal('SYSTEM ALERTS', 'alerts', alerts.length ? response.data : { alerts: ['No active alerts.'] }, 'alerts');
+      } else if (panelKey === 'tasks') {
+        const response = await axios.get('/api/core/tasks');
+        const tasks = response.data?.tasks || [];
+        runLocal('TASK LIST', 'tasks', tasks.length ? response.data : { tasks: [{ description: 'No open tasks.', status: 'empty' }] }, 'task show');
+      } else if (panelKey === 'autonomy') {
+        const response = await axios.get('/api/core/autonomy/status');
+        runLocal('AUTONOMY STATUS', 'status', response.data, 'autonomy status');
+      } else if (panelKey === 'loop') {
+        const response = await axios.get('/api/core/loop/status');
+        runLocal('AGENT LOOP STATUS', 'loop', response.data, 'loop status');
+      }
+    } catch (error) {
+      runLocal('OPERATOR STATUS', 'error', { message: error?.response?.data?.message || 'Unable to load operator panel.' }, 'operator status');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!user) return <div className="portal-text">CALIBRATING DASHBOARD...</div>;
 
   const memoryStatus = operatorSummary?.memory_status || 'UNKNOWN';
@@ -477,19 +518,26 @@ const Dashboard = ({ user }) => {
       </header>
 
       <div className="operator-strip">
-        <span className="state-badge">MEMORY ACTIVE: {memoryStatus}</span>
-        <span className="state-badge">CONTEXT LOADED</span>
-        <span className="state-badge">MODE: {modeFromCommand(commandLabel)}</span>
-        <button type="button" className="state-badge state-badge-button" onClick={() => submitCommand('alerts')} disabled={loading}>ALERTS: {alertsCount}</button>
-        <button type="button" className="state-badge state-badge-button" onClick={() => submitCommand('task show')} disabled={loading}>TASKS: {taskCount}</button>
-        <button type="button" className="state-badge state-badge-button" onClick={() => submitCommand('autonomy status')} disabled={loading}>AUTONOMY: {operatorSummary?.autonomy_status?.monitoring_enabled ? 'ON' : 'OFF'}</button>
-        <button type="button" className="state-badge state-badge-button" onClick={() => submitCommand('loop status')} disabled={loading}>AGENT LOOP: {operatorSummary?.loop_status?.active ? 'ACTIVE' : 'STOPPED'}</button>
+        <button type="button" className="state-badge state-badge-button" onClick={() => openOperatorPanel('memory')}>MEMORY ACTIVE: {memoryStatus}</button>
+        <button type="button" className="state-badge state-badge-button" onClick={() => openOperatorPanel('context')}>CONTEXT LOADED</button>
+        <button type="button" className="state-badge state-badge-button" onClick={() => openOperatorPanel('mode')}>MODE: {modeFromCommand(commandLabel)}</button>
+        <button type="button" className="state-badge state-badge-button" onClick={() => openOperatorPanel('alerts')}>ALERTS: {alertsCount}</button>
+        <button type="button" className="state-badge state-badge-button" onClick={() => openOperatorPanel('tasks')}>TASKS: {taskCount}</button>
+        <button type="button" className="state-badge state-badge-button" onClick={() => openOperatorPanel('autonomy')}>AUTONOMY: {operatorSummary?.autonomy_status?.monitoring_enabled ? 'ON' : 'OFF'}</button>
+        <button type="button" className="state-badge state-badge-button" onClick={() => openOperatorPanel('loop')}>AGENT LOOP: {operatorSummary?.loop_status?.active ? 'ACTIVE' : 'STOPPED'}</button>
       </div>
 
       <div className="summary-strip">
         <p><strong>Current mode:</strong> {modeFromCommand(commandLabel)}</p>
         <p><strong>Active route:</strong> {routeLabel}</p>
         <p><strong>Latest signal state:</strong> {operatorSummary?.state_summary || 'No summary available.'}</p>
+      </div>
+      <div className="summary-strip operator-panel">
+        <p><strong>Latest alert summary:</strong> {(operatorSummary?.active_alerts || [])[0] || 'No active alerts.'}</p>
+        <p><strong>Open task count:</strong> {taskCount}</p>
+        <p><strong>Last agent decision:</strong> {operatorSummary?.loop_status?.latest_agent_summary || 'No loop decision yet.'}</p>
+        <p><strong>Last loop run:</strong> {formatRecordedAt(operatorSummary?.loop_status?.last_run_at)}</p>
+        <p><strong>Current mode:</strong> {operatorSummary?.loop_status?.latest_agent_mode || modeFromCommand(commandLabel)}</p>
       </div>
 
       <main className="crystal-grid"><section className="crystal-heart-section"><div className="crystal-prism"><div className="prism-inner"><span className="prism-label">SYZMEKU</span></div><div className="geo-ring ring-1" /><div className="geo-ring ring-2" /></div></section></main>
@@ -515,7 +563,7 @@ const Dashboard = ({ user }) => {
             {outputMode === 'monitor' && <div><p><strong>State:</strong> {result?.state_summary}</p><p><strong>Alerts:</strong> {(result?.alerts || []).join(' | ') || '-'}</p><p><strong>Risks:</strong> {(result?.risks || []).join(' | ') || '-'}</p><p><strong>Recommended:</strong> {(result?.recommended_actions || []).join(' | ') || '-'}</p></div>}
             {outputMode === 'alerts' && <div>{(result?.alerts || []).map((a, i) => <p key={`${a}-${i}`}>{typeof a === 'string' ? a : `${a?.severity || ''}: ${a?.message || ''}`}</p>)}</div>}
             {outputMode === 'status' && <div><p>Monitoring enabled: {String(result?.monitoring_enabled)}</p><p>Last run: {formatRecordedAt(result?.last_monitor_run)}</p><p>Active alerts: {result?.active_alerts_count ?? 0}</p></div>}
-            {outputMode === 'loop' && <div><p><strong>State:</strong> {result?.active ? 'ACTIVE' : 'STOPPED'}</p><p><strong>Interval:</strong> {result?.interval_ms ?? '-'} ms</p><p><strong>Last run:</strong> {formatRecordedAt(result?.last_run_at)}</p><p><strong>Run count:</strong> {result?.run_count ?? 0}</p><p><strong>Last error:</strong> {result?.last_error || '-'}</p></div>}
+            {outputMode === 'loop' && <div><p><strong>State:</strong> {result?.active ? 'ACTIVE' : 'STOPPED'}</p><p><strong>Interval:</strong> {result?.interval_ms ?? '-'} ms</p><p><strong>Last run:</strong> {formatRecordedAt(result?.last_run_at)}</p><p><strong>Run count:</strong> {result?.run_count ?? 0}</p><p><strong>Last error:</strong> {result?.last_error || '-'}</p><p><strong>Latest summary:</strong> {result?.latest_agent_summary || 'No summary yet.'}</p><p><strong>Latest mode:</strong> {result?.latest_agent_mode || '-'}</p><p><strong>Latest actions:</strong> {(result?.latest_agent_next_actions || []).join(' | ') || '-'}</p></div>}
             {outputMode === 'summary' && <div><p><strong>state_summary:</strong> {result?.state_summary}</p><p><strong>high_priority_focus:</strong> {result?.high_priority_focus}</p><p><strong>active_alerts:</strong> {(result?.active_alerts || []).join(' | ')}</p><p><strong>recommended_next_move:</strong> {result?.recommended_next_move}</p></div>}
             {outputMode === 'help' && (result?.lines || []).map((line) => <p key={line}>{line}</p>)}
             {outputMode === 'history' && (result?.commands || []).map((line, i) => <p key={`${line}-${i}`}>{i + 1}. {line}</p>)}

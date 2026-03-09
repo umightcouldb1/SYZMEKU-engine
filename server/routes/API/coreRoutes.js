@@ -35,6 +35,9 @@ const loopState = {
   lastRunAt: null,
   runCount: 0,
   lastReport: null,
+  latestAgentSummary: "",
+  latestAgentMode: "",
+  latestAgentNextActions: [],
   eventLog: [],
   lastError: null,
 };
@@ -53,6 +56,9 @@ const getLoopStateRecord = async () => {
     interval_ms: LOOP_INTERVAL_MS,
     run_count: 0,
     last_error: "",
+    latest_agent_summary: "",
+    latest_agent_mode: "",
+    latest_agent_next_actions: [],
   });
 
   return record;
@@ -65,6 +71,9 @@ const syncLoopStateFromRecord = (record) => {
   loopState.lastRunAt = record.last_run_at || null;
   loopState.runCount = Number(record.run_count) || 0;
   loopState.lastError = record.last_error || "";
+  loopState.latestAgentSummary = record.latest_agent_summary || "";
+  loopState.latestAgentMode = record.latest_agent_mode || "";
+  loopState.latestAgentNextActions = Array.isArray(record.latest_agent_next_actions) ? record.latest_agent_next_actions : [];
 };
 
 const persistLoopState = async (patch = {}) => {
@@ -80,6 +89,9 @@ const persistLoopState = async (patch = {}) => {
     ...(Object.prototype.hasOwnProperty.call(nextPatch, "last_run_at") ? { last_run_at: nextPatch.last_run_at } : {}),
     ...(typeof nextPatch.run_count === "number" ? { run_count: nextPatch.run_count } : {}),
     ...(typeof nextPatch.last_error === "string" ? { last_error: nextPatch.last_error } : {}),
+    ...(typeof nextPatch.latest_agent_summary === "string" ? { latest_agent_summary: nextPatch.latest_agent_summary } : {}),
+    ...(typeof nextPatch.latest_agent_mode === "string" ? { latest_agent_mode: nextPatch.latest_agent_mode } : {}),
+    ...(Array.isArray(nextPatch.latest_agent_next_actions) ? { latest_agent_next_actions: nextPatch.latest_agent_next_actions } : {}),
   };
 
   const record = await AgentLoopState.findOneAndUpdate(
@@ -497,41 +509,75 @@ const evaluateMonitorState = async () => {
 
 const runAgentLoopCycle = async () => {
   const report = await evaluateMonitorState();
+  const [latestSignals, latestSystems, openTasks, activeAlerts, strategicMemory] = await Promise.all([
+    SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
+    System.find().sort({ updatedAt: -1 }).limit(10).lean(),
+    Task.find({ status: "open" }).sort({ createdAt: -1 }).limit(50).lean(),
+    Promise.resolve((autonomyState.activeAlerts || []).slice(0, 25)),
+    StrategicMemory.find().sort({ updatedAt: -1 }).limit(10).lean(),
+  ]);
+
   const agentReport = await runAgentKernelEvaluation({
     text: "Evaluate current operating state and recommend immediate next actions.",
     rawContext: {
       source: "agent-loop",
       monitorState: report,
+      activeAlerts,
+      openTasks,
+      latestSignals,
+      latestSystems,
+      strategicMemory,
     },
     allowTaskExecution: false,
   });
-  const enabledProtocols = await System.find({ automationEnabled: true }).sort({ updatedAt: -1 }).lean();
-  const protocolTriggers = enabledProtocols
-    .flatMap((system) => (Array.isArray(system?.triggerConditions) ? system.triggerConditions : []))
-    .map((trigger) => String(trigger || "").trim())
-    .filter(Boolean);
+
+  const nextActions = Array.isArray(agentReport.next_actions) ? agentReport.next_actions.slice(0, 5) : [];
+  const normalizedAlerts = Array.isArray(report.alerts) ? report.alerts : [];
+  const existingTaskDescriptions = new Set(openTasks.map((task) => normalizeText(task?.description)));
+  const existingAlertMessages = new Set(normalizedAlerts.map((alert) => normalizeText(alert)));
+
+  const taskCandidates = nextActions
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter((item) => item && !existingTaskDescriptions.has(normalizeText(item)));
+  const alertCandidates = (agentReport.risks || [])
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter((item) => item && !existingAlertMessages.has(normalizeText(item)));
+
+  const createdTasks = await Promise.all(taskCandidates.slice(0, 2).map((description) => Task.create({ description, source: "agent-loop" })));
+  const createdAlerts = alertCandidates.slice(0, 2);
+  if (createdAlerts.length) autonomyState.activeAlerts = [...createdAlerts, ...autonomyState.activeAlerts].slice(0, 50);
 
   const event = {
     type: "loop-cycle",
-    alerts: report.alerts,
     monitor_state: report.state_summary,
-    protocol_trigger_count: protocolTriggers.length,
-    protocol_triggers: protocolTriggers.slice(0, 10),
-    recommended_actions: report.recommended_actions,
+    state_summary: report.state_summary,
     agent_summary: agentReport.summary,
     agent_mode: agentReport.mode_selected,
-    agent_next_actions: agentReport.next_actions.slice(0, 5),
+    agent_next_actions: nextActions,
+    tasks_created: createdTasks.length,
+    alerts_created: createdAlerts.length,
+    open_tasks: openTasks.length,
+    active_alerts: activeAlerts.length,
+    signals_loaded: latestSignals.length,
+    systems_loaded: latestSystems.length,
+    memory_loaded: strategicMemory.length,
   };
 
   loopState.lastRunAt = new Date();
   loopState.runCount += 1;
   loopState.lastError = null;
   loopState.lastReport = event;
+  loopState.latestAgentSummary = event.agent_summary || "";
+  loopState.latestAgentMode = event.agent_mode || "";
+  loopState.latestAgentNextActions = event.agent_next_actions || [];
   appendLoopEvent(event);
   await persistLoopState({
     last_run_at: loopState.lastRunAt,
     run_count: loopState.runCount,
     last_error: "",
+    latest_agent_summary: loopState.latestAgentSummary,
+    latest_agent_mode: loopState.latestAgentMode,
+    latest_agent_next_actions: loopState.latestAgentNextActions,
   });
   console.log("Agent loop cycle completed");
 
@@ -683,6 +729,9 @@ const loopStatusPayload = () => ({
   last_run_at: loopState.lastRunAt,
   run_count: loopState.runCount,
   last_error: loopState.lastError,
+  latest_agent_summary: loopState.latestAgentSummary,
+  latest_agent_mode: loopState.latestAgentMode,
+  latest_agent_next_actions: loopState.latestAgentNextActions,
   last_report: loopState.lastReport,
   recent_events: loopState.eventLog.slice(0, 10),
 });
@@ -1208,6 +1257,9 @@ router.get("/summary", async (_req, res) => {
       last_run_at: loopState.lastRunAt,
       run_count: loopState.runCount,
       last_error: loopState.lastError,
+      latest_agent_summary: loopState.latestAgentSummary,
+      latest_agent_mode: loopState.latestAgentMode,
+      latest_agent_next_actions: loopState.latestAgentNextActions,
     },
   });
 });

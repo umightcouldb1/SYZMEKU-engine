@@ -378,3 +378,18 @@
 .system-card {
   border-color: rgba(164, 120, 255, 0.35);
 }
+
+
+.state-badge-button {
+  color: var(--text-light);
+  cursor: pointer;
+}
+
+.state-badge-button:hover {
+  border-color: rgba(126, 249, 255, 0.8);
+  background: rgba(13, 26, 48, 0.86);
+}
+
+.operator-panel {
+  margin-top: 0.5rem;
+}
