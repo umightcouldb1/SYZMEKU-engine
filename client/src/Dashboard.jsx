@@ -200,6 +200,22 @@ const Dashboard = ({ user }) => {
               </div>
             )) : <p>No risk patterns detected.</p>}
           </section>
+
+          <section className="mentor-card">
+            <h2>Action Kernel</h2>
+            {(summary?.latest_actions || []).length ? (
+              <ul className="mentor-path-list">
+                {(summary?.latest_actions || []).slice(0, 3).map((action) => (
+                  <li key={action?._id || `${action?.action_name}-${action?.timestamp}`}>
+                    <strong>{action?.action_name || 'action'}:</strong> {action?.success ? 'success' : 'failed'}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No actions executed yet.</p>
+            )}
+            <p className="mentor-muted">Last execution: {summary?.latest_actions?.[0]?.error || 'No errors reported.'}</p>
+          </section>
         </main>
       )}
 

@@ -21,7 +21,7 @@ const HELP_LINES = [
   'monitor run | alerts | tasks | autonomy status',
   'loop start',
   'loop stop',
-  'loop status | kernel status | kernel inspect | agent evaluate',
+  'loop status | kernel status | kernel inspect | agent evaluate | actions',
   'memory status | context status | mode status',
   'analyze file | analyze image | voice on | voice off | clear | help',
 ];
@@ -369,6 +369,11 @@ const Dashboard = ({ user }) => {
         nextRoute = 'kernel inspect';
         response = await axios.get('/api/core/kernel/inspect');
         setOutputMode('kernel-inspect');
+      } else if (lowered === 'actions') {
+        setOutputTitle('ACTION HISTORY');
+        nextRoute = 'actions';
+        response = await axios.get('/api/core/actions');
+        setOutputMode('actions');
       } else if (lowered === 'tasks') {
         setOutputTitle('TASK LIST');
         nextRoute = 'tasks';
@@ -605,8 +610,9 @@ const Dashboard = ({ user }) => {
             {outputMode === 'kernel-status' && <div><p><strong>Summary:</strong> {result?.latest?.reasoning_summary || 'No kernel output available.'}</p><p><strong>Mode:</strong> {result?.latest?.dominant_mode || '-'}</p><p><strong>Node:</strong> {result?.latest?.selected_node || '-'}</p><p><strong>Urgency:</strong> {result?.latest?.urgency_score ?? 0}</p></div>}
             {outputMode === 'kernel-inspect' && <div><p><strong>Cycle count:</strong> {(result?.cycles || []).length}</p><p><strong>Protocol executions:</strong> {(result?.protocols || []).length}</p></div>}
             {outputMode === 'status' && <div><p>Monitoring enabled: {String(result?.monitoring_enabled)}</p><p>Last run: {formatRecordedAt(result?.last_monitor_run)}</p><p>Active alerts: {result?.active_alerts_count ?? 0}</p></div>}
-            {outputMode === 'loop' && <div><p><strong>State:</strong> {result?.active ? 'ACTIVE' : 'STOPPED'}</p><p><strong>Interval:</strong> {result?.interval_ms ?? '-'} ms</p><p><strong>Last run:</strong> {formatRecordedAt(result?.last_run_at)}</p><p><strong>Run count:</strong> {result?.run_count ?? 0}</p><p><strong>Last error:</strong> {result?.last_error || '-'}</p><p><strong>Latest summary:</strong> {result?.latest_agent_summary || 'No summary yet.'}</p><p><strong>Latest mode:</strong> {result?.latest_agent_mode || '-'}</p><p><strong>Latest actions:</strong> {(result?.latest_agent_next_actions || []).join(' | ') || '-'}</p></div>}
+            {outputMode === 'loop' && <div><p><strong>State:</strong> {result?.active ? 'ACTIVE' : 'STOPPED'}</p><p><strong>Interval:</strong> {result?.interval_ms ?? '-'} ms</p><p><strong>Last run:</strong> {formatRecordedAt(result?.last_run_at)}</p><p><strong>Run count:</strong> {result?.run_count ?? 0}</p><p><strong>Last error:</strong> {result?.last_error || '-'}</p><p><strong>Latest summary:</strong> {result?.latest_agent_summary || 'No summary yet.'}</p><p><strong>Latest mode:</strong> {result?.latest_agent_mode || '-'}</p><p><strong>Latest actions:</strong> {(result?.latest_agent_next_actions || []).join(' | ') || '-'}</p><p><strong>Latest action executions:</strong> {(result?.latest_action_executions || []).map((item) => `${item.action_name}:${item.success ? 'ok' : 'fail'}`).join(' | ') || '-'}</p></div>}
             {outputMode === 'summary' && <div><p><strong>state_summary:</strong> {result?.state_summary}</p><p><strong>high_priority_focus:</strong> {result?.high_priority_focus}</p><p><strong>active_alerts:</strong> {(result?.active_alerts || []).join(' | ')}</p><p><strong>recommended_next_move:</strong> {result?.recommended_next_move}</p></div>}
+            {outputMode === 'actions' && <div>{(result?.actions || []).length ? (result.actions || []).map((entry) => <div key={entry._id} className="item-card"><p><strong>{entry.action_name}</strong> · {entry.success ? 'success' : 'failed'}</p><p>{entry.error || 'No error.'}</p><p>{formatRecordedAt(entry.timestamp)}</p></div>) : <p>No actions recorded.</p>}</div>}
             {outputMode === 'help' && (result?.lines || []).map((line) => <p key={line}>{line}</p>)}
             {outputMode === 'history' && (result?.commands || []).map((line, i) => <p key={`${line}-${i}`}>{i + 1}. {line}</p>)}
             {outputMode === 'context' && <p>{result?.message || `active=${result?.activeRoute}`}</p>}
