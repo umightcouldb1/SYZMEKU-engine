@@ -8,6 +8,9 @@ const agentLoopStateSchema = new mongoose.Schema(
     last_run_at: { type: Date, default: null },
     run_count: { type: Number, default: 0 },
     last_error: { type: String, default: "" },
+    latest_agent_summary: { type: String, default: "" },
+    latest_agent_mode: { type: String, default: "" },
+    latest_agent_next_actions: { type: [String], default: [] },
   },
   { timestamps: true }
 );
