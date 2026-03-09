@@ -5,6 +5,10 @@ const SystemExecution = require("../../models/SystemExecution");
 const Task = require("../../models/Task");
 const StrategicMemory = require("../../models/StrategicMemory");
 const AgentLoopState = require("../../models/AgentLoopState");
+const KernelSnapshot = require("../../models/KernelSnapshot");
+const KernelCycle = require("../../models/KernelCycle");
+const ProtocolExecutionRecord = require("../../models/ProtocolExecutionRecord");
+const AlertRecord = require("../../models/AlertRecord");
 const mongoose = require("mongoose");
 
 const REQUIRED_ANALYSIS_KEYS = ["objectives", "constraints", "risks", "leverage", "next_actions"];
@@ -23,6 +27,9 @@ const autonomyState = {
   lastRunAt: null,
   activeAlerts: [],
 };
+
+const KERNEL_MODES = ["general", "strategic", "health", "build", "signal", "mentor", "recommend"];
+const KERNEL_NODES = ["sentinel", "mentor", "planner", "protocol", "recommend"];
 
 const LOOP_INTERVAL_MS = Number(process.env.AGENT_LOOP_INTERVAL_MS) > 0 ? Number(process.env.AGENT_LOOP_INTERVAL_MS) : 120000;
 const DEV_DEFAULT_ACTIVE =
@@ -507,65 +514,226 @@ const evaluateMonitorState = async () => {
   };
 };
 
-const runAgentLoopCycle = async () => {
-  const report = await evaluateMonitorState();
-  const [latestSignals, latestSystems, openTasks, activeAlerts, strategicMemory] = await Promise.all([
+const inferDominantMode = ({ latestSignals, openTasks, activeAlerts, recentCommands = [] }) => {
+  const recent = (recentCommands || []).map((item) => normalizeText(item));
+  if (recent.some((item) => /mentor|reflect|reframe/.test(item))) return "mentor";
+  if (activeAlerts.length >= 2) return "signal";
+  const stressValues = latestSignals.map((entry) => entry?.stress).filter((value) => typeof value === "number");
+  const avgStress = stressValues.length ? stressValues.reduce((sum, value) => sum + value, 0) / stressValues.length : 0;
+  if (avgStress >= 7) return "health";
+  if (openTasks.length >= 8) return "strategic";
+  if (recent.some((item) => /build|plan|architect/.test(item))) return "build";
+  if (recent.some((item) => /recommend/.test(item))) return "recommend";
+  return "general";
+};
+
+const chooseNodeFromMode = ({ dominantMode, shouldRunProtocol }) => {
+  if (shouldRunProtocol) return "protocol";
+  if (["health", "signal"].includes(dominantMode)) return "sentinel";
+  if (dominantMode === "mentor") return "mentor";
+  if (["strategic", "build"].includes(dominantMode)) return "planner";
+  return "recommend";
+};
+
+const runSelectedNode = async ({ node, dominantMode, context }) => {
+  const latestSignal = context.latestSignals[0];
+  if (node === "sentinel") {
+    return {
+      reasoningSummary: context.activeAlerts.length
+        ? `Sentinel review found ${context.activeAlerts.length} active alert(s) requiring stabilization.`
+        : "Sentinel review found stable conditions with no active alert pressure.",
+      nextActions: context.activeAlerts.length
+        ? ["Stabilize highest severity alert", "Recheck latest signal trend", "Reduce system load until trend stabilizes"]
+        : ["Continue baseline monitoring", "Log next signal checkpoint"],
+    };
+  }
+
+  if (node === "mentor") {
+    return {
+      reasoningSummary: "Mentor node selected to reinforce alignment, reflection, and focused execution.",
+      nextActions: ["Capture one reflection on current objective", "Choose one aligned action for the next block", "Record confidence signal after execution"],
+    };
+  }
+
+  if (node === "planner") {
+    return {
+      reasoningSummary: `Planner node selected to sequence ${context.openTasks.length} open task(s) with strategic priority.`,
+      nextActions: [
+        "Rank top 3 high-leverage tasks",
+        "Convert one strategic action into an execution task",
+        "Review unresolved risks before next cycle",
+      ],
+    };
+  }
+
+  if (node === "protocol") {
+    const protocolTarget = context.latestSystems.find((system) => system?.automationEnabled) || context.latestSystems[0];
+    return {
+      reasoningSummary: protocolTarget
+        ? `Protocol node selected to run ${protocolTarget.name}.`
+        : "Protocol node selected but no system was available for execution.",
+      nextActions: protocolTarget ? [`Run protocol: ${protocolTarget.name}`, "Store protocol result", "Re-evaluate task priority after protocol run"] : ["Register at least one system protocol"],
+      protocolToRun: protocolTarget?.name || null,
+    };
+  }
+
+  const stress = typeof latestSignal?.stress === "number" ? latestSignal.stress : "n/a";
+  return {
+    reasoningSummary: `Recommend node selected for ${dominantMode} mode. Latest stress=${stress}.`,
+    nextActions: ["Advance one actionable next step", "Keep alert and task pressure visible", "Save concise strategic memory"],
+  };
+};
+
+const runProtocolIfNeeded = async (protocolName) => {
+  if (!protocolName) return null;
+  try {
+    const system = await System.findOne({ name: { $regex: `^${escapeRegex(protocolName)}$`, $options: "i" } }).lean();
+    if (!system) {
+      return await ProtocolExecutionRecord.create({ protocol_name: protocolName, status: "failed", details: "System not found." });
+    }
+
+    const latestSignals = await SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean();
+    const executionPlan = buildExecutionPlan(system, latestSignals);
+    await SystemExecution.create({
+      systemId: system._id,
+      systemName: system.name,
+      readiness: executionPlan.risks.length ? "guarded" : "ready",
+      riskFlags: executionPlan.risks,
+      actions: executionPlan.next_actions,
+      signalSnapshot: latestSignals[0] || null,
+    });
+
+    return await ProtocolExecutionRecord.create({ protocol_name: system.name, status: "executed", details: executionPlan.next_actions.join(" | ") });
+  } catch (error) {
+    return await ProtocolExecutionRecord.create({ protocol_name: protocolName, status: "failed", details: String(error?.message || error) });
+  }
+};
+
+const runAutonomousReasoningKernel = async ({ trigger = "loop", text = "kernel evaluate", rawContext = {} } = {}) => {
+  const [latestSignals, latestSystems, openTasks, currentAlerts, strategicMemory, recentKernelCycles] = await Promise.all([
     SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
     System.find().sort({ updatedAt: -1 }).limit(10).lean(),
     Task.find({ status: "open" }).sort({ createdAt: -1 }).limit(50).lean(),
-    Promise.resolve((autonomyState.activeAlerts || []).slice(0, 25)),
+    AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(25).lean(),
     StrategicMemory.find().sort({ updatedAt: -1 }).limit(10).lean(),
+    KernelCycle.find({ error_summary: "" }).sort({ createdAt: -1 }).limit(1).lean(),
   ]);
 
-  const agentReport = await runAgentKernelEvaluation({
-    text: "Evaluate current operating state and recommend immediate next actions.",
-    rawContext: {
-      source: "agent-loop",
-      monitorState: report,
-      activeAlerts,
-      openTasks,
-      latestSignals,
-      latestSystems,
-      strategicMemory,
+  const recentCommands = normalizeRecentCommands(rawContext);
+  const lastOverlayResult = rawContext?.lastOverlayResult || null;
+  const operatorContext = {
+    latestSignals,
+    latestSystems,
+    openTasks,
+    currentAlerts,
+    strategicMemory,
+    recentCommands,
+    lastOverlayResult,
+    priorKernel: recentKernelCycles[0]?.output || null,
+  };
+
+  const urgency_score = Math.min(10, Math.max(0, currentAlerts.length * 2 + Math.min(openTasks.length, 6) + (latestSignals[0]?.stress || 0) / 2));
+  const dominant_mode = inferDominantMode({ latestSignals, openTasks, activeAlerts: currentAlerts, recentCommands });
+  const should_run_protocol = latestSystems.some((system) => system?.automationEnabled && (currentAlerts.length > 0 || dominant_mode === "build"));
+  const selected_node = chooseNodeFromMode({ dominantMode: dominant_mode, shouldRunProtocol: should_run_protocol });
+  const nodeResult = await runSelectedNode({ node: selected_node, dominantMode: dominant_mode, context: { ...operatorContext, activeAlerts: currentAlerts } });
+  const next_actions = (nodeResult.nextActions || []).slice(0, 5);
+  const should_create_task = next_actions.length > 0 && openTasks.length < 20;
+  const should_create_alert = currentAlerts.length === 0 && urgency_score >= 7;
+  const protocol_to_run = should_run_protocol ? nodeResult.protocolToRun || latestSystems.find((system) => system?.automationEnabled)?.name || null : null;
+
+  const result = {
+    operator_state_summary: `signals=${latestSignals.length}, open_tasks=${openTasks.length}, active_alerts=${currentAlerts.length}, memory_entries=${strategicMemory.length}`,
+    urgency_score,
+    dominant_mode: KERNEL_MODES.includes(dominant_mode) ? dominant_mode : "general",
+    selected_node: KERNEL_NODES.includes(selected_node) ? selected_node : "recommend",
+    reasoning_summary: nodeResult.reasoningSummary || "Kernel completed cycle without additional reasoning detail.",
+    next_actions,
+    should_create_task,
+    should_create_alert,
+    should_run_protocol,
+    protocol_to_run,
+    tasks_created: [],
+    alerts_created: [],
+    protocol_run: null,
+    memory_saved: false,
+    timestamp: new Date().toISOString(),
+    operator_context: {
+      command_history_count: recentCommands.length,
+      has_last_overlay: Boolean(lastOverlayResult),
+      trigger,
+      command_text: text,
     },
-    allowTaskExecution: false,
+  };
+
+  const openTaskNormalized = new Set(openTasks.map((task) => normalizeText(task.description)));
+  if (result.should_create_task) {
+    const taskDescriptions = next_actions.filter((action) => action && !openTaskNormalized.has(normalizeText(action))).slice(0, 2);
+    if (taskDescriptions.length) {
+      const created = await Promise.all(taskDescriptions.map((description) => Task.create({ description, source: "kernel" })));
+      result.tasks_created = created.map((task) => ({ id: task._id, description: task.description }));
+    }
+  }
+
+  if (result.should_create_alert) {
+    const alertMessage = `Kernel urgency ${urgency_score}: prioritize immediate stabilization.`;
+    const fingerprint = normalizeText(alertMessage);
+    const existing = await AlertRecord.findOne({ fingerprint });
+    if (existing) {
+      existing.count += 1;
+      existing.last_seen_at = new Date();
+      await existing.save();
+      result.alerts_created = [{ id: existing._id, message: existing.message, status: "updated" }];
+    } else {
+      const createdAlert = await AlertRecord.create({ fingerprint, message: alertMessage, severity: urgency_score >= 8 ? "high" : "medium", source: "kernel" });
+      result.alerts_created = [{ id: createdAlert._id, message: createdAlert.message, status: "created" }];
+    }
+  }
+
+  if (result.should_run_protocol && protocol_to_run) {
+    const protocolExecution = await runProtocolIfNeeded(protocol_to_run);
+    result.protocol_run = protocolExecution
+      ? { id: protocolExecution._id, protocol_name: protocolExecution.protocol_name, status: protocolExecution.status }
+      : null;
+  }
+
+  const memory = await StrategicMemory.create({
+    title: `Kernel ${result.dominant_mode} ${new Date().toISOString().slice(0, 19)}`,
+    category: "kernel",
+    content: `${result.reasoning_summary} | next_actions=${result.next_actions.join("; ")}`,
+    sourceCommand: text,
+    tags: ["kernel", result.selected_node, result.dominant_mode],
   });
+  result.memory_saved = Boolean(memory?._id);
 
-  const nextActions = Array.isArray(agentReport.next_actions) ? agentReport.next_actions.slice(0, 5) : [];
-  const normalizedAlerts = Array.isArray(report.alerts) ? report.alerts : [];
-  const existingTaskDescriptions = new Set(openTasks.map((task) => normalizeText(task?.description)));
-  const existingAlertMessages = new Set(normalizedAlerts.map((alert) => normalizeText(alert)));
+  const cycleRecord = await KernelCycle.create({ trigger, output: result, error_summary: "" });
+  await KernelSnapshot.findOneAndUpdate(
+    { singletonKey: "primary" },
+    { $set: { latest_output: result }, $setOnInsert: { singletonKey: "primary" } },
+    { upsert: true, new: true }
+  );
 
-  const taskCandidates = nextActions
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter((item) => item && !existingTaskDescriptions.has(normalizeText(item)));
-  const alertCandidates = (agentReport.risks || [])
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter((item) => item && !existingAlertMessages.has(normalizeText(item)));
+  return { result, cycleRecord };
+};
 
-  const createdTasks = await Promise.all(taskCandidates.slice(0, 2).map((description) => Task.create({ description, source: "agent-loop" })));
-  const createdAlerts = alertCandidates.slice(0, 2);
-  if (createdAlerts.length) autonomyState.activeAlerts = [...createdAlerts, ...autonomyState.activeAlerts].slice(0, 50);
+const runAgentLoopCycle = async () => {
+  const { result } = await runAutonomousReasoningKernel({ trigger: "loop", text: "loop autonomous cycle", rawContext: { source: "agent-loop" } });
 
   const event = {
     type: "loop-cycle",
-    monitor_state: report.state_summary,
-    state_summary: report.state_summary,
-    agent_summary: agentReport.summary,
-    agent_mode: agentReport.mode_selected,
-    agent_next_actions: nextActions,
-    tasks_created: createdTasks.length,
-    alerts_created: createdAlerts.length,
-    open_tasks: openTasks.length,
-    active_alerts: activeAlerts.length,
-    signals_loaded: latestSignals.length,
-    systems_loaded: latestSystems.length,
-    memory_loaded: strategicMemory.length,
+    state_summary: result.operator_state_summary,
+    agent_summary: result.reasoning_summary,
+    agent_mode: result.dominant_mode,
+    agent_next_actions: result.next_actions,
+    tasks_created: result.tasks_created.length,
+    alerts_created: result.alerts_created.length,
+    urgency_score: result.urgency_score,
+    selected_node: result.selected_node,
   };
 
   loopState.lastRunAt = new Date();
   loopState.runCount += 1;
-  loopState.lastError = null;
+  loopState.lastError = "";
   loopState.lastReport = event;
   loopState.latestAgentSummary = event.agent_summary || "";
   loopState.latestAgentMode = event.agent_mode || "";
@@ -579,7 +747,7 @@ const runAgentLoopCycle = async () => {
     latest_agent_mode: loopState.latestAgentMode,
     latest_agent_next_actions: loopState.latestAgentNextActions,
   });
-  console.log("Agent loop cycle completed");
+  console.log(`Agent loop cycle completed | mode=${event.agent_mode} node=${event.selected_node} urgency=${event.urgency_score}`);
 
   return event;
 };
@@ -689,6 +857,7 @@ const startAgentLoop = async ({ intervalMs } = {}) => {
     await runAgentLoopCycle();
   } catch (error) {
     loopState.lastError = String(error?.message || error);
+    await KernelCycle.create({ trigger: "loop", output: null, error_summary: loopState.lastError });
     appendLoopEvent({ type: "loop-cycle-error", error: loopState.lastError });
     await persistLoopState({ last_error: loopState.lastError });
   }
@@ -698,6 +867,7 @@ const startAgentLoop = async ({ intervalMs } = {}) => {
       await runAgentLoopCycle();
     } catch (error) {
       loopState.lastError = String(error?.message || error);
+      await KernelCycle.create({ trigger: "loop", output: null, error_summary: loopState.lastError });
       appendLoopEvent({ type: "loop-cycle-error", error: loopState.lastError });
       await persistLoopState({ last_error: loopState.lastError });
     }
@@ -904,6 +1074,24 @@ router.post("/agent", async (req, res) => {
   return res.json(result);
 });
 
+router.post("/agent/evaluate", async (req, res) => {
+  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "agent evaluate";
+  const rawContext = req.body?.context || {};
+  const { result } = await runAutonomousReasoningKernel({ trigger: "manual", text, rawContext });
+  return res.json(result);
+});
+
+router.get("/kernel/status", async (_req, res) => {
+  const snapshot = await KernelSnapshot.findOne({ singletonKey: "primary" }).lean();
+  return res.json({ latest: snapshot?.latest_output || null, loop: loopStatusPayload() });
+});
+
+router.get("/kernel/inspect", async (_req, res) => {
+  const cycles = await KernelCycle.find().sort({ createdAt: -1 }).limit(20).lean();
+  const protocols = await ProtocolExecutionRecord.find().sort({ createdAt: -1 }).limit(20).lean();
+  return res.json({ cycles, protocols });
+});
+
 /* SYSTEM BUILDER */
 router.post("/systems", async (req, res) => {
   const system = await System.create(req.body);
@@ -1091,15 +1279,23 @@ router.post("/monitor/run", async (_req, res) => {
 });
 
 router.get("/alerts", async (_req, res) => {
+  const alerts = await AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(50).lean();
+  if (alerts.length) return res.json({ alerts });
   if (!autonomyState.lastRunAt) await evaluateMonitorState();
-  return res.json({ alerts: autonomyState.activeAlerts });
+  return res.json({ alerts: autonomyState.activeAlerts.length ? autonomyState.activeAlerts : [] });
 });
 
 router.get("/autonomy/status", async (_req, res) => {
+  const [alertCount, latestKernel] = await Promise.all([
+    AlertRecord.countDocuments({ status: "open" }),
+    KernelSnapshot.findOne({ singletonKey: "primary" }).lean(),
+  ]);
   return res.json({
     monitoring_enabled: autonomyState.monitoringEnabled,
     last_monitor_run: autonomyState.lastRunAt,
-    active_alerts_count: autonomyState.activeAlerts.length,
+    active_alerts_count: alertCount,
+    latest_kernel_mode: latestKernel?.latest_output?.dominant_mode || "",
+    latest_kernel_node: latestKernel?.latest_output?.selected_node || "",
   });
 });
 
@@ -1227,26 +1423,38 @@ router.get("/memory/search", async (req, res) => {
 
 router.get("/summary", async (_req, res) => {
   const [latestSignal] = await SignalEntry.find().sort({ createdAt: -1 }).limit(1).lean();
-  const [openTasks, memoryCount] = await Promise.all([
+  const [openTasks, memoryCount, openAlerts, snapshot] = await Promise.all([
     Task.countDocuments({ status: "open" }),
     StrategicMemory.countDocuments(),
+    AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(20).lean(),
+    KernelSnapshot.findOne({ singletonKey: "primary" }).lean(),
   ]);
   if (!autonomyState.lastRunAt) await evaluateMonitorState();
   const loopRecord = await getLoopStateRecord();
   syncLoopStateFromRecord(loopRecord);
 
+  const kernel = snapshot?.latest_output || null;
+
   return res.json({
     state_summary: latestSignal
       ? `Sleep ${latestSignal.sleep ?? "n/a"}, Stress ${latestSignal.stress ?? "n/a"}, Symptoms ${latestSignal.symptoms || "n/a"}.`
       : "No recent signal state available.",
-    high_priority_focus: autonomyState.activeAlerts.length ? "Address active alerts and stabilize signals." : "Continue strategic build execution.",
-    active_alerts: autonomyState.activeAlerts,
-    active_alerts_count: autonomyState.activeAlerts.length,
+    high_priority_focus: openAlerts.length ? "Address active alerts and stabilize signals." : "Continue strategic build execution.",
+    active_alerts: openAlerts,
+    active_alerts_count: openAlerts.length,
     open_task_count: openTasks,
     memory_status: memoryCount > 0 ? `ACTIVE (${memoryCount} entries)` : "EMPTY",
-    recommended_next_move: autonomyState.activeAlerts.length
+    recommended_next_move: openAlerts.length
       ? "Run monitor run, then prioritize highest-severity alert."
-      : "Run agent with current objective to generate next actions.",
+      : "Run agent evaluate to refresh autonomous reasoning.",
+    latest_kernel_summary: kernel?.reasoning_summary || "No kernel cycle recorded yet.",
+    latest_kernel_mode: kernel?.dominant_mode || "general",
+    latest_kernel_node: kernel?.selected_node || "recommend",
+    latest_kernel_urgency: kernel?.urgency_score ?? 0,
+    latest_kernel_next_actions: Array.isArray(kernel?.next_actions) ? kernel.next_actions.slice(0, 3) : [],
+    latest_kernel_task_outcomes: Array.isArray(kernel?.tasks_created) ? kernel.tasks_created : [],
+    latest_kernel_alert_outcomes: Array.isArray(kernel?.alerts_created) ? kernel.alerts_created : [],
+    latest_kernel_timestamp: kernel?.timestamp || null,
     autonomy_status: {
       monitoring_enabled: autonomyState.monitoringEnabled,
       last_monitor_run: autonomyState.lastRunAt,
