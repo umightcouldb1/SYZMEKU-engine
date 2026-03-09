@@ -19,7 +19,9 @@ const HELP_LINES = [
   'agent <goal> | execute <goal> | orchestrate <goal> | plan <goal> | build <goal>',
   'mentor <text> | reflect <text> | reframe <text>',
   'monitor run | alerts | autonomy status',
-  'loop status | loop start | loop stop',
+  'loop start',
+  'loop stop',
+  'loop status',
   'analyze file | analyze image | voice on | voice off | clear | help',
 ];
 
@@ -398,10 +400,11 @@ const Dashboard = ({ user }) => {
       await fetchSummary();
     } catch (err) {
       const message = err?.response?.data?.message || err.message || 'Command execution failed.';
+      const details = err?.response?.data?.details || '';
       setOutputMode('error');
       setOutputTitle('COMMAND ERROR');
       setRouteLabel('error');
-      setResult({ message });
+      setResult({ message, details });
       setShowOverlay(true);
     } finally {
       setLoading(false);
@@ -517,7 +520,7 @@ const Dashboard = ({ user }) => {
             {outputMode === 'help' && (result?.lines || []).map((line) => <p key={line}>{line}</p>)}
             {outputMode === 'history' && (result?.commands || []).map((line, i) => <p key={`${line}-${i}`}>{i + 1}. {line}</p>)}
             {outputMode === 'context' && <p>{result?.message || `active=${result?.activeRoute}`}</p>}
-            {outputMode === 'error' && <p>&gt; {result?.message}</p>}
+            {outputMode === 'error' && <div><p>&gt; {result?.message}</p>{result?.details ? <p>&gt; {result.details}</p> : null}</div>}
           </div>
         )}
 

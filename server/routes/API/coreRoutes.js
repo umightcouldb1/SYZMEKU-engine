@@ -88,16 +88,41 @@ const persistLoopState = async (patch = {}) => {
       $set: payload,
       $setOnInsert: {
         singletonKey: "primary",
-        active: DEV_DEFAULT_ACTIVE,
-        interval_ms: LOOP_INTERVAL_MS,
-        run_count: 0,
-        last_error: "",
       },
     },
     { new: true, upsert: true }
   );
   if (record) syncLoopStateFromRecord(record);
   return record;
+};
+
+const buildLoopStartErrorDetails = (error) => {
+  if (!error) return "Unknown loop start error.";
+
+  if (error?.name === "ValidationError" && error?.errors && typeof error.errors === "object") {
+    const validationMessages = Object.entries(error.errors)
+      .map(([field, detail]) => {
+        const detailMessage = detail?.message || detail?.reason?.message || detail?.properties?.message;
+        return detailMessage ? `${field}: ${detailMessage}` : "";
+      })
+      .filter(Boolean);
+    if (validationMessages.length) return `Validation failed: ${validationMessages.join("; ")}`;
+  }
+
+  if (Array.isArray(error?.writeErrors) && error.writeErrors.length) {
+    const mongoWriteMessage = error.writeErrors
+      .map((item) => item?.errmsg || item?.message || item?.err?.message)
+      .filter(Boolean)
+      .join("; ");
+    if (mongoWriteMessage) return mongoWriteMessage;
+  }
+
+  if (typeof error?.errmsg === "string" && error.errmsg.trim()) return error.errmsg;
+  if (typeof error?.reason?.message === "string" && error.reason.message.trim()) return error.reason.message;
+  if (typeof error?.cause?.message === "string" && error.cause.message.trim()) return error.cause.message;
+  if (typeof error?.message === "string" && error.message.trim()) return error.message;
+
+  return String(error);
 };
 
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
@@ -1041,6 +1066,7 @@ router.post("/loop/start", async (req, res) => {
     await startAgentLoop({ intervalMs: requestedInterval });
     return res.json({ message: "Agent loop started.", ...loopStatusPayload() });
   } catch (error) {
+    const details = buildLoopStartErrorDetails(error);
     console.error("Loop start failed:", error?.message || error);
     console.error(error?.stack || "No stack trace available.");
 
@@ -1066,7 +1092,7 @@ router.post("/loop/start", async (req, res) => {
 
     return res.status(502).json({
       message: "Loop start failed",
-      details: String(error?.message || error),
+      details,
     });
   }
 });
