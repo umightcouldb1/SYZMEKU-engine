@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
   const persistUser = (payload) => {
     const normalizedUser = {
       username: payload.username || payload.email?.split('@')[0] || 'OPERATOR',
-      token: payload.token || 'local-dev-token',
+      token: payload.token || '',
       role: payload.role || 'user',
       mirrorMode: payload.mirrorMode || { origin: 'user' },
     };
@@ -29,9 +29,8 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password) => {
-    // If no API URL is configured, operate in a local-only dev mode.
     if (!baseUrl) {
-      return persistUser({ email });
+      throw new Error('API URL is not configured.');
     }
 
     try {
@@ -49,18 +48,13 @@ export const AuthProvider = ({ children }) => {
 
       return persistUser(data);
     } catch (error) {
-      if (error.name === 'TypeError' || error.message?.toLowerCase().includes('failed to fetch')) {
-        console.warn('Login API unreachable, falling back to local session:', error);
-        return persistUser({ email });
-      }
-
       throw error;
     }
   };
 
   const signup = async (username, email, password) => {
     if (!baseUrl) {
-      return persistUser({ username, email });
+      throw new Error('API URL is not configured.');
     }
 
     try {
@@ -78,11 +72,6 @@ export const AuthProvider = ({ children }) => {
 
       return persistUser(data);
     } catch (error) {
-      if (error.name === 'TypeError' || error.message?.toLowerCase().includes('failed to fetch')) {
-        console.warn('Signup API unreachable, falling back to local session:', error);
-        return persistUser({ username, email });
-      }
-
       throw error;
     }
   };

@@ -176,3 +176,29 @@ Additional testability blocker: no test suite (no Jest/Vitest/Cypress/Playwright
 4. Implement auth/security audit events (login success/failure, logout, privileged actions).
 5. Add deterministic safety escalation path for high-risk distress signals (beyond prompt text).
 6. Add minimum integration tests for auth, role gating, kernel loop lifecycle, and action kernel outputs.
+
+---
+
+## 8) POST-FIX STATUS (2026-03-10)
+
+### FIXED
+- Auth route mismatch resolved: backend now supports both `/api/auth/signup` and compatibility alias `/api/auth/register`, and frontend registration now targets `/api/auth/signup`.
+- Signal payload mismatch resolved: `GET /api/core/signals` now returns `{ entries: [...] }` to match dashboard/operator consumers.
+- Core auth enforcement added: `/api/core/*` now requires authenticated sessions via `protect` middleware.
+- Server-side operator RBAC enforced for privileged controls (`systems`, `protocol status`, `sentinel`, `monitor`, `loop`, `actions`, `autonomy`) with `founder/admin` role checks.
+- Auth hardening baseline added: persistent server-side session store (`AuthSession`) with token `sid` claim verification, session revocation on logout, secure cookie usage, and session expiry enforcement.
+- Auth audit logging added for register success, login success/failure, logout, and role access denials.
+- Core action audit logging added for signal logging, loop start/stop, sentinel status/scan/report, task create/complete, memory save, and manual action-kernel execution.
+- Data subject request scaffolding added: export/delete request endpoints with persistence (`DataRequest`).
+- Distress escalation scaffold added in sentinel status/scan payloads (`distress_escalation` object, non-diagnostic language).
+
+### STILL PARTIAL
+- Tenant scoping remains partial: most core entities still query globally rather than by user ownership.
+- MFA is scaffold-level only (`mfa` user state + status endpoint) and does not include challenge/verification flows.
+- Protocol execution audit coverage is partial for automated/kernel-triggered protocol actions outside request-scoped endpoints.
+- End-to-end runtime verification remains environment-dependent (DB/API keys required for full live validation).
+
+### STILL MISSING
+- Automated integration/e2e test suite for auth/RBAC/core loop lifecycles.
+- Field-level encryption at rest for sensitive health/context payload fields.
+- Full production-grade MFA enrollment/challenge/recovery implementation.
