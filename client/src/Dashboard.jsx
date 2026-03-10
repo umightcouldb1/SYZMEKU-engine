@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import OperatorConsole from './OperatorConsole';
+import OnboardingFlow from './OnboardingFlow';
 import './dashboard.css';
 
 const DAILY_GREETING = () => {
@@ -46,19 +47,26 @@ const Dashboard = ({ user }) => {
   const [latestInsight, setLatestInsight] = useState(null);
   const [showReasoning, setShowReasoning] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [onboardingStatus, setOnboardingStatus] = useState({ completed: false });
+  const [operatorVisibility, setOperatorVisibility] = useState(null);
 
   const refreshMentorData = async () => {
-    const [summaryRes, tasksRes, alertsRes, signalsRes] = await Promise.all([
+    const [summaryRes, tasksRes, alertsRes, signalsRes, onboardingRes, operatorRes] = await Promise.all([
       axios.get('/api/core/summary').catch(() => ({ data: null })),
       axios.get('/api/core/tasks').catch(() => ({ data: { tasks: [] } })),
       axios.get('/api/core/alerts').catch(() => ({ data: { alerts: [] } })),
       axios.get('/api/core/signals').catch(() => ({ data: { entries: [] } })),
+      axios.get('/api/core/onboarding/status').catch(() => ({ data: { completed: false } })),
+      axios.get('/api/core/operator/visibility').catch(() => ({ data: null })),
     ]);
 
     setSummary(summaryRes.data || null);
     const nextTasks = tasksRes.data?.tasks || [];
     setTasks(nextTasks);
     setAlerts(alertsRes.data?.alerts || []);
+
+    setOnboardingStatus(onboardingRes.data || { completed: false });
+    setOperatorVisibility(operatorRes.data || null);
 
     const latestSignal = signalsRes.data?.entries?.[0];
     if (latestSignal) {
@@ -116,12 +124,21 @@ const Dashboard = ({ user }) => {
 
   if (!user) return <div className="portal-text">CALIBRATING DASHBOARD...</div>;
 
+
+  if (!onboardingStatus?.completed) {
+    return (
+      <div className="mentor-shell">
+        <OnboardingFlow user={user} onComplete={refreshMentorData} />
+      </div>
+    );
+  }
+
   if (advancedMode && canAccessOperatorMode) {
     return (
       <div>
         <div className="mentor-top-toggle">
           <button type="button" className="mentor-button secondary" onClick={() => setAdvancedMode(false)}>
-            Back to Mentor Mode
+            Back to Big SYZ
           </button>
         </div>
         <OperatorConsole user={user} />
@@ -135,6 +152,7 @@ const Dashboard = ({ user }) => {
         <div>
           <h1>Big SYZ</h1>
           <p className="mentor-subtitle">Emotionally intelligent mentor platform.</p>
+          <p className="mentor-warmth">Tell Big SYZ what’s going on. You’re not doing this alone.</p>
           <p className="mentor-muted">Powered by the SYZMEKU Engine.</p>
           <p>{DAILY_GREETING()}, {user.username}.</p>
         </div>
@@ -143,7 +161,12 @@ const Dashboard = ({ user }) => {
             Operator Mode
           </button>
         )}
+        {!canAccessOperatorMode && operatorVisibility && (
+          <p className="mentor-warning-inline">Operator Mode hidden for role: {operatorVisibility.role}. Founder/admin required.</p>
+        )}
       </header>
+
+      <section className="mentor-cta"><button type="button" className="mentor-button" onClick={() => setActiveScreen('ask')}>Talk to Big SYZ</button></section>
 
       <nav className="mentor-nav">
         {[
@@ -177,6 +200,7 @@ const Dashboard = ({ user }) => {
             <label>Any symptoms?</label>
             <input type="text" value={signals.symptoms} onChange={(event) => setSignals((prev) => ({ ...prev, symptoms: event.target.value }))} />
             <button type="button" className="mentor-button" onClick={submitCheckIn} disabled={loading}>Analyze my state</button>
+            <button type="button" className="mentor-button secondary" onClick={() => axios.post('/api/core/health-sync/connect')}>Connect health data</button>
           </section>
 
           <section className="mentor-card">

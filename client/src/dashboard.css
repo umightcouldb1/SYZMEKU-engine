@@ -532,3 +532,34 @@
   background: #f5f8ff;
   padding: 0.75rem 1.5rem 0;
 }
+
+.mentor-cta {
+  margin-bottom: 0.8rem;
+}
+
+.mentor-warmth {
+  color: #3b5d91;
+  font-weight: 500;
+}
+
+.mentor-warning-inline {
+  color: #8a5d00;
+  background: #fff4dc;
+  border: 1px solid #ffd38a;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  margin: 0;
+}
+
+.mentor-onboarding {
+  max-width: 740px;
+  margin: 2rem auto;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.mentor-onboarding select {
+  border: 1px solid #ccd8f2;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+}
