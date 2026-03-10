@@ -18,7 +18,31 @@ const userSchema = mongoose.Schema(
         },
         role: {
             type: String,
+            enum: ['founder', 'admin', 'user', 'clinician', 'support'],
             default: 'user',
+        },
+        mfa: {
+            enabled: {
+                type: Boolean,
+                default: false,
+            },
+            method: {
+                type: String,
+                enum: ['totp', 'sms', 'email', 'none'],
+                default: 'none',
+            },
+            secretRef: {
+                type: String,
+                default: '',
+            },
+            recoveryCodes: {
+                type: [String],
+                default: [],
+            },
+            enrolledAt: {
+                type: Date,
+                default: null,
+            },
         },
         flameSignature: {
             type: String,

@@ -12,6 +12,74 @@ const AlertRecord = require("../../models/AlertRecord");
 const ActionExecution = require("../../models/ActionExecution");
 const { buildActionPolicy, createToolRegistry, executeActionPlan } = require("../../logic/actionKernel");
 const mongoose = require("mongoose");
+const { protect, authorizeRoles } = require("../../middleware/authMiddleware");
+const DataRequest = require("../../models/DataRequest");
+const { logAuditEvent } = require("../../utils/audit");
+
+
+
+router.use(protect);
+
+const OPERATOR_ROLES = ["founder", "admin"];
+const requireOperatorRole = authorizeRoles(...OPERATOR_ROLES);
+
+const auditCoreAction = async (req, event, details = {}) => {
+  await logAuditEvent({
+    category: "core-action",
+    event,
+    req,
+    userId: req.user?._id || null,
+    role: req.user?.role || "",
+    success: true,
+    details,
+  });
+};
+
+const buildDistressEscalation = (latestSignals = [], anomalies = []) => {
+  const latest = latestSignals[0] || {};
+  const stress = Number(latest?.stress || 0);
+  const lowSleep = Number(latest?.sleep || 0) <= 3;
+  const riskDetected = anomalies.length > 0 || stress >= 9 || lowSleep;
+  if (!riskDetected) {
+    return {
+      escalated: false,
+      level: "none",
+      reason: "No high-risk distress pattern detected.",
+      guidance: [],
+      disclaimer: "Non-diagnostic support signal only.",
+    };
+  }
+
+  return {
+    escalated: true,
+    level: stress >= 9 ? "high" : "moderate",
+    reason: anomalies[0] || "Concerning stress/sleep pattern detected.",
+    guidance: [
+      "Pause high-risk tasks and shift to immediate stabilization steps.",
+      "Contact a trusted human support person now.",
+      "If you may be in immediate danger, call local emergency services now.",
+    ],
+    disclaimer: "This is not a diagnosis or treatment plan.",
+  };
+};
+
+router.use([
+  "/systems",
+  "/systems/map",
+  "/systems/run",
+  "/systems/automate",
+  "/systems/disable",
+  "/protocol/status",
+  "/sentinel/status",
+  "/sentinel/scan",
+  "/sentinel/report",
+  "/loop/status",
+  "/loop/start",
+  "/loop/stop",
+  "/actions",
+  "/monitor/run",
+  "/autonomy/status",
+], requireOperatorRole);
 
 const REQUIRED_ANALYSIS_KEYS = ["objectives", "constraints", "risks", "leverage", "next_actions"];
 const LINKABLE_SIGNAL_KEYS = ["sleep", "stress", "symptoms", "notes"];
@@ -1253,8 +1321,9 @@ router.post("/systems/disable", async (req, res) => {
   return res.json({ message: `Automation disabled for ${system.name}.`, system: mapSystemRecord(system) });
 });
 
-router.get("/protocol/status", async (_req, res) => {
+router.get("/protocol/status", async (req, res) => {
   const systems = await System.find().sort({ name: 1 }).lean();
+  await auditCoreAction(req, "protocol_status_viewed", { protocolCount: systems.length });
   return res.json({
     protocols: systems.map((system) => ({
       system_name: system.name,
@@ -1268,12 +1337,13 @@ router.get("/protocol/status", async (_req, res) => {
 /* SIGNAL LOG */
 router.post("/signals", async (req, res) => {
   const entry = await SignalEntry.create(req.body);
+  await auditCoreAction(req, "signal_logged", { signalId: entry._id });
   res.json(entry);
 });
 
 router.get("/signals", async (req, res) => {
   const signals = await SignalEntry.find().sort({ createdAt: -1 });
-  res.json(signals);
+  res.json({ entries: signals });
 });
 
 router.get("/signals/trends", async (req, res) => {
@@ -1307,7 +1377,7 @@ router.get("/signals/report", async (req, res) => {
   });
 });
 
-router.get("/sentinel/status", async (_req, res) => {
+router.get("/sentinel/status", async (req, res) => {
   const [latestSignals, openAlerts, latestKernel] = await Promise.all([
     SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
     AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(50).lean(),
@@ -1316,6 +1386,8 @@ router.get("/sentinel/status", async (_req, res) => {
 
   const trends = computeSignalTrendBundle(latestSignals);
   const anomalies = detectSignalAnomalies(latestSignals);
+  const escalation = buildDistressEscalation(latestSignals, anomalies);
+  await auditCoreAction(req, "sentinel_status_viewed", { anomalyCount: anomalies.length, escalated: escalation.escalated });
 
   return res.json({
     node: "Axiom Sentinel",
@@ -1330,10 +1402,11 @@ router.get("/sentinel/status", async (_req, res) => {
       symptoms: trends.symptoms?.state || "insufficient-data",
     },
     last_monitor_run: autonomyState.lastRunAt,
+    distress_escalation: escalation,
   });
 });
 
-router.get("/sentinel/scan", async (_req, res) => {
+router.get("/sentinel/scan", async (req, res) => {
   const [monitorReport, anomaliesPayload, signalReport] = await Promise.all([
     evaluateMonitorState(),
     (async () => {
@@ -1350,21 +1423,27 @@ router.get("/sentinel/scan", async (_req, res) => {
     })(),
   ]);
 
+  const escalation = buildDistressEscalation([], anomaliesPayload.anomalies || []);
+  await auditCoreAction(req, "sentinel_scan", { anomalyCount: anomaliesPayload.anomalies?.length || 0, escalated: escalation.escalated });
+
   return res.json({
     node: "Axiom Sentinel",
     scan_completed_at: new Date().toISOString(),
     monitor: monitorReport,
     anomalies: anomaliesPayload,
     signals: signalReport,
+    distress_escalation: escalation,
   });
 });
 
-router.get("/sentinel/report", async (_req, res) => {
+router.get("/sentinel/report", async (req, res) => {
   const [monitorReport, alerts, latestActions] = await Promise.all([
     evaluateMonitorState(),
     AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(10).lean(),
     ActionExecution.find().sort({ timestamp: -1 }).limit(10).lean(),
   ]);
+
+  await auditCoreAction(req, "sentinel_report", { openAlertCount: alerts.length });
 
   return res.json({
     sentinel: "Axiom Sentinel",
@@ -1377,8 +1456,9 @@ router.get("/sentinel/report", async (_req, res) => {
   });
 });
 
-router.post("/monitor/run", async (_req, res) => {
+router.post("/monitor/run", async (req, res) => {
   const report = await evaluateMonitorState();
+  await auditCoreAction(req, "sentinel_monitor_run", { alertCount: report.alerts?.length || 0 });
   return res.json({
     alerts: report.alerts,
     risks: report.risks,
@@ -1387,7 +1467,7 @@ router.post("/monitor/run", async (_req, res) => {
   });
 });
 
-router.get("/alerts", async (_req, res) => {
+router.get("/alerts", async (req, res) => {
   const alerts = await AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(50).lean();
   if (alerts.length) return res.json({ alerts });
   if (!autonomyState.lastRunAt) await evaluateMonitorState();
@@ -1418,6 +1498,7 @@ router.post("/loop/start", async (req, res) => {
   try {
     const requestedInterval = Number(req.body?.interval_ms);
     await startAgentLoop({ intervalMs: requestedInterval });
+    await auditCoreAction(req, "loop_started", { intervalMs: loopState.intervalMs });
     return res.json({ message: "Agent loop started.", ...loopStatusPayload() });
   } catch (error) {
     const details = buildLoopStartErrorDetails(error);
@@ -1451,8 +1532,9 @@ router.post("/loop/start", async (req, res) => {
   }
 });
 
-router.post("/loop/stop", async (_req, res) => {
+router.post("/loop/stop", async (req, res) => {
   await stopAgentLoop();
+  await auditCoreAction(req, "loop_stopped", {});
   return res.json({ message: "Agent loop stopped.", ...loopStatusPayload() });
 });
 
@@ -1463,6 +1545,7 @@ router.post("/tasks", async (req, res) => {
   if (!description) return res.status(400).json({ message: "Task description is required." });
 
   const task = await Task.create({ description, source });
+  await auditCoreAction(req, "task_created", { taskId: task._id, source: task.source });
   return res.json(task);
 });
 
@@ -1478,6 +1561,7 @@ router.post("/tasks/:id/complete", async (req, res) => {
   task.status = "done";
   task.completedAt = new Date();
   await task.save();
+  await auditCoreAction(req, "task_completed", { taskId: task._id });
   return res.json(task);
 });
 
@@ -1507,10 +1591,11 @@ router.post("/memory/save", async (req, res) => {
     tags: Array.isArray(req.body?.tags) ? req.body.tags.filter(Boolean) : [],
   });
 
+  await auditCoreAction(req, "memory_saved", { memoryId: memory._id, category: memory.category });
   return res.json(memory);
 });
 
-router.get("/memory", async (_req, res) => {
+router.get("/memory", async (req, res) => {
   const entries = await StrategicMemory.find().sort({ updatedAt: -1 }).limit(50).lean();
   return res.json({ entries });
 });
@@ -1528,6 +1613,23 @@ router.get("/memory/search", async (req, res) => {
     .lean();
 
   return res.json({ query, entries });
+});
+
+router.post("/data/export-request", async (req, res) => {
+  const request = await DataRequest.create({ userId: req.user._id, requestType: "export", notes: String(req.body?.notes || "") });
+  await auditCoreAction(req, "data_export_requested", { requestId: request._id });
+  return res.status(201).json({ request });
+});
+
+router.post("/data/delete-request", async (req, res) => {
+  const request = await DataRequest.create({ userId: req.user._id, requestType: "delete", notes: String(req.body?.notes || "") });
+  await auditCoreAction(req, "data_delete_requested", { requestId: request._id });
+  return res.status(201).json({ request });
+});
+
+router.get("/data/requests", async (req, res) => {
+  const requests = await DataRequest.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean();
+  return res.json({ requests });
 });
 
 router.get("/summary", async (_req, res) => {

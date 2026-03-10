@@ -1,25 +1,55 @@
-// File: server/controllers/auth controller.js
+const { randomUUID } = require('crypto');
 const User = require('../models/User');
+const AuthSession = require('../models/AuthSession');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { logAuditEvent } = require('../utils/audit');
 
-const buildTokenPayload = (user) => ({
+const SESSION_TTL_DAYS = 30;
+const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
+
+const buildTokenPayload = (user, sessionId) => ({
     id: user._id,
+    sid: sessionId,
     role: user.role || 'user',
     mirrorMode: user.mirrorMode,
 });
 
-const createAuthToken = (user) =>
-    jwt.sign(buildTokenPayload(user), process.env.JWT_SECRET, { expiresIn: '30d' });
+const createAuthToken = (user, sessionId) =>
+    jwt.sign(buildTokenPayload(user, sessionId), process.env.JWT_SECRET, { expiresIn: `${SESSION_TTL_DAYS}d` });
 
 const setSessionCookie = (res, token) => {
     res.cookie('session', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 30 * 24 * 60 * 60 * 1000,
+        maxAge: SESSION_TTL_MS,
     });
 };
+
+const createPersistentSession = async (user, req) => {
+    const sessionId = randomUUID();
+    const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+
+    await AuthSession.create({
+        userId: user._id,
+        sessionId,
+        expiresAt,
+        ip: req?.ip || '',
+        userAgent: req?.headers?.['user-agent'] || '',
+    });
+
+    return { sessionId, expiresAt };
+};
+
+const buildAuthResponse = (user) => ({
+    _id: user._id,
+    username: user.name,
+    email: user.email,
+    role: user.role || 'user',
+    mirrorMode: user.mirrorMode,
+    mfa: user.mfa || { enabled: false, method: 'none' },
+});
 
 // @desc    Register new operative
 // @route   POST /api/auth/signup
@@ -48,17 +78,21 @@ const registerUser = async (req, res) => {
         return res.status(400).json({ message: 'Invalid operative data.' });
     }
 
-    const token = createAuthToken(user);
+    const { sessionId } = await createPersistentSession(user, req);
+    const token = createAuthToken(user, sessionId);
     setSessionCookie(res, token);
 
-    res.status(201).json({
-        _id: user._id,
-        username: user.name,
-        email: user.email,
+    await logAuditEvent({
+        category: 'auth',
+        event: 'register_success',
+        req,
+        userId: user._id,
         role: user.role || 'user',
-        mirrorMode: user.mirrorMode,
-        token,
+        success: true,
+        details: { email: user.email },
     });
+
+    res.status(201).json(buildAuthResponse(user));
 };
 
 // @desc    Authenticate operative
@@ -73,30 +107,70 @@ const loginUser = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
+        await logAuditEvent({
+            category: 'auth',
+            event: 'login_failed',
+            req,
+            userId: user?._id || null,
+            role: user?.role || '',
+            success: false,
+            details: { email },
+        });
         return res.status(401).json({ message: 'Access Denied: Invalid credentials.' });
     }
 
-    const token = createAuthToken(user);
+    const { sessionId } = await createPersistentSession(user, req);
+    const token = createAuthToken(user, sessionId);
     setSessionCookie(res, token);
 
-    res.json({
-        _id: user._id,
-        username: user.name,
-        email: user.email,
+    await logAuditEvent({
+        category: 'auth',
+        event: 'login_success',
+        req,
+        userId: user._id,
         role: user.role || 'user',
-        mirrorMode: user.mirrorMode,
-        token,
+        success: true,
     });
+
+    res.json(buildAuthResponse(user));
 };
 
 // @desc    Logout operative
 // @route   POST /api/auth/logout
-const logoutUser = async (_req, res) => {
+const logoutUser = async (req, res) => {
+    const authHeader = req.headers.authorization || '';
+    const bearer = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const cookieToken = (req.headers.cookie || '')
+        .split(';')
+        .map((part) => part.trim())
+        .find((part) => part.startsWith('session='));
+    const token = bearer || (cookieToken ? decodeURIComponent(cookieToken.replace('session=', '')) : null);
+
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            if (decoded?.sid) {
+                await AuthSession.findOneAndUpdate({ sessionId: decoded.sid }, { revokedAt: new Date() });
+            }
+        } catch (_error) {
+            // ignore invalid token during logout; cookie clear still proceeds
+        }
+    }
+
     res.cookie('session', '', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
         expires: new Date(0),
+    });
+
+    await logAuditEvent({
+        category: 'auth',
+        event: 'logout',
+        req,
+        userId: req.user?._id || null,
+        role: req.user?.role || '',
+        success: true,
     });
 
     res.status(200).json({ message: 'Logout successful.' });

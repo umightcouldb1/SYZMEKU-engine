@@ -19,7 +19,7 @@ const API_URL = '/api/auth/'; // Base URL for Auth API routes
 const authService = {
     // Register user
     register: async (userData) => {
-        const response = await axios.post(API_URL + 'register', userData);
+        const response = await axios.post(API_URL + 'signup', userData);
 
         if (response.data) {
             // Save user data (including token) to local storage
@@ -42,7 +42,12 @@ const authService = {
     },
 
     // Logout user
-    logout: () => {
+    logout: async () => {
+        try {
+            await axios.post(API_URL + 'logout');
+        } catch (_error) {
+            // ignore transport errors during client-side logout cleanup
+        }
         localStorage.removeItem('user');
     },
 };
