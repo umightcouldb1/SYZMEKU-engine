@@ -98,6 +98,42 @@ const userSchema = mongoose.Schema(
                 default: false,
             },
         },
+        onboarding: {
+            completed: {
+                type: Boolean,
+                default: false,
+            },
+            completedAt: {
+                type: Date,
+                default: null,
+            },
+            profile: {
+                preferredName: { type: String, default: '' },
+                lifeStage: { type: String, default: '' },
+                supportAreas: { type: [String], default: [] },
+                mentorStyle: { type: String, default: 'gentle' },
+                baseline: {
+                    sleep: { type: Number, default: 0 },
+                    stress: { type: Number, default: 0 },
+                    energy: { type: Number, default: 0 },
+                    mood: { type: String, default: '' },
+                    symptoms: { type: String, default: '' },
+                    focusChallenge: { type: String, default: '' },
+                },
+                goals: { type: [String], default: [] },
+                signalSetup: { type: String, default: 'manual' },
+            },
+        },
+        healthSync: {
+            provider: { type: String, default: 'health_connect' },
+            status: {
+                type: String,
+                enum: ['disconnected', 'pending', 'connected', 'error'],
+                default: 'disconnected',
+            },
+            lastError: { type: String, default: '' },
+            updatedAt: { type: Date, default: null },
+        },
     },
     {
         timestamps: true,

@@ -14,6 +14,9 @@ const { buildActionPolicy, createToolRegistry, executeActionPlan } = require("..
 const mongoose = require("mongoose");
 const { protect, authorizeRoles } = require("../../middleware/authMiddleware");
 const DataRequest = require("../../models/DataRequest");
+const User = require("../../models/User");
+const { requestModelJson, getModelRoutingConfig } = require("../../services/modelRouter");
+const { getHealthIntegrationMeta, parseSleepPayload } = require("../../services/healthDataService");
 const { logAuditEvent } = require("../../utils/audit");
 
 
@@ -412,30 +415,23 @@ const buildExecutionPlan = (system, latestSignals) => {
   return { objectives, constraints, risks, leverage, next_actions };
 };
 
-const requestGeminiJson = async (prompt) => {
-  const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": process.env.Gemini_API_Key,
-    },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
+const requestModelAnalysisJson = async ({ mode, prompt }) => {
+  const modelResult = await requestModelJson({ mode, prompt });
+  if (modelResult?.error) return modelResult;
 
-  if (!geminiResponse.ok) {
-    const errorText = await geminiResponse.text();
+  if (modelResult?.providerError) {
     return {
       error: {
-        objectives: ["Gemini HTTP error"],
-        constraints: [`HTTP status: ${geminiResponse.status}`],
-        risks: [String(errorText || "").slice(0, 300)],
-        leverage: ["Check Gemini_API_Key, API enablement, endpoint, and model name."],
-        next_actions: ["Fix the reported HTTP error and retry command."],
+        objectives: ["Model provider HTTP error"],
+        constraints: [`HTTP status: ${modelResult.providerError.status}`],
+        risks: [String(modelResult.providerError.message || "").slice(0, 300)],
+        leverage: [`Check provider key and model alias mapping for ${modelResult.providerError.model}.`],
+        next_actions: ["Fix the reported model provider error and retry command."],
       },
     };
   }
 
-  const data = await geminiResponse.json();
+  const data = modelResult?.data || {};
   const modelText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   let parsed;
   try {
@@ -443,7 +439,7 @@ const requestGeminiJson = async (prompt) => {
   } catch {
     return {
       error: {
-        objectives: ["Gemini returned non-JSON output."],
+        objectives: ["Model returned non-JSON output."],
         constraints: [],
         risks: [String(modelText || "").slice(0, 300)],
         leverage: [],
@@ -879,7 +875,7 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
       strategicMemory,
     });
 
-    const { error, result } = await requestGeminiJson(prompt);
+    const { error, result } = await requestModelAnalysisJson({ mode: analyzeMode, prompt });
     const usedResult = result || error || FALLBACK_ANALYSIS;
     objectives = usedResult.objectives || [];
     constraints = usedResult.constraints || [];
@@ -1046,16 +1042,6 @@ router.post("/analyze", async (req, res) => {
 
   if (!text) return res.status(400).json({ message: "Command text is required." });
 
-  if (!process.env.Gemini_API_Key) {
-    return res.json({
-      objectives: ["Gemini_API_Key is missing on the server."],
-      constraints: [],
-      risks: [],
-      leverage: [],
-      next_actions: ["Add Gemini_API_Key to Render environment variables."],
-    });
-  }
-
   const rawContext = req.body?.context;
   const { latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
 
@@ -1071,7 +1057,7 @@ router.post("/analyze", async (req, res) => {
   });
 
   try {
-    const { error, result } = await requestGeminiJson(prompt);
+    const { error, result } = await requestModelAnalysisJson({ mode: analyzeMode, prompt });
     if (error) return res.json(error);
     return res.json(result);
   } catch (error) {
@@ -1082,16 +1068,6 @@ router.post("/analyze", async (req, res) => {
 router.post("/recommend", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
   if (!text) return res.status(400).json({ message: "Command text is required." });
-
-  if (!process.env.Gemini_API_Key) {
-    return res.json({
-      objectives: ["Gemini_API_Key is missing on the server."],
-      constraints: [],
-      risks: [],
-      leverage: [],
-      next_actions: ["Add Gemini_API_Key to Render environment variables."],
-    });
-  }
 
   const rawContext = req.body?.context;
   const { latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
@@ -1108,7 +1084,7 @@ router.post("/recommend", async (req, res) => {
   });
 
   try {
-    const { error, result } = await requestGeminiJson(prompt);
+    const { error, result } = await requestModelAnalysisJson({ mode: "recommend", prompt });
     if (error) return res.json(error);
     return res.json(result);
   } catch (error) {
@@ -1119,16 +1095,6 @@ router.post("/recommend", async (req, res) => {
 router.post("/mentor", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
   if (!text) return res.status(400).json({ message: "Mentor prompt text is required." });
-
-  if (!process.env.Gemini_API_Key) {
-    return res.json({
-      objectives: ["Gemini_API_Key is missing on the server."],
-      constraints: [],
-      risks: [],
-      leverage: [],
-      next_actions: ["Add Gemini_API_Key to Render environment variables."],
-    });
-  }
 
   const rawContext = req.body?.context;
   const { latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
@@ -1159,7 +1125,7 @@ router.post("/mentor", async (req, res) => {
   ].join("\n");
 
   try {
-    const { error, result } = await requestGeminiJson(prompt);
+    const { error, result } = await requestModelAnalysisJson({ mode: "mentor", prompt });
     if (error) return res.json(error);
     return res.json(result);
   } catch (error) {
@@ -1683,6 +1649,121 @@ router.get("/summary", async (_req, res) => {
       latest_agent_next_actions: loopState.latestAgentNextActions,
     },
   });
+});
+
+router.get("/model-router/status", async (_req, res) => {
+  return res.json({ aliases: getModelRoutingConfig() });
+});
+
+router.get("/operator/visibility", async (req, res) => {
+  const role = String(req.user?.role || "user").toLowerCase();
+  const canAccessOperatorMode = OPERATOR_ROLES.includes(role);
+  return res.json({ canAccessOperatorMode, role, requiredRoles: OPERATOR_ROLES });
+});
+
+router.post("/dev/set-role", async (req, res) => {
+  if (String(process.env.NODE_ENV) === "production") {
+    return res.status(403).json({ message: "Dev helper is disabled in production." });
+  }
+
+  const nextRole = String(req.body?.role || "").trim();
+  if (!nextRole) return res.status(400).json({ message: "role is required" });
+  const updated = await User.findByIdAndUpdate(req.user._id, { role: nextRole }, { new: true }).select("name email role");
+  return res.json({ message: "Role updated for testing.", user: updated });
+});
+
+router.get("/onboarding/status", async (req, res) => {
+  const user = await User.findById(req.user._id).select("onboarding healthSync name").lean();
+  return res.json({
+    completed: Boolean(user?.onboarding?.completed),
+    completedAt: user?.onboarding?.completedAt || null,
+    profile: user?.onboarding?.profile || {},
+    healthSync: user?.healthSync || { provider: "health_connect", status: "disconnected" },
+    welcomeName: user?.onboarding?.profile?.preferredName || user?.name || "there",
+  });
+});
+
+router.post("/onboarding/complete", async (req, res) => {
+  const payload = req.body || {};
+  const profile = {
+    preferredName: String(payload.preferredName || "").trim(),
+    lifeStage: String(payload.lifeStage || "").trim(),
+    supportAreas: Array.isArray(payload.supportAreas) ? payload.supportAreas.filter(Boolean) : [],
+    mentorStyle: String(payload.mentorStyle || "gentle").trim() || "gentle",
+    baseline: {
+      sleep: Number(payload?.baseline?.sleep || 0),
+      stress: Number(payload?.baseline?.stress || 0),
+      energy: Number(payload?.baseline?.energy || 0),
+      mood: String(payload?.baseline?.mood || "").trim(),
+      symptoms: String(payload?.baseline?.symptoms || "").trim(),
+      focusChallenge: String(payload?.baseline?.focusChallenge || "").trim(),
+    },
+    goals: Array.isArray(payload.goals) ? payload.goals.filter(Boolean) : [],
+    signalSetup: String(payload.signalSetup || "manual"),
+  };
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        onboarding: {
+          completed: true,
+          completedAt: new Date(),
+          profile,
+        },
+      },
+    },
+    { new: true }
+  ).select("onboarding");
+
+  return res.json({ onboarding: user?.onboarding || null });
+});
+
+router.get("/health-sync/status", async (req, res) => {
+  const user = await User.findById(req.user._id).select("healthSync").lean();
+  return res.json({
+    healthSync: user?.healthSync || { provider: "health_connect", status: "disconnected" },
+    integration: getHealthIntegrationMeta(),
+  });
+});
+
+router.post("/health-sync/connect", async (req, res) => {
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        healthSync: {
+          provider: "health_connect",
+          status: "pending",
+          lastError: "",
+          updatedAt: new Date(),
+        },
+      },
+    },
+    { new: true }
+  ).select("healthSync");
+
+  return res.json({
+    healthSync: user?.healthSync,
+    nextStep: "Complete Health Connect permissions in Android app layer.",
+  });
+});
+
+router.post("/health-sync/mock-import", async (req, res) => {
+  const parsed = parseSleepPayload(req.body || {});
+  const hours = Number(parsed.sleepHours || 7);
+  await SignalEntry.create({ sleep: hours, stress: Number(req.body?.stress || 3), symptoms: String(req.body?.symptoms || "health-connect-import") });
+  await User.findByIdAndUpdate(req.user._id, {
+    $set: {
+      healthSync: {
+        provider: "health_connect",
+        status: "connected",
+        lastError: "",
+        updatedAt: new Date(),
+      },
+    },
+  });
+  return res.json({ imported: true, provider: "health_connect", sleepHours: hours });
 });
 
 /* legacy routes kept for compatibility */
