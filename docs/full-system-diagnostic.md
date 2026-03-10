@@ -202,3 +202,11 @@ Additional testability blocker: no test suite (no Jest/Vitest/Cypress/Playwright
 - Automated integration/e2e test suite for auth/RBAC/core loop lifecycles.
 - Field-level encryption at rest for sensitive health/context payload fields.
 - Full production-grade MFA enrollment/challenge/recovery implementation.
+
+## Productization finishing pass status
+
+- Onboarding status: Added chat-first guided onboarding with persisted completion state at `/api/core/onboarding/status` and `/api/core/onboarding/complete`.
+- Operator mode visibility status: RBAC remains founder/admin; `/api/core/operator/visibility` now returns role diagnostics and the UI shows a clear mismatch message.
+- Health integration status: Added Health Connect-first scaffold (`health_connect` provider) with sync status states (`disconnected|pending|connected|error`) and mock sleep import endpoint.
+- Multi-model router status: Added environment-driven model alias router (`mentor_model`, `strategic_model`, `signal_model`, `safety_model`, `code_model`) used by analyze/recommend/mentor endpoints.
+- Test harness results: Added Codex-runnable harness at `server/scripts/technicalHarness.cjs` that reports pass/fail across auth, onboarding, operator gating, signals, reasoning endpoints, sentinel, loop, tasks, and memory.
