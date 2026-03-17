@@ -563,3 +563,65 @@
   border-radius: 8px;
   padding: 0.45rem 0.55rem;
 }
+
+.conversational-onboarding {
+  background: #fcfdff;
+  border-color: #e4e9f7;
+  gap: 1rem;
+}
+
+.onboarding-step {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.onboarding-intro {
+  font-size: 1.03rem;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.onboarding-label {
+  margin: 0;
+  font-weight: 600;
+  color: #263a63;
+}
+
+.onboarding-input {
+  width: 100%;
+  border: 1px solid #d7deef;
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  background: #f7f9ff;
+  color: #1a2950;
+}
+
+.onboarding-input:focus {
+  outline: 2px solid #adc4ff;
+  border-color: #adc4ff;
+}
+
+.onboarding-options {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.onboarding-option {
+  text-align: left;
+  border-radius: 12px;
+  border: 1px solid #d7deef;
+  background: #f5f7fd;
+  color: #1a356b;
+  padding: 0.6rem 0.8rem;
+}
+
+.onboarding-response {
+  background: #f4f6fc;
+  border: 1px solid #dbe2f5;
+  border-radius: 12px;
+  padding: 0.8rem;
+}
+
+.onboarding-response p {
+  margin: 0;
+}
