@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import OperatorConsole from './OperatorConsole';
-import OnboardingFlow from './OnboardingFlow';
 import './dashboard.css';
 
 const DAILY_GREETING = () => {
@@ -47,16 +46,14 @@ const Dashboard = ({ user }) => {
   const [latestInsight, setLatestInsight] = useState(null);
   const [showReasoning, setShowReasoning] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [onboardingStatus, setOnboardingStatus] = useState({ completed: false });
   const [operatorVisibility, setOperatorVisibility] = useState(null);
 
   const refreshMentorData = async () => {
-    const [summaryRes, tasksRes, alertsRes, signalsRes, onboardingRes, operatorRes] = await Promise.all([
+    const [summaryRes, tasksRes, alertsRes, signalsRes, operatorRes] = await Promise.all([
       axios.get('/api/core/summary').catch(() => ({ data: null })),
       axios.get('/api/core/tasks').catch(() => ({ data: { tasks: [] } })),
       axios.get('/api/core/alerts').catch(() => ({ data: { alerts: [] } })),
       axios.get('/api/core/signals').catch(() => ({ data: { entries: [] } })),
-      axios.get('/api/core/onboarding/status').catch(() => ({ data: { completed: false } })),
       axios.get('/api/core/operator/visibility').catch(() => ({ data: null })),
     ]);
 
@@ -65,7 +62,6 @@ const Dashboard = ({ user }) => {
     setTasks(nextTasks);
     setAlerts(alertsRes.data?.alerts || []);
 
-    setOnboardingStatus(onboardingRes.data || { completed: false });
     setOperatorVisibility(operatorRes.data || null);
 
     const latestSignal = signalsRes.data?.entries?.[0];
@@ -124,14 +120,6 @@ const Dashboard = ({ user }) => {
 
   if (!user) return <div className="portal-text">CALIBRATING DASHBOARD...</div>;
 
-
-  if (!onboardingStatus?.completed) {
-    return (
-      <div className="mentor-shell">
-        <OnboardingFlow user={user} onComplete={refreshMentorData} />
-      </div>
-    );
-  }
 
   if (advancedMode && canAccessOperatorMode) {
     return (

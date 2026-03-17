@@ -3,17 +3,16 @@ import { Navigate, useLocation } from 'react-router-dom';
 
 export default function RequireAuth({ children }) {
   const location = useLocation();
-  let token = null;
+  let user = null;
 
   try {
-    const storedUser = JSON.parse(localStorage.getItem('user'));
-    token = storedUser?.token || localStorage.getItem('syz_token') || null;
-  } catch (error) {
-    token = null;
+    user = JSON.parse(localStorage.getItem('user'));
+  } catch (_error) {
+    user = null;
   }
 
-  if (!token) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (!user) {
+    return <Navigate to="/welcome" replace state={{ from: location.pathname }} />;
   }
 
   return children;

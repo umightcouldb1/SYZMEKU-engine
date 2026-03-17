@@ -1,53 +1,90 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
 import { useSelector } from 'react-redux';
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import AuthScreen from './AuthScreen';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import AuthPage from './AuthPage';
 import Dashboard from './Dashboard';
+import OnboardingFlow from './OnboardingFlow';
+import WelcomeScreen from './WelcomeScreen';
 import RequireAuth from './components/RequireAuth';
 import PrivateLayout from './layouts/PrivateLayout';
+import './entryFlow.css';
+
+const ONBOARDING_STORAGE_KEY = 'syz_onboarding_complete';
+
+const getStoredUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem('user'));
+  } catch (_error) {
+    return null;
+  }
+};
 
 function App() {
   const auth = useSelector((state) => state.auth || {});
-  const user = auth.user || null;
-  let storedUser = null;
-  const [isAscended, setIsAscended] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [onboardingReady, setOnboardingReady] = useState(false);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
 
-  try {
-    storedUser = JSON.parse(localStorage.getItem('user'));
-  } catch (error) {
-    storedUser = null;
-  }
+  const user = useMemo(() => auth.user || getStoredUser(), [auth.user]);
+  const isAuthenticated = Boolean(user);
 
   useEffect(() => {
-    const token = storedUser?.token || localStorage.getItem('syz_token');
-    setIsAscended(Boolean(token));
-  }, [storedUser?.token]);
+    let cancelled = false;
 
-  useEffect(() => {
-    if (isAscended && location.pathname === '/login') {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [isAscended, location.pathname, navigate]);
+    const syncOnboardingStatus = async () => {
+      if (!isAuthenticated) {
+        setOnboardingCompleted(false);
+        setOnboardingReady(true);
+        return;
+      }
 
-  const resolvedUser = user || storedUser;
-  const isLoading = auth.isLoading || false;
+      setOnboardingReady(false);
+      try {
+        const response = await axios.get('/api/core/onboarding/status');
+        if (cancelled) return;
+        const completed = Boolean(response.data?.completed);
+        setOnboardingCompleted(completed);
+        localStorage.setItem(ONBOARDING_STORAGE_KEY, completed ? 'true' : 'false');
+      } catch (_error) {
+        if (cancelled) return;
+        const localState = localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true';
+        setOnboardingCompleted(localState);
+      } finally {
+        if (!cancelled) {
+          setOnboardingReady(true);
+        }
+      }
+    };
 
-  if (isLoading) {
+    syncOnboardingStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, user?._id]);
+
+  const completeOnboarding = () => {
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
+    setOnboardingCompleted(true);
+  };
+
+  if (!onboardingReady) {
     return <div className="portal-text">SYNCHRONIZING ESSENCE...</div>;
   }
 
-  const handleAscend = (token) => {
-    if (token) {
-      localStorage.setItem('syz_token', token);
-    }
-    setIsAscended(true);
-  };
-
   return (
     <Routes>
-      <Route path="/login" element={<AuthScreen onAscend={handleAscend} />} />
+      <Route path="/welcome" element={<WelcomeScreen />} />
+      <Route path="/login" element={isAuthenticated ? <Navigate to={onboardingCompleted ? '/app' : '/onboarding'} replace /> : <AuthPage mode="login" />} />
+      <Route path="/signup" element={isAuthenticated ? <Navigate to={onboardingCompleted ? '/app' : '/onboarding'} replace /> : <AuthPage mode="signup" />} />
+      <Route
+        path="/onboarding"
+        element={
+          <RequireAuth>
+            {onboardingCompleted ? <Navigate to="/app" replace /> : <OnboardingFlow user={user} onComplete={completeOnboarding} />}
+          </RequireAuth>
+        }
+      />
       <Route
         element={
           <RequireAuth>
@@ -55,9 +92,18 @@ function App() {
           </RequireAuth>
         }
       >
-        <Route path="/dashboard" element={<Dashboard user={resolvedUser} />} />
+        <Route path="/app" element={onboardingCompleted ? <Dashboard user={user} /> : <Navigate to="/onboarding" replace />} />
+        <Route path="/dashboard" element={<Navigate to="/app" replace />} />
       </Route>
-      <Route path="*" element={<Navigate to={isAscended ? '/dashboard' : '/login'} replace />} />
+      <Route
+        path="*"
+        element={
+          <Navigate
+            to={isAuthenticated ? (onboardingCompleted ? '/app' : '/onboarding') : '/welcome'}
+            replace
+          />
+        }
+      />
     </Routes>
   );
 }
