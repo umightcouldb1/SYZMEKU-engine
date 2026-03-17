@@ -2,195 +2,201 @@ import React, { useMemo, useState } from 'react';
 import axios from 'axios';
 
 const LIFE_STAGE_OPTIONS = [
-  'Just figuring things out',
-  'Building something',
-  'Recovering / resetting',
-  'Maintaining & growing',
+  'I’m figuring things out',
+  'I’m building something meaningful',
+  'I’m recovering and resetting',
+  'I’m maintaining momentum',
   'Something else',
 ];
 
-const INTERACTION_STYLE_OPTIONS = [
-  'Calm & grounding',
-  'Direct & honest',
-  'Strategic & focused',
-  'Reflective & deep',
+const SUPPORT_STYLE_OPTIONS = [
+  'Calm and grounding',
+  'Direct and honest',
+  'Strategic and focused',
+  'Reflective and deep',
 ];
 
+const ONBOARDING_STEPS = [
+  {
+    key: 'name',
+    type: 'short',
+    prompt: 'What should I call you?',
+    label: 'Preferred name',
+    placeholder: 'Enter your preferred name',
+  },
+  {
+    key: 'lifeStage',
+    type: 'choice',
+    prompt: 'Where are you right now in this season of life?',
+    label: 'Life stage',
+    options: LIFE_STAGE_OPTIONS,
+  },
+  {
+    key: 'primaryConcern',
+    type: 'long',
+    prompt: 'What has been taking up the most emotional bandwidth lately?',
+    label: 'Current concern',
+    placeholder: 'Share what feels most important right now',
+  },
+  {
+    key: 'interactionStyle',
+    type: 'choice',
+    prompt: 'How do you want me to show up when supporting you?',
+    label: 'Preferred support style',
+    options: SUPPORT_STYLE_OPTIONS,
+  },
+  {
+    key: 'goals',
+    type: 'long',
+    prompt: 'What would progress look like for you over the next few weeks?',
+    label: 'Baseline state and goals',
+    placeholder: 'Describe the state you want to move toward',
+  },
+];
+
+const SUPPORT_COPY = {
+  short: 'Short answer step: keep it simple and direct.',
+  long: 'Reflection step: take your time and write freely.',
+  choice: 'Selection step: choose the option that feels most true right now.',
+};
+
+const getResponse = (field, value) => {
+  if (field === 'name') return `${value}—great to meet you. We’ll build your guidance around that identity.`;
+  if (field === 'lifeStage') return `Thank you for naming that. ${value} gives us an honest starting point.`;
+  if (field === 'primaryConcern') return 'I hear that. We’ll turn this signal into practical direction.';
+  if (field === 'interactionStyle') return `${value} works. I’ll keep that tone consistent with you.`;
+  if (field === 'goals') return 'Clear direction. We can now translate this into daily aligned momentum.';
+  return 'Thank you for sharing that.';
+};
+
 const OnboardingFlow = ({ user, onComplete }) => {
-  const [step, setStep] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [inputValue, setInputValue] = useState(user?.username || '');
   const [mentorResponse, setMentorResponse] = useState('');
-  const [awaitingContinue, setAwaitingContinue] = useState(false);
   const [form, setForm] = useState({
     name: user?.username || '',
     lifeStage: '',
     primaryConcern: '',
     interactionStyle: '',
+    goals: '',
   });
 
-  const conversationalPayload = useMemo(
+  const currentStep = ONBOARDING_STEPS[currentIndex];
+
+  const payload = useMemo(
     () => ({
       name: form.name,
       lifeStage: form.lifeStage,
       primaryConcern: form.primaryConcern,
       interactionStyle: form.interactionStyle,
+      goals: form.goals,
       preferredName: form.name,
-      supportAreas: form.primaryConcern ? [form.primaryConcern] : [],
+      supportAreas: [form.primaryConcern, form.goals].filter(Boolean),
       mentorStyle: form.interactionStyle,
     }),
     [form],
   );
 
-  const getResponse = (field, value) => {
-    if (field === 'name') {
-      return `${value}—beautiful. I am here to support your next chapter with clarity.`;
-    }
-    if (field === 'lifeStage') {
-      return `Thank you for sharing. ${value} is a powerful place to build from.`;
-    }
-    if (field === 'primaryConcern') {
-      return `Got it. ${value} usually means too many signals competing at once.`;
-    }
-    if (field === 'interactionStyle') {
-      return `${value} it is. I will meet you there with consistency.`;
-    }
-    return 'Thank you for sharing that.';
+  const updateField = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const progressStep = () => {
-    setStep((current) => current + 1);
-    setAwaitingContinue(false);
-    setMentorResponse('');
-  };
-
-  const handleTextSubmit = (field) => {
-    const value = inputValue.trim();
+  const nextStep = () => {
+    const value = String(form[currentStep.key] || '').trim();
     if (!value) return;
-
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setMentorResponse(getResponse(field, value));
-    setAwaitingContinue(true);
-    setInputValue('');
-  };
-
-  const handleOptionSelect = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setMentorResponse(getResponse(field, value));
-    setAwaitingContinue(true);
+    setMentorResponse(getResponse(currentStep.key, value));
+    setCurrentIndex((prev) => prev + 1);
   };
 
   const save = async () => {
     setLoading(true);
     try {
-      await axios.post('/api/core/onboarding/complete', conversationalPayload);
+      await axios.post('/api/core/onboarding/complete', payload);
       onComplete?.();
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <section className="mentor-card mentor-onboarding conversational-onboarding">
-      <h2>Big SYZ Onboarding</h2>
-
-      {step === 0 && (
-        <div className="onboarding-step">
-          <p className="onboarding-intro">
-            Big SYZ learns how you think, feel, and move—
-            <br />
-            then helps you move with clarity.
-          </p>
-          <p className="mentor-muted">No pressure. No judgment. Just alignment.</p>
-          <button type="button" className="mentor-button" onClick={progressStep}>
-            Let’s begin
+  if (!currentStep) {
+    return (
+      <main className="onboarding-shell">
+        <section className="onboarding-stage onboarding-wide">
+          <h2>You’re all set.</h2>
+          <p className="mentor-muted">Big SYZ is calibrated and ready to support your next moves.</p>
+          <button type="button" className="entry-primary-button" disabled={loading} onClick={save}>
+            {loading ? 'Saving...' : 'Enter Big SYZ home'}
           </button>
-        </div>
-      )}
+        </section>
+      </main>
+    );
+  }
 
-      {step === 1 && (
-        <div className="onboarding-step">
-          <label htmlFor="onboarding-name" className="onboarding-label">What should I call you?</label>
-          <input
-            id="onboarding-name"
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            className="onboarding-input"
-            placeholder="Enter your name"
-          />
-          <button type="button" className="mentor-button" onClick={() => handleTextSubmit('name')}>Send</button>
-        </div>
-      )}
+  const stepNumber = currentIndex + 1;
+  const isShort = currentStep.type === 'short';
+  const isLong = currentStep.type === 'long';
 
-      {step === 2 && (
-        <div className="onboarding-step">
-          <p className="onboarding-label">Where are you in life right now?</p>
-          <div className="onboarding-options">
-            {LIFE_STAGE_OPTIONS.map((option) => (
-              <button type="button" key={option} className="mentor-chip onboarding-option" onClick={() => handleOptionSelect('lifeStage', option)}>
-                {option}
-              </button>
-            ))}
+  return (
+    <main className="onboarding-shell">
+      <section className={`onboarding-stage ${isLong ? 'onboarding-wide' : isShort ? 'onboarding-narrow' : 'onboarding-medium'}`}>
+        <header className="onboarding-header-row">
+          <div>
+            <p className="auth-eyebrow">Guided onboarding</p>
+            <h2>{currentStep.prompt}</h2>
           </div>
-        </div>
-      )}
+          <p className="onboarding-progress">Step {stepNumber} of {ONBOARDING_STEPS.length}</p>
+        </header>
 
-      {step === 3 && (
-        <div className="onboarding-step">
-          <label htmlFor="onboarding-concern" className="onboarding-label">What’s been on your mind lately?</label>
-          <input
-            id="onboarding-concern"
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            className="onboarding-input"
-            placeholder="Share what has been on your mind"
-          />
-          <button type="button" className="mentor-button" onClick={() => handleTextSubmit('primaryConcern')}>Send</button>
-        </div>
-      )}
+        <label className="onboarding-field-label">
+          {currentStep.label}
+          {currentStep.type !== 'choice' && (
+            currentStep.type === 'long' ? (
+              <textarea
+                value={form[currentStep.key]}
+                onChange={(event) => updateField(currentStep.key, event.target.value)}
+                placeholder={currentStep.placeholder}
+                className="onboarding-textarea"
+              />
+            ) : (
+              <input
+                type="text"
+                value={form[currentStep.key]}
+                onChange={(event) => updateField(currentStep.key, event.target.value)}
+                placeholder={currentStep.placeholder}
+                className="onboarding-input"
+              />
+            )
+          )}
+        </label>
 
-      {step === 4 && (
-        <div className="onboarding-step">
-          <p className="onboarding-label">How do you want me to show up for you?</p>
-          <div className="onboarding-options">
-            {INTERACTION_STYLE_OPTIONS.map((option) => (
+        {currentStep.type === 'choice' && (
+          <div className="onboarding-choice-grid" role="radiogroup" aria-label={currentStep.label}>
+            {currentStep.options.map((option) => (
               <button
                 type="button"
                 key={option}
-                className="mentor-chip onboarding-option"
-                onClick={() => handleOptionSelect('interactionStyle', option)}
+                className={`onboarding-choice ${form[currentStep.key] === option ? 'selected' : ''}`}
+                onClick={() => updateField(currentStep.key, option)}
               >
                 {option}
               </button>
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      {mentorResponse && (
-        <div className="onboarding-response">
-          <p className="mentor-muted">Big SYZ</p>
-          <p>{mentorResponse}</p>
+        <div className="onboarding-footer-row">
+          <button type="button" className="entry-primary-button" onClick={nextStep}>Continue</button>
+          {mentorResponse && <p className="mentor-muted">Big SYZ: {mentorResponse}</p>}
         </div>
-      )}
+      </section>
 
-      {awaitingContinue && step < 5 && (
-        <button type="button" className="mentor-button" onClick={progressStep}>
-          Continue
-        </button>
-      )}
-
-      {step === 5 && (
-        <div className="onboarding-step">
-          <p className="mentor-muted">You’re aligned. Let’s move with intention.</p>
-          <button type="button" className="mentor-button" disabled={loading} onClick={save}>
-            {loading ? 'Saving...' : 'Finish onboarding'}
-          </button>
-        </div>
-      )}
-    </section>
+      <aside className="onboarding-support-panel">
+        <h3>Why this matters</h3>
+        <p>{SUPPORT_COPY[currentStep.type]}</p>
+        <p className="mentor-muted">Your responses are used to personalize guidance and are handled with privacy-first defaults.</p>
+        <p className="mentor-muted">Current step: {currentStep.label}</p>
+      </aside>
+    </main>
   );
 };
 
