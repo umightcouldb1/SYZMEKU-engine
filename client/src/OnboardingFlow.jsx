@@ -1,44 +1,89 @@
 import React, { useMemo, useState } from 'react';
 import axios from 'axios';
 
-const STEPS = [
-  'welcome',
-  'consent',
-  'profile',
-  'baseline',
-  'goals',
-  'signals',
-  'insight',
+const LIFE_STAGE_OPTIONS = [
+  'Just figuring things out',
+  'Building something',
+  'Recovering / resetting',
+  'Maintaining & growing',
+  'Something else',
 ];
 
-const GOALS = ['focus', 'emotional clarity', 'planning', 'recovery', 'performance', 'self-mastery'];
+const INTERACTION_STYLE_OPTIONS = [
+  'Calm & grounding',
+  'Direct & honest',
+  'Strategic & focused',
+  'Reflective & deep',
+];
 
 const OnboardingFlow = ({ user, onComplete }) => {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [inputValue, setInputValue] = useState(user?.username || '');
+  const [mentorResponse, setMentorResponse] = useState('');
+  const [awaitingContinue, setAwaitingContinue] = useState(false);
   const [form, setForm] = useState({
-    preferredName: user?.username || '',
+    name: user?.username || '',
     lifeStage: '',
-    supportAreas: [],
-    mentorStyle: 'gentle',
-    baseline: { sleep: 6, stress: 4, energy: 5, mood: '', symptoms: '', focusChallenge: '' },
-    goals: [],
-    signalSetup: 'manual',
+    primaryConcern: '',
+    interactionStyle: '',
   });
 
-  const firstInsight = useMemo(() => {
-    const highStress = Number(form.baseline.stress) >= 7;
-    const lowSleep = Number(form.baseline.sleep) <= 5;
-    if (highStress || lowSleep) {
-      return 'You are carrying load. Start with one stabilizing step: reduce today to one must-win task and a short recovery block.';
+  const conversationalPayload = useMemo(
+    () => ({
+      name: form.name,
+      lifeStage: form.lifeStage,
+      primaryConcern: form.primaryConcern,
+      interactionStyle: form.interactionStyle,
+      preferredName: form.name,
+      supportAreas: form.primaryConcern ? [form.primaryConcern] : [],
+      mentorStyle: form.interactionStyle,
+    }),
+    [form],
+  );
+
+  const getResponse = (field, value) => {
+    if (field === 'name') {
+      return `${value}—beautiful. I am here to support your next chapter with clarity.`;
     }
-    return 'Your baseline is workable. Start with one clear priority and one reflective check-in tonight.';
-  }, [form]);
+    if (field === 'lifeStage') {
+      return `Thank you for sharing. ${value} is a powerful place to build from.`;
+    }
+    if (field === 'primaryConcern') {
+      return `Got it. ${value} usually means too many signals competing at once.`;
+    }
+    if (field === 'interactionStyle') {
+      return `${value} it is. I will meet you there with consistency.`;
+    }
+    return 'Thank you for sharing that.';
+  };
+
+  const progressStep = () => {
+    setStep((current) => current + 1);
+    setAwaitingContinue(false);
+    setMentorResponse('');
+  };
+
+  const handleTextSubmit = (field) => {
+    const value = inputValue.trim();
+    if (!value) return;
+
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setMentorResponse(getResponse(field, value));
+    setAwaitingContinue(true);
+    setInputValue('');
+  };
+
+  const handleOptionSelect = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setMentorResponse(getResponse(field, value));
+    setAwaitingContinue(true);
+  };
 
   const save = async () => {
     setLoading(true);
     try {
-      await axios.post('/api/core/onboarding/complete', form);
+      await axios.post('/api/core/onboarding/complete', conversationalPayload);
       onComplete?.();
     } finally {
       setLoading(false);
@@ -46,66 +91,104 @@ const OnboardingFlow = ({ user, onComplete }) => {
   };
 
   return (
-    <section className="mentor-card mentor-onboarding">
+    <section className="mentor-card mentor-onboarding conversational-onboarding">
       <h2>Big SYZ Onboarding</h2>
-      {STEPS[step] === 'welcome' && (
-        <>
-          <p>Big SYZ is your emotionally intelligent mentor, powered by the SYZMEKU Engine.</p>
-          <button type="button" className="mentor-button" onClick={() => setStep(step + 1)}>Start</button>
-        </>
+
+      {step === 0 && (
+        <div className="onboarding-step">
+          <p className="onboarding-intro">
+            Big SYZ learns how you think, feel, and move—
+            <br />
+            then helps you move with clarity.
+          </p>
+          <p className="mentor-muted">No pressure. No judgment. Just alignment.</p>
+          <button type="button" className="mentor-button" onClick={progressStep}>
+            Let’s begin
+          </button>
+        </div>
       )}
-      {STEPS[step] === 'consent' && (
-        <>
-          <p>Emotions are indicators, not commands. We read patterns and respond with support.</p>
-          <p className="mentor-muted">Big SYZ provides non-diagnostic guidance and is not treatment.</p>
-          <button type="button" className="mentor-button" onClick={() => setStep(step + 1)}>I understand</button>
-        </>
+
+      {step === 1 && (
+        <div className="onboarding-step">
+          <label htmlFor="onboarding-name" className="onboarding-label">What should I call you?</label>
+          <input
+            id="onboarding-name"
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            className="onboarding-input"
+            placeholder="Enter your name"
+          />
+          <button type="button" className="mentor-button" onClick={() => handleTextSubmit('name')}>Send</button>
+        </div>
       )}
-      {STEPS[step] === 'profile' && (
-        <>
-          <input type="text" placeholder="Preferred name" value={form.preferredName} onChange={(e) => setForm({ ...form, preferredName: e.target.value })} />
-          <input type="text" placeholder="Age range or life stage" value={form.lifeStage} onChange={(e) => setForm({ ...form, lifeStage: e.target.value })} />
-          <input type="text" placeholder="What do you want help with?" onBlur={(e) => setForm({ ...form, supportAreas: [e.target.value].filter(Boolean) })} />
-          <select value={form.mentorStyle} onChange={(e) => setForm({ ...form, mentorStyle: e.target.value })}>
-            <option value="gentle">Gentle</option><option value="direct">Direct</option><option value="reflective">Reflective</option><option value="strategic">Strategic</option>
-          </select>
-          <button type="button" className="mentor-button" onClick={() => setStep(step + 1)}>Continue</button>
-        </>
-      )}
-      {STEPS[step] === 'baseline' && (
-        <>
-          <label>Sleep ({form.baseline.sleep}h)</label><input type="range" min="0" max="12" value={form.baseline.sleep} onChange={(e) => setForm({ ...form, baseline: { ...form.baseline, sleep: Number(e.target.value) } })} />
-          <label>Stress ({form.baseline.stress})</label><input type="range" min="0" max="10" value={form.baseline.stress} onChange={(e) => setForm({ ...form, baseline: { ...form.baseline, stress: Number(e.target.value) } })} />
-          <label>Energy ({form.baseline.energy})</label><input type="range" min="0" max="10" value={form.baseline.energy} onChange={(e) => setForm({ ...form, baseline: { ...form.baseline, energy: Number(e.target.value) } })} />
-          <input type="text" placeholder="Mood" value={form.baseline.mood} onChange={(e) => setForm({ ...form, baseline: { ...form.baseline, mood: e.target.value } })} />
-          <input type="text" placeholder="Symptoms" value={form.baseline.symptoms} onChange={(e) => setForm({ ...form, baseline: { ...form.baseline, symptoms: e.target.value } })} />
-          <input type="text" placeholder="Current focus challenge" value={form.baseline.focusChallenge} onChange={(e) => setForm({ ...form, baseline: { ...form.baseline, focusChallenge: e.target.value } })} />
-          <button type="button" className="mentor-button" onClick={() => setStep(step + 1)}>Continue</button>
-        </>
-      )}
-      {STEPS[step] === 'goals' && (
-        <>
-          <div className="mentor-quick-actions">{GOALS.map((goal) => <button type="button" key={goal} className="mentor-chip" onClick={() => setForm({ ...form, goals: form.goals.includes(goal) ? form.goals.filter((g) => g !== goal) : [...form.goals, goal] })}>{goal}</button>)}</div>
-          <button type="button" className="mentor-button" onClick={() => setStep(step + 1)}>Continue</button>
-        </>
-      )}
-      {STEPS[step] === 'signals' && (
-        <>
-          <p>Choose your signal source:</p>
-          <div className="mentor-quick-actions">
-            <button type="button" className="mentor-chip" onClick={() => setForm({ ...form, signalSetup: 'manual' })}>Manual check-in</button>
-            <button type="button" className="mentor-chip" onClick={() => setForm({ ...form, signalSetup: 'connect_health' })}>Connect health data</button>
-            <button type="button" className="mentor-chip" onClick={() => setForm({ ...form, signalSetup: 'skip' })}>Skip for now</button>
+
+      {step === 2 && (
+        <div className="onboarding-step">
+          <p className="onboarding-label">Where are you in life right now?</p>
+          <div className="onboarding-options">
+            {LIFE_STAGE_OPTIONS.map((option) => (
+              <button type="button" key={option} className="mentor-chip onboarding-option" onClick={() => handleOptionSelect('lifeStage', option)}>
+                {option}
+              </button>
+            ))}
           </div>
-          <button type="button" className="mentor-button" onClick={() => setStep(step + 1)}>Continue</button>
-        </>
+        </div>
       )}
-      {STEPS[step] === 'insight' && (
-        <>
-          <p><strong>First insight:</strong> {firstInsight}</p>
-          <p className="mentor-muted"><strong>Next step:</strong> Tell Big SYZ what is most important in the next 24 hours.</p>
-          <button type="button" className="mentor-button" disabled={loading} onClick={save}>{loading ? 'Saving...' : 'Finish onboarding'}</button>
-        </>
+
+      {step === 3 && (
+        <div className="onboarding-step">
+          <label htmlFor="onboarding-concern" className="onboarding-label">What’s been on your mind lately?</label>
+          <input
+            id="onboarding-concern"
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            className="onboarding-input"
+            placeholder="Share what has been on your mind"
+          />
+          <button type="button" className="mentor-button" onClick={() => handleTextSubmit('primaryConcern')}>Send</button>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div className="onboarding-step">
+          <p className="onboarding-label">How do you want me to show up for you?</p>
+          <div className="onboarding-options">
+            {INTERACTION_STYLE_OPTIONS.map((option) => (
+              <button
+                type="button"
+                key={option}
+                className="mentor-chip onboarding-option"
+                onClick={() => handleOptionSelect('interactionStyle', option)}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {mentorResponse && (
+        <div className="onboarding-response">
+          <p className="mentor-muted">Big SYZ</p>
+          <p>{mentorResponse}</p>
+        </div>
+      )}
+
+      {awaitingContinue && step < 5 && (
+        <button type="button" className="mentor-button" onClick={progressStep}>
+          Continue
+        </button>
+      )}
+
+      {step === 5 && (
+        <div className="onboarding-step">
+          <p className="mentor-muted">You’re aligned. Let’s move with intention.</p>
+          <button type="button" className="mentor-button" disabled={loading} onClick={save}>
+            {loading ? 'Saving...' : 'Finish onboarding'}
+          </button>
+        </div>
       )}
     </section>
   );
