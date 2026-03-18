@@ -33,10 +33,61 @@ const PATH_STAGES = [
 
 const normalizeFocusTasks = (tasks = []) => tasks.map((task) => task?.description).filter(Boolean);
 
+const buildConversation = ({ user, summary, chatAnswer, loading }) => {
+  const userName = user?.username || user?.name || 'there';
+  const transcript = [
+    {
+      id: 'welcome',
+      speaker: 'syz',
+      label: 'Big SYZ',
+      text: `${DAILY_GREETING()}, ${userName}. I’m here to help you slow the noise down, name what matters, and choose the next grounded move. Start with how you feel, what you’re carrying, or what decision needs clarity today.`,
+    },
+  ];
+
+  if (chatAnswer?.question) {
+    transcript.push({
+      id: 'user-question',
+      speaker: 'user',
+      label: 'You',
+      text: chatAnswer.question,
+    });
+  }
+
+  if (chatAnswer?.response) {
+    transcript.push({
+      id: 'mentor-answer',
+      speaker: 'syz',
+      label: 'Big SYZ',
+      text:
+        chatAnswer.response?.reasoning_summary ||
+        chatAnswer.response?.summary ||
+        'I analyzed your pattern and prepared a grounded next step.',
+      detail: chatAnswer.internalCommand ? `Internal route: ${chatAnswer.internalCommand}` : '',
+    });
+  } else if (summary?.recommended_next_move) {
+    transcript.push({
+      id: 'mentor-nudge',
+      speaker: 'syz',
+      label: 'Big SYZ',
+      text: `Right now I’d guide you toward this: ${summary.recommended_next_move}`,
+    });
+  }
+
+  if (loading) {
+    transcript.push({
+      id: 'loading',
+      speaker: 'syz',
+      label: 'Big SYZ',
+      text: 'Listening… translating your signals into a grounded response.',
+      pending: true,
+    });
+  }
+
+  return transcript;
+};
+
 const Dashboard = ({ user }) => {
   const [advancedMode, setAdvancedMode] = useState(false);
-  const canAccessOperatorMode = ['founder', 'admin'].includes(String(user?.role || '').toLowerCase());
-  const [activeScreen, setActiveScreen] = useState('dashboard');
   const [summary, setSummary] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -48,6 +99,8 @@ const Dashboard = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [operatorVisibility, setOperatorVisibility] = useState(null);
 
+  const canAccessOperatorMode = Boolean(operatorVisibility?.canAccessOperatorMode || ['founder', 'admin'].includes(String(user?.role || '').toLowerCase()));
+
   const refreshMentorData = async () => {
     const [summaryRes, tasksRes, alertsRes, signalsRes, operatorRes] = await Promise.all([
       axios.get('/api/core/summary').catch(() => ({ data: null })),
@@ -58,10 +111,8 @@ const Dashboard = ({ user }) => {
     ]);
 
     setSummary(summaryRes.data || null);
-    const nextTasks = tasksRes.data?.tasks || [];
-    setTasks(nextTasks);
+    setTasks(tasksRes.data?.tasks || []);
     setAlerts(alertsRes.data?.alerts || []);
-
     setOperatorVisibility(operatorRes.data || null);
 
     const latestSignal = signalsRes.data?.entries?.[0];
@@ -79,6 +130,10 @@ const Dashboard = ({ user }) => {
   }, []);
 
   const topFocus = useMemo(() => normalizeFocusTasks(tasks).slice(0, 3), [tasks]);
+  const conversation = useMemo(
+    () => buildConversation({ user, summary, chatAnswer, loading }),
+    [user, summary, chatAnswer, loading],
+  );
 
   const submitCheckIn = async () => {
     setLoading(true);
@@ -115,11 +170,11 @@ const Dashboard = ({ user }) => {
   };
 
   const applyQuickPrompt = (type) => {
-    setChatInput(QUICK_PROMPTS[type] || '');
+    const prompt = QUICK_PROMPTS[type] || '';
+    setChatInput(prompt);
   };
 
   if (!user) return <div className="portal-text">CALIBRATING DASHBOARD...</div>;
-
 
   if (advancedMode && canAccessOperatorMode) {
     return (
@@ -135,147 +190,172 @@ const Dashboard = ({ user }) => {
   }
 
   return (
-    <div className="mentor-shell">
-      <header className="mentor-header">
-        <div>
-          <h1>Big SYZ</h1>
-          <p className="mentor-subtitle">Emotionally intelligent mentor platform.</p>
-          <p className="mentor-warmth">Tell Big SYZ what’s going on. You’re not doing this alone.</p>
+    <div className="mentor-shell mentor-home-shell">
+      <header className="mentor-header mentor-home-header">
+        <div className="mentor-header-copy">
+          <p className="mentor-eyebrow">Big SYZ Home</p>
+          <h1>Mentor first. Dashboard second.</h1>
+          <p className="mentor-subtitle">Emotionally intelligent support anchored in your real signals.</p>
+          <p className="mentor-warmth">{DAILY_GREETING()}, {user.username}. Bring the honest version of today and let Big SYZ help you find the next clear move.</p>
           <p className="mentor-muted">Powered by the SYZMEKU Engine.</p>
-          <p>{DAILY_GREETING()}, {user.username}.</p>
         </div>
-        {canAccessOperatorMode && (
-          <button type="button" className="mentor-button secondary" onClick={() => setAdvancedMode(true)}>
-            Operator Mode
-          </button>
-        )}
-        {!canAccessOperatorMode && operatorVisibility && (
-          <p className="mentor-warning-inline">Operator Mode hidden for role: {operatorVisibility.role}. Founder/admin required.</p>
-        )}
+
+        <aside className="mentor-operator-entry mentor-card">
+          <p className="mentor-section-label">Operator Access</p>
+          {canAccessOperatorMode ? (
+            <>
+              <h2>Founder/Admin entry unlocked</h2>
+              <p className="mentor-muted">This account can open the operator console for deeper system control and diagnostics.</p>
+              <div className="mentor-operator-meta">
+                <span className="mentor-pill success">Role: {operatorVisibility?.effectiveRole || user?.role || 'founder'}</span>
+                {operatorVisibility?.accessSource && <span className="mentor-pill">Access source: {operatorVisibility.accessSource}</span>}
+              </div>
+              <button type="button" className="mentor-button" onClick={() => setAdvancedMode(true)}>
+                Enter Operator Mode
+              </button>
+            </>
+          ) : (
+            <>
+              <h2>Operator Mode is intentionally hidden</h2>
+              <p className="mentor-warning-inline">Current account role: {operatorVisibility?.role || user?.role || 'user'}.</p>
+              <p className="mentor-muted">If this is your founder/admin account, update that account role in the database and the operator entry point will appear here.</p>
+              <div className="mentor-operator-meta">
+                {operatorVisibility?.email && <span className="mentor-pill">Signed in as: {operatorVisibility.email}</span>}
+                <span className="mentor-pill">Required roles: founder/admin</span>
+              </div>
+            </>
+          )}
+        </aside>
       </header>
 
-      <section className="mentor-cta"><button type="button" className="mentor-button" onClick={() => setActiveScreen('ask')}>Talk to Big SYZ</button></section>
-
-      <nav className="mentor-nav">
-        {[
-          ['dashboard', 'Mentor Dashboard'],
-          ['ask', 'Ask SYZMEKU'],
-          ['focus', 'Focus Board'],
-          ['patterns', 'Pattern Intelligence'],
-        ].map(([key, label]) => (
-          <button key={key} type="button" className={`mentor-button ${activeScreen === key ? 'active' : ''}`} onClick={() => setActiveScreen(key)}>{label}</button>
-        ))}
-      </nav>
-
-      {activeScreen === 'dashboard' && (
-        <main className="mentor-grid">
-          <section className="mentor-card">
-            <h2>Today's Insight</h2>
-            <p>{buildInsightMessage(summary, latestInsight)}</p>
-            <p className="mentor-muted">Emotions are indicators, not commands. We read emotional signals as pattern data and respond with empathy.</p>
-            <button type="button" className="mentor-link" onClick={() => setShowReasoning((prev) => !prev)}>
-              {showReasoning ? 'Hide reasoning' : 'Show reasoning'}
+      <main className="mentor-home-layout">
+        <section className="mentor-chat-panel mentor-card">
+          <div className="mentor-chat-intro">
+            <div>
+              <p className="mentor-section-label">Primary conversation</p>
+              <h2>Talk to Big SYZ</h2>
+              <p className="mentor-muted">Start with a feeling, a friction point, or a decision. The cards below stay available as support context.</p>
+            </div>
+            <button type="button" className="mentor-button" onClick={askMentor} disabled={loading || !chatInput.trim()}>
+              Talk to Big SYZ
             </button>
-            {showReasoning && <p className="mentor-muted">{latestInsight?.reasoning_summary || summary?.state_summary || 'No deeper reasoning yet.'}</p>}
-          </section>
+          </div>
 
-          <section className="mentor-card">
-            <h2>Quick Check-In</h2>
-            <label>How did you sleep? ({signals.sleep} hours)</label>
-            <input type="range" min="0" max="12" value={signals.sleep} onChange={(event) => setSignals((prev) => ({ ...prev, sleep: Number(event.target.value) }))} />
-            <label>Stress level today? ({signals.stress})</label>
-            <input type="range" min="0" max="10" value={signals.stress} onChange={(event) => setSignals((prev) => ({ ...prev, stress: Number(event.target.value) }))} />
-            <label>Any symptoms?</label>
-            <input type="text" value={signals.symptoms} onChange={(event) => setSignals((prev) => ({ ...prev, symptoms: event.target.value }))} />
-            <button type="button" className="mentor-button" onClick={submitCheckIn} disabled={loading}>Analyze my state</button>
-            <button type="button" className="mentor-button secondary" onClick={() => axios.post('/api/core/health-sync/connect')}>Connect health data</button>
-          </section>
+          <div className="mentor-conversation-thread">
+            {conversation.map((entry) => (
+              <article key={entry.id} className={`mentor-message mentor-message-${entry.speaker}${entry.pending ? ' is-pending' : ''}`}>
+                <p className="mentor-message-label">{entry.label}</p>
+                <p>{entry.text}</p>
+                {entry.detail && <p className="mentor-message-detail">{entry.detail}</p>}
+              </article>
+            ))}
+          </div>
 
-          <section className="mentor-card">
-            <h2>Progress Path</h2>
-            <ul className="mentor-path-list">
-              {PATH_STAGES.map((path) => (
-                <li key={path.name}><strong>{path.name}:</strong> {path.detail}</li>
+          <div className="mentor-example-prompt-block">
+            <p className="mentor-section-label">Example prompts</p>
+            <div className="mentor-quick-actions mentor-quick-actions-wrap">
+              {Object.entries(QUICK_PROMPTS).map(([key, value]) => (
+                <button key={key} type="button" className="mentor-chip" onClick={() => applyQuickPrompt(key)}>
+                  {value}
+                </button>
               ))}
-            </ul>
-          </section>
+            </div>
+          </div>
 
-          <section className="mentor-card">
-            <h2>Focus for Today</h2>
-            {topFocus.length ? (
-              <ol>{topFocus.map((task) => <li key={task}>{task}</li>)}</ol>
-            ) : (
-              <p>No focus items yet.</p>
-            )}
-          </section>
-
-          <section className="mentor-card">
-            <h2>Recent Patterns</h2>
-            {alerts.length ? alerts.slice(0, 2).map((alert, index) => (
-              <div key={`${index}-${alert?.message || alert}`} className="mentor-warning">
-                <strong>⚠ Pattern detected</strong>
-                <p>{typeof alert === 'string' ? alert : alert?.message}</p>
+          <div className="mentor-compose-box">
+            <label htmlFor="mentor-chat-input" className="mentor-section-label">What do you want support with right now?</label>
+            <div className="mentor-ask-row mentor-ask-row-stacked">
+              <textarea
+                id="mentor-chat-input"
+                value={chatInput}
+                onChange={(event) => setChatInput(event.target.value)}
+                placeholder="I need help making today feel manageable without shutting down."
+                rows="4"
+              />
+              <div className="mentor-compose-actions">
+                <button type="button" className="mentor-button" onClick={askMentor} disabled={loading || !chatInput.trim()}>
+                  Talk to Big SYZ
+                </button>
+                <p className="mentor-muted">Big SYZ responds with emotionally intelligent pattern guidance, not diagnosis.</p>
               </div>
-            )) : <p>No risk patterns detected.</p>}
-          </section>
+            </div>
+          </div>
+        </section>
 
-          <section className="mentor-card">
-            <h2>Action Kernel</h2>
-            {(summary?.latest_actions || []).length ? (
+        <section className="mentor-support-panel">
+          <div className="mentor-support-grid mentor-grid">
+            <section className="mentor-card">
+              <p className="mentor-section-label">Today’s Insight</p>
+              <h2>Your grounded next step</h2>
+              <p>{buildInsightMessage(summary, latestInsight)}</p>
+              <p className="mentor-muted">Emotions are indicators, not commands. Big SYZ reads emotional signals as pattern data and responds with empathy.</p>
+              <button type="button" className="mentor-link" onClick={() => setShowReasoning((prev) => !prev)}>
+                {showReasoning ? 'Hide reasoning' : 'Show reasoning'}
+              </button>
+              {showReasoning && <p className="mentor-muted">{latestInsight?.reasoning_summary || summary?.state_summary || 'No deeper reasoning yet.'}</p>}
+            </section>
+
+            <section className="mentor-card">
+              <p className="mentor-section-label">Quick Check-In</p>
+              <h2>Capture today’s state</h2>
+              <label>How did you sleep? ({signals.sleep} hours)</label>
+              <input type="range" min="0" max="12" value={signals.sleep} onChange={(event) => setSignals((prev) => ({ ...prev, sleep: Number(event.target.value) }))} />
+              <label>Stress level today? ({signals.stress})</label>
+              <input type="range" min="0" max="10" value={signals.stress} onChange={(event) => setSignals((prev) => ({ ...prev, stress: Number(event.target.value) }))} />
+              <label htmlFor="mentor-symptoms">Any symptoms?</label>
+              <input id="mentor-symptoms" type="text" value={signals.symptoms} onChange={(event) => setSignals((prev) => ({ ...prev, symptoms: event.target.value }))} />
+              <div className="mentor-inline-actions">
+                <button type="button" className="mentor-button" onClick={submitCheckIn} disabled={loading}>Analyze my state</button>
+                <button type="button" className="mentor-button secondary" onClick={() => axios.post('/api/core/health-sync/connect')}>Connect health data</button>
+              </div>
+            </section>
+
+            <section className="mentor-card">
+              <p className="mentor-section-label">Progress Path</p>
+              <h2>Where this can grow</h2>
               <ul className="mentor-path-list">
-                {(summary?.latest_actions || []).slice(0, 3).map((action) => (
-                  <li key={action?._id || `${action?.action_name}-${action?.timestamp}`}>
-                    <strong>{action?.action_name || 'action'}:</strong> {action?.success ? 'success' : 'failed'}
-                  </li>
+                {PATH_STAGES.map((path) => (
+                  <li key={path.name}><strong>{path.name}:</strong> {path.detail}</li>
                 ))}
               </ul>
-            ) : (
-              <p>No actions executed yet.</p>
-            )}
-            <p className="mentor-muted">Last execution: {summary?.latest_actions?.[0]?.error || 'No errors reported.'}</p>
-          </section>
-        </main>
-      )}
+            </section>
 
-      {activeScreen === 'ask' && (
-        <section className="mentor-card">
-          <h2>Ask Big SYZ</h2>
-          <p>Ask anything about your patterns, productivity, state, or next decision.</p>
-          <div className="mentor-quick-actions">
-            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('overwhelmed')}>I feel overwhelmed</button>
-            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('focus')}>Help me focus</button>
-            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('patterns')}>What patterns are you noticing?</button>
-            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('dayPlan')}>Help me plan my day</button>
-            <button type="button" className="mentor-chip" onClick={() => applyQuickPrompt('off')}>I feel off today</button>
+            <section className="mentor-card">
+              <p className="mentor-section-label">Focus for Today</p>
+              <h2>High-leverage focus</h2>
+              {topFocus.length ? <ol>{topFocus.map((task) => <li key={task}>{task}</li>)}</ol> : <p>No focus items yet.</p>}
+            </section>
+
+            <section className="mentor-card">
+              <p className="mentor-section-label">Recent Patterns</p>
+              <h2>What needs attention</h2>
+              {alerts.length ? alerts.slice(0, 2).map((alert, index) => (
+                <div key={`${index}-${alert?.message || alert}`} className="mentor-warning">
+                  <strong>⚠ Pattern detected</strong>
+                  <p>{typeof alert === 'string' ? alert : alert?.message}</p>
+                </div>
+              )) : <p>No risk patterns detected.</p>}
+            </section>
+
+            <section className="mentor-card">
+              <p className="mentor-section-label">Action Kernel summary</p>
+              <h2>Latest execution context</h2>
+              {(summary?.latest_actions || []).length ? (
+                <ul className="mentor-path-list">
+                  {(summary?.latest_actions || []).slice(0, 3).map((action) => (
+                    <li key={action?._id || `${action?.action_name}-${action?.timestamp}`}>
+                      <strong>{action?.action_name || 'action'}:</strong> {action?.success ? 'success' : 'failed'}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No actions executed yet.</p>
+              )}
+              <p className="mentor-muted">Last execution: {summary?.latest_actions?.[0]?.error || 'No errors reported.'}</p>
+            </section>
           </div>
-          <p className="mentor-muted">Examples: "I feel overwhelmed" · "Help me focus" · "What patterns are you noticing?" · "Help me plan my day" · "I feel off today".</p>
-          <div className="mentor-ask-row">
-            <input type="text" value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder="I feel like my productivity collapses after lunch" />
-            <button type="button" className="mentor-button" onClick={askMentor} disabled={loading}>Ask</button>
-          </div>
-          {chatAnswer && (
-            <div className="mentor-answer">
-              <p><strong>You:</strong> {chatAnswer.question}</p>
-              <p><strong>SYZMEKU:</strong> {chatAnswer.response?.reasoning_summary || chatAnswer.response?.summary || 'I analyzed your pattern and prepared recommendations.'}</p>
-            </div>
-          )}
         </section>
-      )}
-
-      {activeScreen === 'focus' && (
-        <section className="mentor-card">
-          <h2>Focus Board</h2>
-          {normalizeFocusTasks(tasks).length ? <ol>{normalizeFocusTasks(tasks).map((task) => <li key={task}>{task}</li>)}</ol> : <p>No focus items yet.</p>}
-        </section>
-      )}
-
-      {activeScreen === 'patterns' && (
-        <section className="mentor-card">
-          <h2>Pattern Intelligence</h2>
-          <p>{summary?.state_summary || 'Not enough pattern data yet. Keep checking in daily.'}</p>
-          <p className="mentor-muted">Suggested next move: {summary?.recommended_next_move || 'Complete your daily check-in to generate a personalized recommendation.'}</p>
-        </section>
-      )}
+      </main>
     </div>
   );
 };
