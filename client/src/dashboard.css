@@ -625,3 +625,200 @@
 .onboarding-response p {
   margin: 0;
 }
+
+.mentor-home-shell {
+  background:
+    radial-gradient(circle at top left, rgba(86, 137, 255, 0.12), transparent 32%),
+    linear-gradient(180deg, #f6f8ff 0%, #eef3ff 100%);
+}
+
+.mentor-home-header {
+  margin-bottom: 1.5rem;
+}
+
+.mentor-header-copy {
+  max-width: 760px;
+}
+
+.mentor-eyebrow,
+.mentor-section-label {
+  margin: 0 0 0.45rem;
+  color: #3f66b9;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.mentor-home-layout {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.mentor-chat-panel {
+  padding: 1.25rem;
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(37, 73, 145, 0.12);
+}
+
+.mentor-chat-intro {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.mentor-chat-intro h2,
+.mentor-operator-entry h2 {
+  margin: 0;
+}
+
+.mentor-conversation-thread {
+  display: grid;
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.mentor-message {
+  max-width: 780px;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  line-height: 1.55;
+}
+
+.mentor-message p {
+  margin: 0;
+}
+
+.mentor-message-label {
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+  font-weight: 700;
+}
+
+.mentor-message-syz {
+  background: linear-gradient(135deg, #f3f7ff 0%, #ffffff 100%);
+  border: 1px solid #d7e2fb;
+}
+
+.mentor-message-user {
+  justify-self: end;
+  background: linear-gradient(135deg, #2f6fff 0%, #1e53d8 100%);
+  color: #fff;
+}
+
+.mentor-message-user .mentor-message-label,
+.mentor-message-user .mentor-message-detail {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.mentor-message-detail {
+  margin-top: 0.45rem;
+  color: #6177a6;
+  font-size: 0.8rem;
+}
+
+.mentor-example-prompt-block {
+  margin-bottom: 1rem;
+}
+
+.mentor-quick-actions-wrap {
+  flex-wrap: wrap;
+}
+
+.mentor-compose-box {
+  border-top: 1px solid #e0e7f8;
+  padding-top: 1rem;
+}
+
+.mentor-ask-row-stacked {
+  flex-direction: column;
+}
+
+.mentor-ask-row-stacked textarea {
+  width: 100%;
+  min-height: 124px;
+  border: 1px solid #ccd8f2;
+  border-radius: 14px;
+  padding: 0.85rem 0.95rem;
+  font: inherit;
+  resize: vertical;
+  background: #fbfcff;
+  color: #10213f;
+}
+
+.mentor-compose-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.mentor-support-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.mentor-support-grid {
+  align-items: start;
+}
+
+.mentor-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+
+.mentor-operator-entry {
+  min-width: min(100%, 360px);
+  max-width: 380px;
+}
+
+.mentor-operator-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.85rem 0 1rem;
+}
+
+.mentor-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: #edf3ff;
+  color: #3159ae;
+  font-size: 0.8rem;
+  border: 1px solid #d2def8;
+}
+
+.mentor-pill.success {
+  background: #eefaf1;
+  color: #26714a;
+  border-color: #bee2c8;
+}
+
+.mentor-warning-inline {
+  color: #9d5c00;
+  font-weight: 600;
+}
+
+.is-pending {
+  opacity: 0.75;
+}
+
+@media (max-width: 960px) {
+  .mentor-home-header,
+  .mentor-chat-intro,
+  .mentor-compose-actions {
+    flex-direction: column;
+  }
+
+  .mentor-operator-entry {
+    max-width: none;
+  }
+}

@@ -12,7 +12,7 @@ const AlertRecord = require("../../models/AlertRecord");
 const ActionExecution = require("../../models/ActionExecution");
 const { buildActionPolicy, createToolRegistry, executeActionPlan } = require("../../logic/actionKernel");
 const mongoose = require("mongoose");
-const { protect, authorizeRoles } = require("../../middleware/authMiddleware");
+const { protect } = require("../../middleware/authMiddleware");
 const DataRequest = require("../../models/DataRequest");
 const User = require("../../models/User");
 const { requestModelJson, getModelRoutingConfig } = require("../../services/modelRouter");
@@ -24,7 +24,56 @@ const { logAuditEvent } = require("../../utils/audit");
 router.use(protect);
 
 const OPERATOR_ROLES = ["founder", "admin"];
-const requireOperatorRole = authorizeRoles(...OPERATOR_ROLES);
+
+const parseRoleEmails = (value = "") =>
+  new Set(
+    String(value)
+      .split(",")
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean)
+  );
+
+const founderEmails = parseRoleEmails(process.env.FOUNDER_EMAILS);
+const adminEmails = parseRoleEmails(process.env.ADMIN_EMAILS);
+
+const resolveOperatorVisibility = (user = {}) => {
+  const role = String(user?.role || "user").toLowerCase();
+  const email = String(user?.email || "").trim().toLowerCase();
+  const matchedEmailRole = founderEmails.has(email) ? "founder" : adminEmails.has(email) ? "admin" : "";
+  const canAccessOperatorMode = OPERATOR_ROLES.includes(role) || Boolean(matchedEmailRole);
+  const effectiveRole = OPERATOR_ROLES.includes(role) ? role : matchedEmailRole || role;
+  const accessSource = OPERATOR_ROLES.includes(role) ? "role" : matchedEmailRole ? "email_allowlist" : "none";
+
+  return {
+    canAccessOperatorMode,
+    role,
+    email,
+    effectiveRole,
+    matchedEmailRole,
+    accessSource,
+    requiredRoles: OPERATOR_ROLES,
+  };
+};
+
+const requireOperatorRole = async (req, res, next) => {
+  const visibility = resolveOperatorVisibility(req.user);
+
+  if (!visibility.canAccessOperatorMode) {
+    await logAuditEvent({
+      category: 'access',
+      event: 'role_access_denied',
+      req,
+      userId: req.user?._id || null,
+      role: req.user?.role || '',
+      success: false,
+      details: { allowedRoles: OPERATOR_ROLES, email: visibility.email },
+    });
+    return res.status(403).json({ message: 'Access denied' });
+  }
+
+  req.operatorVisibility = visibility;
+  return next();
+};
 
 const auditCoreAction = async (req, event, details = {}) => {
   await logAuditEvent({
@@ -1656,9 +1705,7 @@ router.get("/model-router/status", async (_req, res) => {
 });
 
 router.get("/operator/visibility", async (req, res) => {
-  const role = String(req.user?.role || "user").toLowerCase();
-  const canAccessOperatorMode = OPERATOR_ROLES.includes(role);
-  return res.json({ canAccessOperatorMode, role, requiredRoles: OPERATOR_ROLES });
+  return res.json(resolveOperatorVisibility(req.user));
 });
 
 router.post("/dev/set-role", async (req, res) => {
