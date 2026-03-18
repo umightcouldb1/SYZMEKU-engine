@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const LIFE_STAGE_OPTIONS = [
   'I’m figuring things out',
@@ -69,10 +70,12 @@ const getResponse = (field, value) => {
   return 'Thank you for sharing that.';
 };
 
-const OnboardingFlow = ({ user, onComplete }) => {
+const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
+  const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [mentorResponse, setMentorResponse] = useState('');
+  const [completionError, setCompletionError] = useState('');
   const [form, setForm] = useState({
     name: user?.username || '',
     lifeStage: '',
@@ -108,11 +111,42 @@ const OnboardingFlow = ({ user, onComplete }) => {
     setCurrentIndex((prev) => prev + 1);
   };
 
-  const save = async () => {
+  const navigateToHome = async ({ skipCompletion = false } = {}) => {
     setLoading(true);
+    setCompletionError('');
+
     try {
-      await axios.post('/api/core/onboarding/complete', payload);
-      onComplete?.();
+      let completionResponse = null;
+
+      if (!skipCompletion) {
+        completionResponse = await axios.post('/api/core/onboarding/complete', payload);
+        console.info('[onboarding] completion request success', {
+          onboardingComplete: Boolean(completionResponse.data?.onboarding?.completed),
+          targetRoute: appHomeRoute,
+        });
+      }
+
+      const syncResult = await onComplete?.();
+      console.info('[onboarding] local session sync result', {
+        completed: Boolean(syncResult?.completed ?? completionResponse?.data?.onboarding?.completed),
+        source: syncResult?.source || 'component',
+        targetRoute: syncResult?.targetRoute || appHomeRoute,
+      });
+
+      const onboardingComplete = Boolean(syncResult?.completed ?? completionResponse?.data?.onboarding?.completed);
+      if (!onboardingComplete) {
+        throw new Error('Onboarding saved, but your session did not refresh correctly. Please try going to Big SYZ Home again.');
+      }
+
+      navigate(syncResult?.targetRoute || appHomeRoute, { replace: true });
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || 'We saved your progress, but could not enter Big SYZ Home. Please try again.';
+      console.error('[onboarding] completion flow failed', {
+        message,
+        targetRoute: appHomeRoute,
+        onboardingComplete: error?.response?.data?.onboarding?.completed,
+      });
+      setCompletionError(message);
     } finally {
       setLoading(false);
     }
@@ -124,9 +158,13 @@ const OnboardingFlow = ({ user, onComplete }) => {
         <section className="onboarding-stage onboarding-wide">
           <h2>You’re all set.</h2>
           <p className="mentor-muted">Big SYZ is calibrated and ready to support your next moves.</p>
-          <button type="button" className="entry-primary-button" disabled={loading} onClick={save}>
-            {loading ? 'Saving...' : 'Enter Big SYZ home'}
+          <button type="button" className="entry-primary-button" disabled={loading} onClick={() => navigateToHome()}>
+            {loading ? 'Saving...' : 'ENTER BIG SYZ HOME'}
           </button>
+          <button type="button" className="entry-secondary-button" disabled={loading} onClick={() => navigateToHome({ skipCompletion: true })}>
+            Go to Big SYZ Home
+          </button>
+          {completionError && <p className="auth-error-text">{completionError}</p>}
         </section>
       </main>
     );
@@ -184,17 +222,29 @@ const OnboardingFlow = ({ user, onComplete }) => {
           </div>
         )}
 
+        {mentorResponse && <p className="mentor-muted">{mentorResponse}</p>}
+
         <div className="onboarding-footer-row">
-          <button type="button" className="entry-primary-button" onClick={nextStep}>Continue</button>
-          {mentorResponse && <p className="mentor-muted">Big SYZ: {mentorResponse}</p>}
+          <button
+            type="button"
+            className="entry-secondary-button"
+            onClick={() => setCurrentIndex((prev) => Math.max(prev - 1, 0))}
+            disabled={currentIndex === 0}
+          >
+            Back
+          </button>
+          <button type="button" className="entry-primary-button" onClick={nextStep}>
+            Continue
+          </button>
         </div>
       </section>
 
       <aside className="onboarding-support-panel">
-        <h3>Why this matters</h3>
-        <p>{SUPPORT_COPY[currentStep.type]}</p>
-        <p className="mentor-muted">Your responses are used to personalize guidance and are handled with privacy-first defaults.</p>
-        <p className="mentor-muted">Current step: {currentStep.label}</p>
+        <p className="auth-eyebrow">Support note</p>
+        <h3>{SUPPORT_COPY[currentStep.type]}</h3>
+        <p className="mentor-muted">
+          These answers shape how Big SYZ reflects, prioritizes, and supports you once you enter the main app.
+        </p>
       </aside>
     </main>
   );

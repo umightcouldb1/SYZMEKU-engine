@@ -1674,6 +1674,10 @@ router.post("/dev/set-role", async (req, res) => {
 
 router.get("/onboarding/status", async (req, res) => {
   const user = await User.findById(req.user._id).select("onboarding healthSync name").lean();
+  console.info('[onboarding] status requested', {
+    userId: String(req.user._id),
+    completed: Boolean(user?.onboarding?.completed),
+  });
   return res.json({
     completed: Boolean(user?.onboarding?.completed),
     completedAt: user?.onboarding?.completedAt || null,
@@ -1715,6 +1719,12 @@ router.post("/onboarding/complete", async (req, res) => {
     },
     { new: true }
   ).select("onboarding");
+
+  console.info('[onboarding] completion saved', {
+    userId: String(req.user._id),
+    completed: Boolean(user?.onboarding?.completed),
+    completedAt: user?.onboarding?.completedAt || null,
+  });
 
   return res.json({ onboarding: user?.onboarding || null });
 });
