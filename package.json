@@ -1,33 +1,19 @@
 {
-  "name": "syzmeku-engine",
-  "version": "1.0.0",
-  "description": "The SYZMEKU Engine: A Crystalline Architecture for Systemic Coherence.",
-  "main": "server/server.cjs",
+  "name": "big-syz-engine",
+  "version": "5.0.0-GSI",
+  "description": "Automated business intelligence, content distribution, and client management for T.O.I. Souljah Academy",
+  "main": "server/server.js",
   "scripts": {
-    "start": "cross-env NODE_ENV=production node server/server.cjs",
-    "server": "nodemon server/server.cjs",
-    "client": "npm start --prefix client",
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "install-all": "npm install --prefix ./client && npm install --prefix ./server && npm install",
-    "client-build": "npm run build --prefix ./client",
-    "render-build": "npm run install-all && npm run client-build"
+    "setup": "npm install && cd server && npm install && cd ../client && npm install",
+    "client-build": "cd client && npm run build",
+    "render-build": "npm run setup && npm run client-build",
+    "start": "cd server && node server.js"
   },
-  "author": "SYZMEKU Solutions",
-  "license": "ISC",
-  "dependencies": {
-    "colors": "^1.4.0",
-    "concurrently": "^8.2.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "express-async-handler": "^1.2.0",
-    "express-mongo-sanitize": "^2.2.0",
-    "express-rate-limit": "^7.3.1",
-    "helmet": "^7.1.0",
-    "mongoose": "^8.4.4"
-  },
-  "devDependencies": {
-    "cross-env": "^7.0.3",
-    "nodemon": "^3.1.4"
-  }
+  "keywords": [
+    "SYZMEKU",
+    "Graphical-Sovereign-Interface",
+    "Triangulum-Theta-7"
+  ],
+  "author": "El Kai 'Tharion Kai Zhun",
+  "license": "Sovereign"
 }
