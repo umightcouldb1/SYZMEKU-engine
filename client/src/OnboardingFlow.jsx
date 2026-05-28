@@ -92,7 +92,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
       lifeStage: form.lifeStage,
       primaryConcern: form.primaryConcern,
       interactionStyle: form.interactionStyle,
-      goals: form.goals,
+      goals: [form.goals].filter(Boolean),
       preferredName: form.name,
       supportAreas: [form.primaryConcern, form.goals].filter(Boolean),
       mentorStyle: form.interactionStyle,
@@ -111,31 +111,23 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
     setCurrentIndex((prev) => prev + 1);
   };
 
-  const navigateToHome = async ({ skipCompletion = false } = {}) => {
+  const navigateToHome = async () => {
     setLoading(true);
     setCompletionError('');
 
     try {
-      let completionResponse = null;
+      const completionResponse = await axios.post('/api/core/onboarding/complete', payload);
+      const syncResult = await onComplete?.(completionResponse.data);
+      const onboardingComplete = Boolean(syncResult?.completed ?? completionResponse.data?.onboarding?.completed);
 
-      if (!skipCompletion) {
-        completionResponse = await axios.post('/api/core/onboarding/complete', payload);
-        console.info('[onboarding] completion request success', {
-          onboardingComplete: Boolean(completionResponse.data?.onboarding?.completed),
-          targetRoute: appHomeRoute,
-        });
-      }
-
-      const syncResult = await onComplete?.();
-      console.info('[onboarding] local session sync result', {
-        completed: Boolean(syncResult?.completed ?? completionResponse?.data?.onboarding?.completed),
+      console.info('[onboarding] completion flow success', {
+        completed: onboardingComplete,
         source: syncResult?.source || 'component',
         targetRoute: syncResult?.targetRoute || appHomeRoute,
       });
 
-      const onboardingComplete = Boolean(syncResult?.completed ?? completionResponse?.data?.onboarding?.completed);
       if (!onboardingComplete) {
-        throw new Error('Onboarding saved, but your session did not refresh correctly. Please try going to Big SYZ Home again.');
+        throw new Error('Onboarding saved, but your session did not refresh correctly. Please try entering Big SYZ Home again.');
       }
 
       navigate(syncResult?.targetRoute || appHomeRoute, { replace: true });
@@ -158,11 +150,8 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
         <section className="onboarding-stage onboarding-wide">
           <h2>You’re all set.</h2>
           <p className="mentor-muted">Big SYZ is calibrated and ready to support your next moves.</p>
-          <button type="button" className="entry-primary-button" disabled={loading} onClick={() => navigateToHome()}>
+          <button type="button" className="entry-primary-button" disabled={loading} onClick={navigateToHome}>
             {loading ? 'Saving...' : 'ENTER BIG SYZ HOME'}
-          </button>
-          <button type="button" className="entry-secondary-button" disabled={loading} onClick={() => navigateToHome({ skipCompletion: true })}>
-            Go to Big SYZ Home
           </button>
           {completionError && <p className="auth-error-text">{completionError}</p>}
         </section>
