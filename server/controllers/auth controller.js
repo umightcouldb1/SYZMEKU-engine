@@ -42,13 +42,15 @@ const createPersistentSession = async (user, req) => {
     return { sessionId, expiresAt };
 };
 
-const buildAuthResponse = (user) => ({
+const buildAuthResponse = (user, token) => ({
     _id: user._id,
     username: user.name,
     email: user.email,
     role: user.role || 'user',
     mirrorMode: user.mirrorMode,
     mfa: user.mfa || { enabled: false, method: 'none' },
+    onboarding: user.onboarding || { completed: false },
+    token,
 });
 
 // @desc    Register new operative
@@ -92,7 +94,7 @@ const registerUser = async (req, res) => {
         details: { email: user.email },
     });
 
-    res.status(201).json(buildAuthResponse(user));
+    res.status(201).json(buildAuthResponse(user, token));
 };
 
 // @desc    Authenticate operative
@@ -132,7 +134,7 @@ const loginUser = async (req, res) => {
         success: true,
     });
 
-    res.json(buildAuthResponse(user));
+    res.json(buildAuthResponse(user, token));
 };
 
 // @desc    Logout operative
