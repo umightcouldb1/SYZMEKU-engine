@@ -2,8 +2,35 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
+axios.defaults.withCredentials = true;
+
+const getStoredUser = () => {
+    try {
+        return JSON.parse(localStorage.getItem('user'));
+    } catch (_error) {
+        localStorage.removeItem('user');
+        return null;
+    }
+};
+
+const setAuthHeader = (userData) => {
+    const token = userData?.token;
+    if (token) {
+        axios.defaults.headers.common.Authorization = `Bearer ${token}`;
+    } else {
+        delete axios.defaults.headers.common.Authorization;
+    }
+};
+
+const persistAuthUser = (userData) => {
+    if (!userData) return;
+    localStorage.setItem('user', JSON.stringify(userData));
+    setAuthHeader(userData);
+};
+
 // Get user from localStorage (used for persistence across page reloads)
-const user = JSON.parse(localStorage.getItem('user'));
+const user = getStoredUser();
+setAuthHeader(user);
 
 const initialState = {
     user: user ? user : null, // Load user from storage or start as null
@@ -23,7 +50,7 @@ const authService = {
 
         if (response.data) {
             // Save user data (including token) to local storage
-            localStorage.setItem('user', JSON.stringify(response.data));
+            persistAuthUser(response.data);
         }
 
         return response.data;
@@ -35,7 +62,7 @@ const authService = {
 
         if (response.data) {
             // Save user data (including token) to local storage
-            localStorage.setItem('user', JSON.stringify(response.data));
+            persistAuthUser(response.data);
         }
 
         return response.data;
@@ -49,6 +76,8 @@ const authService = {
             // ignore transport errors during client-side logout cleanup
         }
         localStorage.removeItem('user');
+        localStorage.removeItem('syz_onboarding_complete');
+        setAuthHeader(null);
     },
 };
 
@@ -119,12 +148,14 @@ export const authSlice = createSlice({
                 state.isLoading = false;
                 state.isSuccess = true;
                 state.user = action.payload;
+                setAuthHeader(action.payload);
             })
             .addCase(register.rejected, (state, action) => {
                 state.isLoading = false;
                 state.isError = true;
                 state.message = action.payload; // Payload is the error message from rejectWithValue
                 state.user = null; // Registration failed, ensure user is null
+                setAuthHeader(null);
             })
             // --- LOGIN ---
             .addCase(login.pending, (state) => {
@@ -134,16 +165,19 @@ export const authSlice = createSlice({
                 state.isLoading = false;
                 state.isSuccess = true;
                 state.user = action.payload;
+                setAuthHeader(action.payload);
             })
             .addCase(login.rejected, (state, action) => {
                 state.isLoading = false;
                 state.isError = true;
                 state.message = action.payload;
                 state.user = null; // Login failed, ensure user is null
+                setAuthHeader(null);
             })
             // --- LOGOUT ---
             .addCase(logout.fulfilled, (state) => {
                 state.user = null;
+                setAuthHeader(null);
             });
     },
 });
