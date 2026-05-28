@@ -17,19 +17,26 @@ const getStoredUser = () => {
   try {
     return JSON.parse(localStorage.getItem('user'));
   } catch (_error) {
+    localStorage.removeItem('user');
     return null;
   }
 };
 
-const persistUserOnboardingState = (completed) => {
+const getLocalOnboardingComplete = () => {
+  const storedUser = getStoredUser();
+  return localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true' || Boolean(storedUser?.onboarding?.completed);
+};
+
+const persistUserOnboardingState = (completed, onboarding = null) => {
   try {
-    const storedUser = JSON.parse(localStorage.getItem('user'));
+    const storedUser = getStoredUser();
     if (!storedUser) return;
 
     localStorage.setItem('user', JSON.stringify({
       ...storedUser,
       onboarding: {
         ...(storedUser.onboarding || {}),
+        ...(onboarding || {}),
         completed,
       },
     }));
@@ -41,10 +48,10 @@ const persistUserOnboardingState = (completed) => {
 function App() {
   const auth = useSelector((state) => state.auth || {});
   const [onboardingReady, setOnboardingReady] = useState(false);
-  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(() => getLocalOnboardingComplete());
 
   const user = useMemo(() => auth.user || getStoredUser(), [auth.user]);
-  const isAuthenticated = Boolean(user);
+  const isAuthenticated = Boolean(user?._id || user?.email);
 
   const syncOnboardingStatus = useCallback(async ({ silent = false } = {}) => {
     if (!isAuthenticated) {
@@ -53,23 +60,27 @@ function App() {
       return { completed: false, source: 'guest' };
     }
 
+    const localState = getLocalOnboardingComplete();
+    if (localState) {
+      setOnboardingCompleted(true);
+    }
+
     if (!silent) {
       setOnboardingReady(false);
     }
 
     try {
       const response = await axios.get('/api/core/onboarding/status');
-      const completed = Boolean(response.data?.completed);
+      const completed = Boolean(response.data?.completed || localState);
       console.info('[onboarding] status sync success', {
         completed,
         targetRoute: completed ? APP_HOME_ROUTE : '/onboarding',
       });
       setOnboardingCompleted(completed);
       localStorage.setItem(ONBOARDING_STORAGE_KEY, completed ? 'true' : 'false');
-      persistUserOnboardingState(completed);
+      persistUserOnboardingState(completed, completed ? response.data : null);
       return { completed, source: 'server', data: response.data };
     } catch (error) {
-      const localState = localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true';
       console.warn('[onboarding] status sync fallback', {
         completed: localState,
         message: error?.response?.data?.message || error?.message || 'Unknown sync error',
@@ -98,15 +109,23 @@ function App() {
     };
   }, [syncOnboardingStatus, user?._id]);
 
-  const completeOnboarding = async () => {
-    localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
-    persistUserOnboardingState(true);
-    setOnboardingCompleted(true);
-    const result = await syncOnboardingStatus({ silent: true });
+  const completeOnboarding = async (completionData = {}) => {
+    const onboarding = completionData?.onboarding || { completed: true };
+    const completed = Boolean(onboarding?.completed ?? true);
+
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, completed ? 'true' : 'false');
+    persistUserOnboardingState(completed, onboarding);
+    setOnboardingCompleted(completed);
+    setOnboardingReady(true);
+
+    if (completed) {
+      syncOnboardingStatus({ silent: true });
+    }
+
     return {
-      completed: Boolean(result?.completed),
+      completed,
       targetRoute: APP_HOME_ROUTE,
-      source: result?.source || 'local',
+      source: 'completion',
     };
   };
 
