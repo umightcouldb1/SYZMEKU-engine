@@ -22,6 +22,8 @@ const getStoredUser = () => {
   }
 };
 
+const getStoredToken = (user = null) => user?.token || localStorage.getItem('token') || '';
+
 const getLocalOnboardingComplete = () => {
   const storedUser = getStoredUser();
   return localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true' || Boolean(storedUser?.onboarding?.completed);
@@ -32,14 +34,21 @@ const persistUserOnboardingState = (completed, onboarding = null) => {
     const storedUser = getStoredUser();
     if (!storedUser) return;
 
+    const token = getStoredToken(storedUser);
+    const role = storedUser.role || localStorage.getItem('user_role') || 'user';
+
     localStorage.setItem('user', JSON.stringify({
       ...storedUser,
+      token,
+      role,
       onboarding: {
         ...(storedUser.onboarding || {}),
         ...(onboarding || {}),
         completed,
       },
     }));
+    if (token) localStorage.setItem('token', token);
+    localStorage.setItem('user_role', role);
   } catch (_error) {
     // ignore malformed local user state during onboarding sync
   }
@@ -51,7 +60,8 @@ function App() {
   const [onboardingCompleted, setOnboardingCompleted] = useState(() => getLocalOnboardingComplete());
 
   const user = useMemo(() => auth.user || getStoredUser(), [auth.user]);
-  const isAuthenticated = Boolean(user?._id || user?.email);
+  const token = getStoredToken(user);
+  const isAuthenticated = Boolean(token);
 
   const syncOnboardingStatus = useCallback(async ({ silent = false } = {}) => {
     if (!isAuthenticated) {
