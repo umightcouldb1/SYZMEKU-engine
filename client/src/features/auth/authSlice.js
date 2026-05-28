@@ -13,8 +13,11 @@ const getStoredUser = () => {
     }
 };
 
-const setAuthHeader = (userData) => {
-    const token = userData?.token;
+const getStoredToken = (userData = null) => userData?.token || localStorage.getItem('token') || '';
+const getStoredRole = (userData = null) => userData?.role || localStorage.getItem('user_role') || 'user';
+
+const setAuthHeader = (userData = null) => {
+    const token = getStoredToken(userData);
     if (token) {
         axios.defaults.headers.common.Authorization = `Bearer ${token}`;
     } else {
@@ -24,8 +27,13 @@ const setAuthHeader = (userData) => {
 
 const persistAuthUser = (userData) => {
     if (!userData) return;
-    localStorage.setItem('user', JSON.stringify(userData));
-    setAuthHeader(userData);
+    const token = getStoredToken(userData);
+    const role = getStoredRole(userData);
+
+    localStorage.setItem('user', JSON.stringify({ ...userData, token, role }));
+    if (token) localStorage.setItem('token', token);
+    localStorage.setItem('user_role', role);
+    setAuthHeader({ ...userData, token });
 };
 
 // Get user from localStorage (used for persistence across page reloads)
@@ -33,7 +41,7 @@ const user = getStoredUser();
 setAuthHeader(user);
 
 const initialState = {
-    user: user ? user : null, // Load user from storage or start as null
+    user: user ? { ...user, token: getStoredToken(user), role: getStoredRole(user) } : null,
     isError: false,
     isSuccess: false,
     isLoading: false,
@@ -76,6 +84,8 @@ const authService = {
             // ignore transport errors during client-side logout cleanup
         }
         localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user_role');
         localStorage.removeItem('syz_onboarding_complete');
         setAuthHeader(null);
     },
@@ -148,7 +158,7 @@ export const authSlice = createSlice({
                 state.isLoading = false;
                 state.isSuccess = true;
                 state.user = action.payload;
-                setAuthHeader(action.payload);
+                persistAuthUser(action.payload);
             })
             .addCase(register.rejected, (state, action) => {
                 state.isLoading = false;
@@ -165,7 +175,7 @@ export const authSlice = createSlice({
                 state.isLoading = false;
                 state.isSuccess = true;
                 state.user = action.payload;
-                setAuthHeader(action.payload);
+                persistAuthUser(action.payload);
             })
             .addCase(login.rejected, (state, action) => {
                 state.isLoading = false;
