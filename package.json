@@ -6,8 +6,10 @@
   "scripts": {
     "setup": "npm install && cd server && npm install && cd ../client && npm install",
     "client-build": "cd client && npm run build",
+    "server-check": "node --check server/server.js",
     "render-build": "npm run setup && npm run client-build",
-    "start": "cd server && node server.js"
+    "start": "cd server && node server.js",
+    "test": "npm run server-check && npm run client-build"
   },
   "keywords": [
     "SYZMEKU",
