@@ -1,7 +1,14 @@
 services:
   - type: web
-    name: syzmeku-api
+    name: syzmeku-engine
     env: node
-    plan: starter
+    plan: free
     buildCommand: npm run render-build
-    startCommand: npm start
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 22.16.0
+      - key: ENGINE_SIGNATURE
+        value: "EL_KAI_THARION_KAI_ZHUN"
+      - key: SYSTEM_VECTOR
+        value: "TRIANGULUM_THETA_7"
