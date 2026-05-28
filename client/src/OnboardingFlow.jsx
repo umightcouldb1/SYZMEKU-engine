@@ -70,6 +70,16 @@ const getResponse = (field, value) => {
   return 'Thank you for sharing that.';
 };
 
+const clearStaleAuthState = () => {
+  localStorage.removeItem('user');
+  localStorage.removeItem('token');
+  localStorage.removeItem('user_role');
+  localStorage.removeItem('syz_onboarding_complete');
+  delete axios.defaults.headers.common.Authorization;
+};
+
+const getStoredToken = (user = null) => user?.token || localStorage.getItem('token') || '';
+
 const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -111,11 +121,24 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
     setCurrentIndex((prev) => prev + 1);
   };
 
+  const redirectToLogin = () => {
+    clearStaleAuthState();
+    navigate('/login', {
+      replace: true,
+      state: { message: 'Your session needs a fresh login before Big SYZ Home can open.' },
+    });
+  };
+
   const navigateToHome = async () => {
     setLoading(true);
     setCompletionError('');
 
     try {
+      if (!getStoredToken(user)) {
+        redirectToLogin();
+        return;
+      }
+
       const completionResponse = await axios.post('/api/core/onboarding/complete', payload);
       const syncResult = await onComplete?.(completionResponse.data);
       const onboardingComplete = Boolean(syncResult?.completed ?? completionResponse.data?.onboarding?.completed);
@@ -132,6 +155,11 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
 
       navigate(syncResult?.targetRoute || appHomeRoute, { replace: true });
     } catch (error) {
+      if (error?.response?.status === 401) {
+        redirectToLogin();
+        return;
+      }
+
       const message = error?.response?.data?.message || error?.message || 'We saved your progress, but could not enter Big SYZ Home. Please try again.';
       console.error('[onboarding] completion flow failed', {
         message,
@@ -151,7 +179,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
           <h2>You’re all set.</h2>
           <p className="mentor-muted">Big SYZ is calibrated and ready to support your next moves.</p>
           <button type="button" className="entry-primary-button" disabled={loading} onClick={navigateToHome}>
-            {loading ? 'Saving...' : 'ENTER BIG SYZ HOME'}
+            {loading ? 'Checking session...' : 'ENTER BIG SYZ HOME'}
           </button>
           {completionError && <p className="auth-error-text">{completionError}</p>}
         </section>
