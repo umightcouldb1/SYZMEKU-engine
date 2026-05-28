@@ -14,11 +14,12 @@ app.get('/api/telemetry/status', (req, res) => {
   });
 });
 
-// Structural Pathing Fix: Direct routing to the client workspace build
-app.use(express.static(path.join(__dirname, '../client/build')));
+// Structural Pathing Fix: Vite emits the client production bundle to dist
+const clientBuildPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientBuildPath));
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
 });
 
 const PORT = process.env.PORT || 5000;
