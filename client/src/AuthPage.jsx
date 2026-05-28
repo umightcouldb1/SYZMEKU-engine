@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { login, register, reset } from './features/auth/authSlice';
 
 const AuthPage = ({ mode = 'login' }) => {
   const isSignup = mode === 'signup';
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isLoading, message } = useSelector((state) => state.auth || {});
 
   const [form, setForm] = useState({
@@ -14,7 +15,7 @@ const AuthPage = ({ mode = 'login' }) => {
     email: '',
     password: '',
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState(location.state?.message || '');
 
   const onChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
