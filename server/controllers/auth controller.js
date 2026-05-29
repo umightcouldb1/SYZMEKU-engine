@@ -8,6 +8,20 @@ const { logAuditEvent } = require('../utils/audit');
 const SESSION_TTL_DAYS = 30;
 const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 
+const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
+
+const getJwtSecret = () => {
+    const configuredSecret = process.env.JWT_SECRET || [process.env.ENGINE_SIGNATURE, process.env.SYSTEM_VECTOR]
+        .filter(Boolean)
+        .join(':');
+
+    if (!configuredSecret) {
+        throw new Error('JWT secret is not configured. Set JWT_SECRET or ENGINE_SIGNATURE/SYSTEM_VECTOR.');
+    }
+
+    return configuredSecret;
+};
+
 const buildTokenPayload = (user, sessionId) => ({
     id: user._id,
     sid: sessionId,
@@ -16,7 +30,7 @@ const buildTokenPayload = (user, sessionId) => ({
 });
 
 const createAuthToken = (user, sessionId) =>
-    jwt.sign(buildTokenPayload(user, sessionId), process.env.JWT_SECRET, { expiresIn: `${SESSION_TTL_DAYS}d` });
+    jwt.sign(buildTokenPayload(user, sessionId), getJwtSecret(), { expiresIn: `${SESSION_TTL_DAYS}d` });
 
 const setSessionCookie = (res, token) => {
     res.cookie('session', token, {
@@ -53,54 +67,68 @@ const buildAuthResponse = (user, token) => ({
     token,
 });
 
+const isDuplicateKeyError = (error) => error?.code === 11000;
+
 // @desc    Register new operative
 // @route   POST /api/auth/signup
 const registerUser = async (req, res) => {
-    const { username, email, password } = req.body;
+    const username = String(req.body?.username || '').trim();
+    const email = normalizeEmail(req.body?.email);
+    const { password } = req.body;
 
     if (!username || !email || !password) {
         return res.status(400).json({ message: 'Username, email, and password are required.' });
     }
 
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-        return res.status(400).json({ message: 'Operative already exists.' });
+    try {
+        const userExists = await User.findOne({ email });
+        if (userExists) {
+            return res.status(409).json({ message: 'An account already exists for this email. Please log in.' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const user = await User.create({
+            name: username,
+            email,
+            password: hashedPassword,
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid operative data.' });
+        }
+
+        const { sessionId } = await createPersistentSession(user, req);
+        const token = createAuthToken(user, sessionId);
+        setSessionCookie(res, token);
+
+        await logAuditEvent({
+            category: 'auth',
+            event: 'register_success',
+            req,
+            userId: user._id,
+            role: user.role || 'user',
+            success: true,
+            details: { email: user.email },
+        });
+
+        return res.status(201).json(buildAuthResponse(user, token));
+    } catch (error) {
+        if (isDuplicateKeyError(error)) {
+            return res.status(409).json({ message: 'An account already exists for this email. Please log in.' });
+        }
+
+        console.error('[AUTH_ERR] Registration failed:', error?.message || error);
+        return res.status(500).json({ message: 'Unable to create account right now. Please try again.' });
     }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const user = await User.create({
-        name: username,
-        email,
-        password: hashedPassword,
-    });
-
-    if (!user) {
-        return res.status(400).json({ message: 'Invalid operative data.' });
-    }
-
-    const { sessionId } = await createPersistentSession(user, req);
-    const token = createAuthToken(user, sessionId);
-    setSessionCookie(res, token);
-
-    await logAuditEvent({
-        category: 'auth',
-        event: 'register_success',
-        req,
-        userId: user._id,
-        role: user.role || 'user',
-        success: true,
-        details: { email: user.email },
-    });
-
-    res.status(201).json(buildAuthResponse(user, token));
 };
 
 // @desc    Authenticate operative
 // @route   POST /api/auth/login
 const loginUser = async (req, res) => {
-    const { email, password } = req.body;
+    const email = normalizeEmail(req.body?.email);
+    const { password } = req.body;
 
     if (!email || !password) {
         return res.status(400).json({ message: 'Email and password are required.' });
@@ -150,7 +178,7 @@ const logoutUser = async (req, res) => {
 
     if (token) {
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const decoded = jwt.verify(token, getJwtSecret());
             if (decoded?.sid) {
                 await AuthSession.findOneAndUpdate({ sessionId: decoded.sid }, { revokedAt: new Date() });
             }
