@@ -16,6 +16,13 @@ const getStoredUser = () => {
 const getStoredToken = (userData = null) => userData?.token || localStorage.getItem('token') || '';
 const getStoredRole = (userData = null) => userData?.role || localStorage.getItem('user_role') || 'user';
 
+const getAuthErrorMessage = (error) =>
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.message ||
+    error?.toString() ||
+    'Authentication failed.';
+
 const setAuthHeader = (userData = null) => {
     const token = getStoredToken(userData);
     if (token) {
@@ -100,14 +107,8 @@ export const register = createAsyncThunk(
         try {
             return await authService.register(user);
         } catch (error) {
-            // Error handling: get the message from response, or generic error
-            const message = 
-                (error.response && error.response.data && error.response.data.message) ||
-                error.message ||
-                error.toString();
-            
-            // Rejects the promise and returns the error message
-            return thunkAPI.rejectWithValue(message);
+            // Rejects the promise and returns the server error message
+            return thunkAPI.rejectWithValue(getAuthErrorMessage(error));
         }
     }
 );
@@ -119,12 +120,7 @@ export const login = createAsyncThunk(
         try {
             return await authService.login(user);
         } catch (error) {
-            const message = 
-                (error.response && error.response.data && error.response.data.message) ||
-                error.message ||
-                error.toString();
-            
-            return thunkAPI.rejectWithValue(message);
+            return thunkAPI.rejectWithValue(getAuthErrorMessage(error));
         }
     }
 );
