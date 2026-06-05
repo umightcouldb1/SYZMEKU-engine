@@ -3,6 +3,12 @@ const User = require('../models/User');
 
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 
+const deriveUsernameFromEmail = (email = '') => {
+  const normalizedEmail = normalizeEmail(email);
+  const localPart = normalizedEmail.split('@')[0] || 'user';
+  return localPart.replace(/[^a-z0-9._-]/g, '').slice(0, 48) || 'user';
+};
+
 const escapeRegExp = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const findUserByEmail = async (email) => {
@@ -29,9 +35,16 @@ const ensureAdminRoleForUser = async (user) => {
   if (!user || !isAdminEmail(user.email)) return user;
 
   let changed = false;
+  const normalizedEmail = normalizeEmail(user.email);
+  const derivedUsername = deriveUsernameFromEmail(normalizedEmail);
 
-  if (normalizeEmail(user.email) !== user.email) {
-    user.email = normalizeEmail(user.email);
+  if (user.email !== normalizedEmail) {
+    user.email = normalizedEmail;
+    changed = true;
+  }
+
+  if (!user.username) {
+    user.username = derivedUsername;
     changed = true;
   }
 
@@ -47,6 +60,7 @@ const ensureAdminRoleForUser = async (user) => {
 const initializeAdminSystem = async () => {
   const adminEmail = getAdminEmail();
   const initialPassword = getInitialAdminPassword();
+  const derivedUsername = deriveUsernameFromEmail(adminEmail);
 
   if (!adminEmail) {
     console.warn('[SYS-INIT] ADMIN_EMAIL not configured; admin auto-initialization skipped.');
@@ -67,12 +81,13 @@ const initializeAdminSystem = async () => {
 
       admin = await User.create({
         name: process.env.ADMIN_NAME || 'System Commander',
+        username: process.env.ADMIN_USERNAME || derivedUsername,
         email: adminEmail,
         password: hashedPassword,
         role: 'admin',
       });
 
-      console.log('[SYS-INIT] Master Admin account securely deployed.');
+      console.log(`[SYS-INIT] Master Admin account securely deployed with username: ${admin.username}.`);
       return;
     }
 
@@ -80,6 +95,11 @@ const initializeAdminSystem = async () => {
 
     if (admin.email !== adminEmail) {
       admin.email = adminEmail;
+      changed = true;
+    }
+
+    if (!admin.username) {
+      admin.username = process.env.ADMIN_USERNAME || derivedUsername;
       changed = true;
     }
 
@@ -110,6 +130,7 @@ const initializeAdminSystem = async () => {
 };
 
 module.exports = {
+  deriveUsernameFromEmail,
   ensureAdminRoleForUser,
   findAdminByEmail,
   findUserByEmail,
