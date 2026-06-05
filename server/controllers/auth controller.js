@@ -4,7 +4,7 @@ const AuthSession = require('../models/AuthSession');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { logAuditEvent } = require('../utils/audit');
-const { ensureAdminRoleForUser, isAdminEmail, normalizeEmail } = require('../utils/adminIdentity');
+const { ensureAdminRoleForUser, findUserByEmail, isAdminEmail, normalizeEmail } = require('../utils/adminIdentity');
 
 const SESSION_TTL_DAYS = 30;
 const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
@@ -80,7 +80,7 @@ const registerUser = async (req, res) => {
     }
 
     try {
-        const userExists = await User.findOne({ email });
+        const userExists = await findUserByEmail(email);
         if (userExists) {
             return res.status(409).json({ message: 'An account already exists for this email. Please log in.' });
         }
@@ -135,7 +135,7 @@ const loginUser = async (req, res) => {
         return res.status(400).json({ message: 'Email and password are required.' });
     }
 
-    let user = await User.findOne({ email });
+    let user = await findUserByEmail(email);
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
         await logAuditEvent({
@@ -150,6 +150,7 @@ const loginUser = async (req, res) => {
         return res.status(401).json({ message: 'Access Denied: Invalid credentials.' });
     }
 
+    user.email = email;
     user = await ensureAdminRoleForUser(user);
     const { sessionId } = await createPersistentSession(user, req);
     const token = createAuthToken(user, sessionId);
