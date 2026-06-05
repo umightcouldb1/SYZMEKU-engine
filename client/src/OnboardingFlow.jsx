@@ -7,8 +7,9 @@ const LIFE_STAGE_OPTIONS = [
   'I’m building something meaningful',
   'I’m recovering and resetting',
   'I’m maintaining momentum',
-  'Something else',
 ];
+
+const CUSTOM_LIFE_STAGE_LABEL = 'Something else';
 
 const SUPPORT_STYLE_OPTIONS = [
   'Calm and grounding',
@@ -27,7 +28,7 @@ const ONBOARDING_STEPS = [
   },
   {
     key: 'lifeStage',
-    type: 'choice',
+    type: 'multi-choice',
     prompt: 'Where are you right now in this season of life?',
     label: 'Life stage',
     options: LIFE_STAGE_OPTIONS,
@@ -59,13 +60,17 @@ const SUPPORT_COPY = {
   short: 'Short answer step: keep it simple and direct.',
   long: 'Reflection step: take your time and write freely.',
   choice: 'Selection step: choose the option that feels most true right now.',
+  'multi-choice': 'Selection step: choose the options that feel most true right now.',
 };
 
+const formatValue = (value) => (Array.isArray(value) ? value.join(', ') : value);
+
 const getResponse = (field, value) => {
-  if (field === 'name') return `${value}—great to meet you. We’ll build your guidance around that identity.`;
-  if (field === 'lifeStage') return `Thank you for naming that. ${value} gives us an honest starting point.`;
+  const displayValue = formatValue(value);
+  if (field === 'name') return `${displayValue}—great to meet you. We’ll build your guidance around that identity.`;
+  if (field === 'lifeStage') return `Thank you for naming that. ${displayValue} gives us an honest starting point.`;
   if (field === 'primaryConcern') return 'I hear that. We’ll turn this signal into practical direction.';
-  if (field === 'interactionStyle') return `${value} works. I’ll keep that tone consistent with you.`;
+  if (field === 'interactionStyle') return `${displayValue} works. I’ll keep that tone consistent with you.`;
   if (field === 'goals') return 'Clear direction. We can now translate this into daily aligned momentum.';
   return 'Thank you for sharing that.';
 };
@@ -80,15 +85,19 @@ const clearStaleAuthState = () => {
 
 const getStoredToken = (user = null) => user?.token || localStorage.getItem('token') || '';
 
+const hasValue = (value) => (Array.isArray(value) ? value.length > 0 : Boolean(String(value || '').trim()));
+
 const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [mentorResponse, setMentorResponse] = useState('');
   const [completionError, setCompletionError] = useState('');
+  const [customLifeStageActive, setCustomLifeStageActive] = useState(false);
+  const [customLifeStageText, setCustomLifeStageText] = useState('');
   const [form, setForm] = useState({
     name: user?.username || '',
-    lifeStage: '',
+    lifeStage: [],
     primaryConcern: '',
     interactionStyle: '',
     goals: '',
@@ -99,12 +108,13 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
   const payload = useMemo(
     () => ({
       name: form.name,
-      lifeStage: form.lifeStage,
+      lifeStage: formatValue(form.lifeStage),
+      lifeStages: form.lifeStage,
       primaryConcern: form.primaryConcern,
       interactionStyle: form.interactionStyle,
       goals: [form.goals].filter(Boolean),
       preferredName: form.name,
-      supportAreas: [form.primaryConcern, form.goals].filter(Boolean),
+      supportAreas: [...form.lifeStage, form.primaryConcern, form.goals].filter(Boolean),
       mentorStyle: form.interactionStyle,
     }),
     [form],
@@ -114,9 +124,48 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const nextStep = () => {
-    const value = String(form[currentStep.key] || '').trim();
+  const toggleLifeStage = (option) => {
+    setForm((prev) => {
+      const current = Array.isArray(prev.lifeStage) ? prev.lifeStage : [];
+      const next = current.includes(option)
+        ? current.filter((item) => item !== option)
+        : [...current, option];
+      return { ...prev, lifeStage: next };
+    });
+  };
+
+  const removeLifeStage = (option) => {
+    setForm((prev) => ({
+      ...prev,
+      lifeStage: prev.lifeStage.filter((item) => item !== option),
+    }));
+  };
+
+  const commitCustomLifeStage = () => {
+    const value = customLifeStageText.trim();
     if (!value) return;
+    setForm((prev) => {
+      const current = Array.isArray(prev.lifeStage) ? prev.lifeStage : [];
+      return current.includes(value) ? prev : { ...prev, lifeStage: [...current, value] };
+    });
+    setCustomLifeStageText('');
+    setCustomLifeStageActive(false);
+  };
+
+  const handleCustomLifeStageKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitCustomLifeStage();
+    }
+    if (event.key === 'Escape') {
+      setCustomLifeStageText('');
+      setCustomLifeStageActive(false);
+    }
+  };
+
+  const nextStep = () => {
+    const value = form[currentStep.key];
+    if (!hasValue(value)) return;
     setMentorResponse(getResponse(currentStep.key, value));
     setCurrentIndex((prev) => prev + 1);
   };
@@ -190,6 +239,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
   const stepNumber = currentIndex + 1;
   const isShort = currentStep.type === 'short';
   const isLong = currentStep.type === 'long';
+  const isMultiChoice = currentStep.type === 'multi-choice';
 
   return (
     <main className="onboarding-shell">
@@ -203,8 +253,8 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
         </header>
 
         <label className="onboarding-field-label">
-          {currentStep.label}
-          {currentStep.type !== 'choice' && (
+          {currentStep.label}{isMultiChoice ? ' (Select all that apply)' : ''}
+          {currentStep.type !== 'choice' && currentStep.type !== 'multi-choice' && (
             currentStep.type === 'long' ? (
               <textarea
                 value={form[currentStep.key]}
@@ -239,6 +289,61 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
           </div>
         )}
 
+        {isMultiChoice && (
+          <>
+            <div className="onboarding-choice-grid onboarding-multi-choice-grid" role="group" aria-label={currentStep.label}>
+              {currentStep.options.map((option) => {
+                const selected = form.lifeStage.includes(option);
+                return (
+                  <button
+                    type="button"
+                    key={option}
+                    className={`onboarding-choice ${selected ? 'selected' : ''}`}
+                    aria-pressed={selected}
+                    onClick={() => toggleLifeStage(option)}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+
+              {customLifeStageActive ? (
+                <div className="onboarding-custom-choice-input-wrap">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={customLifeStageText}
+                    onChange={(event) => setCustomLifeStageText(event.target.value)}
+                    onKeyDown={handleCustomLifeStageKeyDown}
+                    onBlur={commitCustomLifeStage}
+                    placeholder="Type details and press Enter"
+                    className="onboarding-custom-choice-input"
+                  />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className={`onboarding-choice onboarding-custom-choice ${form.lifeStage.some((item) => !LIFE_STAGE_OPTIONS.includes(item)) ? 'selected' : ''}`}
+                  onClick={() => setCustomLifeStageActive(true)}
+                >
+                  {form.lifeStage.find((item) => !LIFE_STAGE_OPTIONS.includes(item)) || CUSTOM_LIFE_STAGE_LABEL}
+                </button>
+              )}
+            </div>
+
+            {form.lifeStage.length > 0 && (
+              <div className="onboarding-selected-tags" aria-label="Selected life stage options">
+                {form.lifeStage.map((tag) => (
+                  <button key={tag} type="button" className="onboarding-selected-tag" onClick={() => removeLifeStage(tag)}>
+                    {tag}
+                    <span aria-hidden="true">×</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
         {mentorResponse && <p className="mentor-muted">{mentorResponse}</p>}
 
         <div className="onboarding-footer-row">
@@ -250,7 +355,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
           >
             Back
           </button>
-          <button type="button" className="entry-primary-button" onClick={nextStep}>
+          <button type="button" className="entry-primary-button" onClick={nextStep} disabled={!hasValue(form[currentStep.key])}>
             Continue
           </button>
         </div>
