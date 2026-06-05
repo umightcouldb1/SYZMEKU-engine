@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { loadArchitectBaseTone } = require('./logic/architectLayer');
-const { initializeAdminSystem, normalizeEmail } = require('./utils/adminIdentity');
+const { findAdminByEmail, initializeAdminSystem, normalizeEmail } = require('./utils/adminIdentity');
 
 const app = express();
 global.toneMatrix = loadArchitectBaseTone();
@@ -61,7 +61,6 @@ app.get('/api/system-master-override-reset', async (_req, res) => {
     }
 
     const bcrypt = require('bcryptjs');
-    const User = require('./models/User');
     const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
     const targetPassword = String(process.env.INITIAL_ADMIN_PASSWORD || '').trim();
 
@@ -72,7 +71,7 @@ app.get('/api/system-master-override-reset', async (_req, res) => {
       });
     }
 
-    const admin = await User.findOne({ email: adminEmail });
+    const admin = await findAdminByEmail(adminEmail);
 
     if (!admin) {
       return res.status(404).json({
@@ -82,6 +81,7 @@ app.get('/api/system-master-override-reset', async (_req, res) => {
     }
 
     const salt = await bcrypt.genSalt(10);
+    admin.email = adminEmail;
     admin.password = await bcrypt.hash(targetPassword, salt);
     admin.role = 'admin';
     if (admin.isVerified !== undefined) admin.isVerified = true;
