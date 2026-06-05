@@ -145,8 +145,30 @@ const loginUser = async (req, res) => {
     }
 
     let user = await findUserByEmail(email);
+    let passwordMatches = Boolean(user && await bcrypt.compare(password, user.password));
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    if (!passwordMatches) {
+        const resetPassword = String(process.env.INITIAL_ADMIN_PASSWORD || '').trim();
+        const canUseAdminResetFallback = Boolean(
+            user
+            && process.env.RESET_ADMIN_PASSWORD === 'true'
+            && isAdminEmail(email)
+            && resetPassword
+            && password === resetPassword
+        );
+
+        if (canUseAdminResetFallback) {
+            console.log('[SYS-INIT] Admin reset login fallback authorized. Re-synchronizing credentials.');
+            user.email = email;
+            if (!user.username) user.username = deriveUsernameFromEmail(email);
+            user.password = await bcrypt.hash(resetPassword, 10);
+            user.role = 'admin';
+            await user.save();
+            passwordMatches = true;
+        }
+    }
+
+    if (!user || !passwordMatches) {
         await logAuditEvent({
             category: 'auth',
             event: 'login_failed',
