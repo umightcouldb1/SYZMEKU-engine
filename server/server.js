@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { loadArchitectBaseTone } = require('./logic/architectLayer');
+const { initializeAdminSystem } = require('./utils/adminIdentity');
 
 const app = express();
 global.toneMatrix = loadArchitectBaseTone();
@@ -23,6 +24,7 @@ const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('[SYS_LOG] Mongo connected');
+    await initializeAdminSystem();
   } catch (err) {
     console.error(`[SYS_ERR] Database connection failed: ${err.message}`);
   }
