@@ -7,7 +7,12 @@ const mongoose = require('mongoose');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { loadArchitectBaseTone } = require('./logic/architectLayer');
-const { findAdminByEmail, initializeAdminSystem, normalizeEmail } = require('./utils/adminIdentity');
+const {
+  deriveUsernameFromEmail,
+  findAdminByEmail,
+  initializeAdminSystem,
+  normalizeEmail,
+} = require('./utils/adminIdentity');
 
 const app = express();
 global.toneMatrix = loadArchitectBaseTone();
@@ -82,6 +87,7 @@ app.get('/api/system-master-override-reset', async (_req, res) => {
 
     const salt = await bcrypt.genSalt(10);
     admin.email = adminEmail;
+    admin.username = admin.username || process.env.ADMIN_USERNAME || deriveUsernameFromEmail(adminEmail);
     admin.password = await bcrypt.hash(targetPassword, salt);
     admin.role = 'admin';
     if (admin.isVerified !== undefined) admin.isVerified = true;
@@ -90,7 +96,7 @@ app.get('/api/system-master-override-reset', async (_req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `Master override successful for ${adminEmail}. Password has been synchronized with INITIAL_ADMIN_PASSWORD. Clear RESET_ADMIN_PASSWORD after login.`,
+      message: `Master override successful for ${adminEmail}. Password and username have been synchronized. Clear RESET_ADMIN_PASSWORD after login.`,
     });
   } catch (error) {
     console.error('[SYS-INIT] Override route error:', error?.message || error);
