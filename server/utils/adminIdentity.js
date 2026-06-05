@@ -3,7 +3,18 @@ const User = require('../models/User');
 
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 
+const escapeRegExp = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const getAdminEmail = () => normalizeEmail(process.env.ADMIN_EMAIL);
+
+const findAdminByEmail = async (email) => {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return null;
+
+  return User.findOne({
+    email: { $regex: `^${escapeRegExp(normalizedEmail)}$`, $options: 'i' },
+  });
+};
 
 const isAdminEmail = (email = '') => {
   const adminEmail = getAdminEmail();
@@ -14,10 +25,20 @@ const getInitialAdminPassword = () => String(process.env.INITIAL_ADMIN_PASSWORD 
 
 const ensureAdminRoleForUser = async (user) => {
   if (!user || !isAdminEmail(user.email)) return user;
-  if (user.role === 'admin') return user;
 
-  user.role = 'admin';
-  await user.save();
+  let changed = false;
+
+  if (normalizeEmail(user.email) !== user.email) {
+    user.email = normalizeEmail(user.email);
+    changed = true;
+  }
+
+  if (user.role !== 'admin') {
+    user.role = 'admin';
+    changed = true;
+  }
+
+  if (changed) await user.save();
   return user;
 };
 
@@ -31,7 +52,7 @@ const initializeAdminSystem = async () => {
   }
 
   try {
-    let admin = await User.findOne({ email: adminEmail });
+    let admin = await findAdminByEmail(adminEmail);
 
     if (!admin) {
       if (!initialPassword) {
@@ -54,6 +75,11 @@ const initializeAdminSystem = async () => {
     }
 
     let changed = false;
+
+    if (admin.email !== adminEmail) {
+      admin.email = adminEmail;
+      changed = true;
+    }
 
     if (admin.role !== 'admin') {
       admin.role = 'admin';
@@ -83,6 +109,7 @@ const initializeAdminSystem = async () => {
 
 module.exports = {
   ensureAdminRoleForUser,
+  findAdminByEmail,
   initializeAdminSystem,
   isAdminEmail,
   normalizeEmail,
