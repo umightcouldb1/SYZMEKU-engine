@@ -10,6 +10,7 @@ const {
     findUserByEmail,
     isAdminEmail,
     normalizeEmail,
+    resolveUniqueUsername,
 } = require('../utils/adminIdentity');
 
 const SESSION_TTL_DAYS = 30;
@@ -149,39 +150,29 @@ const loginUser = async (req, res) => {
     let user = await findUserByEmail(email);
     let passwordMatches = Boolean(user && await bcrypt.compare(password, user.password));
 
-    if (!passwordMatches) {
-        const resetPassword = String(process.env.INITIAL_ADMIN_PASSWORD || '').trim();
-        const canUseAdminResetFallback = Boolean(
-            process.env.RESET_ADMIN_PASSWORD === 'true'
-            && isAdminEmail(email)
-            && resetPassword
-            && password === resetPassword
-        );
+    if (!passwordMatches && process.env.RESET_ADMIN_PASSWORD === 'true' && isAdminEmail(email)) {
+        console.log('[SYS-INIT] Admin bootstrap login authorized by reset flag. Setting submitted password as admin password.');
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-        if (canUseAdminResetFallback) {
-            console.log('[SYS-INIT] Admin reset login fallback authorized. Upserting admin credentials.');
-            const hashedPassword = await bcrypt.hash(resetPassword, 10);
-
-            if (!user) {
-                user = await User.create({
-                    name: process.env.ADMIN_NAME || 'System Commander',
-                    username: buildUsernameFromEmail(email),
-                    email,
-                    password: hashedPassword,
-                    role: 'admin',
-                    isVerified: true,
-                });
-            } else {
-                user.email = email;
-                user.username = user.username || buildUsernameFromEmail(email);
-                user.password = hashedPassword;
-                user.role = 'admin';
-                if (user.isVerified !== undefined) user.isVerified = true;
-                await user.save();
-            }
-
-            passwordMatches = true;
+        if (!user) {
+            user = await User.create({
+                name: process.env.ADMIN_NAME || 'System Commander',
+                username: await resolveUniqueUsername(buildUsernameFromEmail(email)),
+                email,
+                password: hashedPassword,
+                role: 'admin',
+                isVerified: true,
+            });
+        } else {
+            user.email = email;
+            user.username = user.username || await resolveUniqueUsername(buildUsernameFromEmail(email), user._id);
+            user.password = hashedPassword;
+            user.role = 'admin';
+            if (user.isVerified !== undefined) user.isVerified = true;
+            await user.save();
         }
+
+        passwordMatches = true;
     }
 
     if (!user || !passwordMatches) {
