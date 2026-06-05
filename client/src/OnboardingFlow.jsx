@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './interactionEnhancements.css';
+import './onboardingPrism.css';
 
 const LIFE_STAGE_OPTIONS = [
   'I’m figuring things out',
@@ -87,6 +88,8 @@ const clearStaleAuthState = () => {
 const getStoredToken = (user = null) => user?.token || localStorage.getItem('token') || '';
 
 const hasValue = (value) => (Array.isArray(value) ? value.length > 0 : Boolean(String(value || '').trim()));
+
+const formatStageCode = (stepNumber) => `STAGE_${String(stepNumber).padStart(2, '0')} // ${String(ONBOARDING_STEPS.length).padStart(2, '0')}`;
 
 const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
   const navigate = useNavigate();
@@ -224,8 +227,9 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
 
   if (!currentStep) {
     return (
-      <main className="onboarding-shell">
-        <section className="onboarding-stage onboarding-wide">
+      <main className="onboarding-shell onboarding-prism-shell">
+        <section className="onboarding-stage onboarding-wide onboarding-prism-card">
+          <div className="iridescent-shimmer" />
           <h2>You’re all set.</h2>
           <p className="mentor-muted">Big SYZ is calibrated and ready to support your next moves.</p>
           <button type="button" className="entry-primary-button" disabled={loading} onClick={navigateToHome}>
@@ -243,18 +247,19 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
   const isMultiChoice = currentStep.type === 'multi-choice';
 
   return (
-    <main className="onboarding-shell">
-      <section className={`onboarding-stage ${isLong ? 'onboarding-wide' : isShort ? 'onboarding-narrow' : 'onboarding-medium'}`}>
+    <main className="onboarding-shell onboarding-prism-shell">
+      <section className={`onboarding-stage onboarding-prism-card ${isLong ? 'onboarding-wide' : isShort ? 'onboarding-narrow' : 'onboarding-medium'}`}>
+        <div className="iridescent-shimmer" />
         <header className="onboarding-header-row">
           <div>
-            <p className="auth-eyebrow">Guided onboarding</p>
+            <p className="auth-eyebrow">Guided Onboarding</p>
             <h2>{currentStep.prompt}</h2>
           </div>
-          <p className="onboarding-progress">Step {stepNumber} of {ONBOARDING_STEPS.length}</p>
+          <p className="onboarding-progress">{formatStageCode(stepNumber)}</p>
         </header>
 
         <label className="onboarding-field-label">
-          {currentStep.label}{isMultiChoice ? ' (Select all that apply)' : ''}
+          {isMultiChoice ? '[ Select all frequency fields that apply ]' : currentStep.label}
           {currentStep.type !== 'choice' && currentStep.type !== 'multi-choice' && (
             currentStep.type === 'long' ? (
               <textarea
@@ -317,7 +322,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
                     onChange={(event) => setCustomLifeStageText(event.target.value)}
                     onKeyDown={handleCustomLifeStageKeyDown}
                     onBlur={commitCustomLifeStage}
-                    placeholder="Type details and press Enter"
+                    placeholder="Type vector details and press Enter"
                     className="onboarding-custom-choice-input"
                   />
                 </div>
@@ -327,7 +332,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
                   className={`onboarding-choice onboarding-custom-choice ${form.lifeStage.some((item) => !LIFE_STAGE_OPTIONS.includes(item)) ? 'selected' : ''}`}
                   onClick={() => setCustomLifeStageActive(true)}
                 >
-                  {form.lifeStage.find((item) => !LIFE_STAGE_OPTIONS.includes(item)) || CUSTOM_LIFE_STAGE_LABEL}
+                  {form.lifeStage.find((item) => !LIFE_STAGE_OPTIONS.includes(item)) || `${CUSTOM_LIFE_STAGE_LABEL} +`}
                 </button>
               )}
             </div>
@@ -362,11 +367,11 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
         </div>
       </section>
 
-      <aside className="onboarding-support-panel">
-        <p className="auth-eyebrow">Support note</p>
+      <aside className="onboarding-support-panel onboarding-prism-support">
+        <p className="auth-eyebrow">System Matrix Note</p>
         <h3>{SUPPORT_COPY[currentStep.type]}</h3>
         <p className="mentor-muted">
-          These answers shape how Big SYZ reflects, prioritizes, and supports you once you enter the main app.
+          These metrics tune how Big SYZ reflects, prioritizes, and supports you once interface authorization is complete.
         </p>
       </aside>
     </main>
