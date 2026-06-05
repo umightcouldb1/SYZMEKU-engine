@@ -1,0 +1,89 @@
+:root {
+  --font-ancient-future: 'Orbitron', sans-serif;
+  --font-tech-data: 'Space Grotesk', sans-serif;
+}
+
+.auth-prism-shell,
+.auth-prism-panel,
+.auth-prism-panel input,
+.auth-prism-panel button {
+  font-family: var(--font-tech-data);
+}
+
+.auth-prism-panel .auth-eyebrow,
+.auth-prism-panel h1,
+.auth-prism-panel .auth-form-grid label,
+.prism-submit-button,
+.auth-version-chip {
+  font-family: var(--font-ancient-future);
+}
+
+.auth-prism-panel .auth-eyebrow {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+}
+
+.auth-prism-panel h1 {
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.auth-prism-panel .auth-copy {
+  color: #8791a8;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-prism-panel .auth-form-grid label {
+  color: rgba(103, 232, 249, 0.84);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+}
+
+.auth-prism-panel .auth-form-grid label:last-of-type {
+  color: rgba(244, 114, 182, 0.84);
+}
+
+.auth-prism-panel .auth-form-grid input {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.prism-submit-button {
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.auth-footer-row {
+  font-family: var(--font-tech-data);
+}
+
+.auth-version-chip {
+  color: rgba(103, 232, 249, 0.54);
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 560px) {
+  .auth-prism-panel .auth-eyebrow {
+    letter-spacing: 0.32em;
+  }
+
+  .auth-prism-panel h1 {
+    letter-spacing: 0.1em;
+  }
+
+  .prism-submit-button {
+    letter-spacing: 0.12em;
+  }
+}
