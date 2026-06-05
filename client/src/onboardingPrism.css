@@ -1,0 +1,245 @@
+.onboarding-prism-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  grid-template-columns: minmax(320px, 1fr) minmax(240px, 320px);
+  align-items: start;
+  gap: 1.2rem;
+  padding: clamp(1.25rem, 5vw, 3rem);
+  background:
+    linear-gradient(rgba(99, 179, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 179, 255, 0.045) 1px, transparent 1px),
+    radial-gradient(circle at 15% 18%, rgba(34, 211, 238, 0.18), transparent 34%),
+    radial-gradient(circle at 86% 82%, rgba(236, 72, 153, 0.16), transparent 35%),
+    #02040a;
+  background-size: 72px 72px, 72px 72px, auto, auto, auto;
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+.onboarding-prism-shell::before,
+.onboarding-prism-shell::after {
+  content: '';
+  position: absolute;
+  width: min(52vw, 700px);
+  aspect-ratio: 1;
+  border-radius: 999px;
+  filter: blur(135px);
+  pointer-events: none;
+  z-index: -2;
+}
+
+.onboarding-prism-shell::before {
+  top: -22%;
+  left: -12%;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.26), rgba(99, 102, 241, 0.12), transparent 68%);
+}
+
+.onboarding-prism-shell::after {
+  right: -12%;
+  bottom: -24%;
+  background: radial-gradient(circle, rgba(244, 63, 94, 0.24), rgba(168, 85, 247, 0.14), transparent 70%);
+}
+
+.onboarding-prism-card,
+.onboarding-prism-support {
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  background:
+    linear-gradient(145deg, rgba(7, 11, 20, 0.96), rgba(13, 18, 33, 0.9)) padding-box,
+    linear-gradient(135deg, #22d3ee, #8b5cf6 38%, #ec4899 68%, #fbbf24) border-box;
+  border: 1px solid transparent;
+  box-shadow:
+    0 0 50px rgba(168, 85, 247, 0.15),
+    0 24px 80px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(18px);
+}
+
+.onboarding-prism-card {
+  padding: clamp(1.5rem, 4vw, 2rem);
+}
+
+.onboarding-prism-card > *:not(.iridescent-shimmer),
+.onboarding-prism-support > * {
+  position: relative;
+  z-index: 1;
+}
+
+.onboarding-prism-card .iridescent-shimmer {
+  opacity: 0.55;
+}
+
+.onboarding-prism-shell .auth-eyebrow,
+.onboarding-prism-shell h2,
+.onboarding-prism-shell .onboarding-field-label,
+.onboarding-prism-shell .onboarding-choice,
+.onboarding-prism-shell .entry-primary-button,
+.onboarding-prism-shell .entry-secondary-button,
+.onboarding-prism-shell .onboarding-progress,
+.onboarding-prism-shell .onboarding-selected-tag,
+.onboarding-prism-support h3 {
+  font-family: 'Orbitron', sans-serif;
+}
+
+.onboarding-prism-shell .auth-eyebrow {
+  width: fit-content;
+  color: transparent;
+  background: linear-gradient(90deg, #67e8f9, #c084fc, #f0abfc);
+  background-clip: text;
+  -webkit-background-clip: text;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.42em;
+}
+
+.onboarding-prism-shell h2 {
+  max-width: 760px;
+  font-size: clamp(1.35rem, 3.2vw, 2.1rem);
+  line-height: 1.18;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.08);
+}
+
+.onboarding-prism-shell .onboarding-progress {
+  border: 1px solid rgba(34, 211, 238, 0.22);
+  border-radius: 999px;
+  background: rgba(34, 211, 238, 0.1);
+  color: #67e8f9;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.28rem 0.55rem;
+}
+
+.onboarding-prism-shell .onboarding-field-label {
+  margin-top: 1.65rem;
+  color: #8791a8;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.onboarding-prism-shell .onboarding-input,
+.onboarding-prism-shell .onboarding-textarea {
+  border-color: rgba(148, 163, 184, 0.42) !important;
+  background: rgba(15, 23, 42, 0.58) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.onboarding-prism-shell .onboarding-input:focus,
+.onboarding-prism-shell .onboarding-textarea:focus,
+.onboarding-prism-shell .onboarding-custom-choice-input:focus {
+  border-color: rgba(34, 211, 238, 0.92) !important;
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(34, 211, 238, 0.12),
+    0 0 20px rgba(34, 211, 238, 0.18);
+}
+
+.onboarding-prism-shell .onboarding-choice {
+  min-height: 64px;
+  border-color: rgba(30, 41, 59, 0.9);
+  background: rgba(16, 21, 36, 0.6);
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+  transition: border-color 180ms ease, color 180ms ease, box-shadow 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.onboarding-prism-shell .onboarding-choice:hover {
+  border-color: rgba(148, 163, 184, 0.62);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.onboarding-prism-shell .onboarding-choice.selected {
+  border-color: rgba(34, 211, 238, 0.9);
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(139, 92, 246, 0.16));
+  color: #fff;
+  box-shadow: 0 0 18px rgba(34, 211, 238, 0.18);
+}
+
+.onboarding-prism-shell .onboarding-custom-choice.selected {
+  border-color: rgba(244, 114, 182, 0.9);
+  background: linear-gradient(135deg, rgba(244, 114, 182, 0.18), rgba(139, 92, 246, 0.16));
+  box-shadow: 0 0 18px rgba(236, 72, 153, 0.2);
+}
+
+.onboarding-prism-shell .onboarding-selected-tags {
+  border-color: rgba(30, 41, 59, 0.9);
+  background: rgba(16, 21, 36, 0.4);
+}
+
+.onboarding-prism-shell .onboarding-selected-tag {
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(139, 92, 246, 0.1));
+  color: #67e8f9;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.onboarding-prism-shell .mentor-muted {
+  color: #8791a8;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.onboarding-prism-shell .entry-primary-button,
+.onboarding-prism-shell .entry-secondary-button {
+  border-radius: 10px;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  padding: 0.78rem 1.1rem;
+  text-transform: uppercase;
+}
+
+.onboarding-prism-shell .entry-primary-button {
+  background: linear-gradient(90deg, #06b6d4, #7c3aed, #ec4899);
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.16);
+}
+
+.onboarding-prism-shell .entry-secondary-button {
+  border-color: rgba(148, 163, 184, 0.26);
+  background: rgba(15, 23, 42, 0.46);
+}
+
+.onboarding-prism-support {
+  padding: 1.35rem;
+  color: #d7e3ff;
+}
+
+.onboarding-prism-support h3 {
+  margin-top: 0;
+  color: #fff;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  line-height: 1.55;
+  text-transform: uppercase;
+}
+
+@media (max-width: 980px) {
+  .onboarding-prism-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .onboarding-prism-shell .onboarding-header-row,
+  .onboarding-prism-shell .onboarding-footer-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .onboarding-prism-shell .auth-eyebrow {
+    letter-spacing: 0.28em;
+  }
+}
