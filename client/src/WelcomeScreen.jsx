@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const clearStaleAuthState = () => {
@@ -10,6 +10,7 @@ const clearStaleAuthState = () => {
 
 const WelcomeScreen = () => {
   const navigate = useNavigate();
+  const [showInfo, setShowInfo] = useState(false);
 
   const startAuthFlow = (path) => {
     clearStaleAuthState();
@@ -40,8 +41,44 @@ const WelcomeScreen = () => {
         <button type="button" className="welcome-learn-link welcome-text-button" onClick={() => startAuthFlow('/login')}>
           Continue as returning user
         </button>
-        <p className="welcome-learn-link">Learn how it works</p>
+        <button type="button" className="welcome-learn-link welcome-text-button" onClick={() => setShowInfo(true)}>
+          Learn how it works
+        </button>
       </section>
+
+      {showInfo && (
+        <div className="welcome-info-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-info-title">
+          <section className="welcome-info-panel">
+            <button type="button" className="welcome-info-close" aria-label="Close information panel" onClick={() => setShowInfo(false)}>
+              ×
+            </button>
+            <p className="auth-eyebrow">Engine blueprint</p>
+            <h2 id="welcome-info-title">How Big SYZ Works</h2>
+            <div className="welcome-info-grid">
+              <article>
+                <h3>1. Guided Signal Intake</h3>
+                <p>Your onboarding answers establish your current season, support needs, and preferred guidance style.</p>
+              </article>
+              <article>
+                <h3>2. Pattern Reflection</h3>
+                <p>The system organizes those signals into clear prompts, reminders, and direction for daily momentum.</p>
+              </article>
+              <article>
+                <h3>3. Adaptive Mentorship</h3>
+                <p>Your profile persists so Big SYZ can keep its tone, context, and next steps aligned as you move.</p>
+              </article>
+            </div>
+            <div className="welcome-info-actions">
+              <button type="button" className="entry-secondary-button" onClick={() => setShowInfo(false)}>
+                Keep reading later
+              </button>
+              <button type="button" className="entry-primary-button" onClick={() => startAuthFlow('/signup')}>
+                Create account
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 };
