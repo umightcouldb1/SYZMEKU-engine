@@ -29,17 +29,21 @@ const connectDB = async () => {
 };
 connectDB();
 
+// ==========================================
+// PHASE III SECURITY LAYER INTEGRATION
+// ==========================================
 app.use(helmet());
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 300,
-    standardHeaders: true,
-    legacyHeaders: false,
-  }),
-);
-app.use(express.json({ limit: '1mb' }));
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || true, credentials: true }));
+app.use(express.json({ limit: '1mb' }));
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.API_RATE_LIMIT_MAX || 100),
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api', apiLimiter);
 
 // Telemetry Handshake Verification Route
 app.get('/api/telemetry/status', (req, res) => {
