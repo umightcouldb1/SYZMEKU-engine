@@ -39,8 +39,8 @@ const ONBOARDING_STEPS = [
     key: 'primaryConcern',
     type: 'long',
     prompt: 'What has been taking up the most emotional bandwidth lately?',
-    label: 'Current concern',
-    placeholder: 'Share what feels most important right now',
+    label: 'Current core concern',
+    placeholder: 'Share what feels most vital to untangle or prioritize right now',
   },
   {
     key: 'interactionStyle',
@@ -67,15 +67,84 @@ const SUPPORT_COPY = {
 
 const formatValue = (value) => (Array.isArray(value) ? value.join(', ') : value);
 
+const generateSystemReflection = (stages = []) => {
+  if (!stages.length) {
+    return 'Acknowledging system connection. Let’s explore your current vector alignment with patience and precision.';
+  }
+
+  const lowerStages = stages.map((stage) => stage.toLowerCase());
+  const hasBuilding = lowerStages.some((stage) => stage.includes('building'));
+  const hasFiguring = lowerStages.some((stage) => stage.includes('figuring'));
+  const hasResetting = lowerStages.some((stage) => stage.includes('recovering') || stage.includes('reset'));
+  const hasMomentum = lowerStages.some((stage) => stage.includes('momentum'));
+  const hasCustom = stages.some((stage) => !LIFE_STAGE_OPTIONS.includes(stage));
+
+  if (hasBuilding && hasResetting) {
+    return 'Balancing construction with deep structural restoration takes real internal capacity. We will tune the engine to protect your energy while supporting what you are building.';
+  }
+
+  if (hasBuilding && hasMomentum) {
+    return 'Your field is oriented toward expansion and continuity. Big SYZ will prioritize operational momentum without letting speed outrun alignment.';
+  }
+
+  if (hasBuilding) {
+    return 'Focusing coordinates on manifestation and expansion. Big SYZ is calibrating around operational momentum and the architecture you are bringing into form.';
+  }
+
+  if (hasResetting || hasFiguring) {
+    return 'A season of calibration is not a delay. It is a tactical position for restoring clarity, protecting signal quality, and choosing the next move with intention.';
+  }
+
+  if (hasCustom) {
+    return 'You named a more specific coordinate than the default grid could hold. Big SYZ will keep that signal visible as we map what needs attention next.';
+  }
+
+  return `Acknowledging your current alignment with ${formatValue(stages)}. Let’s map the emotional bandwidth around that field with care.`;
+};
+
 const getResponse = (field, value) => {
   const displayValue = formatValue(value);
   if (field === 'name') return `${displayValue}—great to meet you. We’ll build your guidance around that identity.`;
-  if (field === 'lifeStage') return `Thank you for naming that. ${displayValue} gives us an honest starting point.`;
-  if (field === 'primaryConcern') return 'I hear that. We’ll turn this signal into practical direction.';
+  if (field === 'lifeStage') return generateSystemReflection(Array.isArray(value) ? value : [value].filter(Boolean));
+  if (field === 'primaryConcern') return 'That signal is received. We’ll translate it into guidance that is specific enough to move with.';
   if (field === 'interactionStyle') return `${displayValue} works. I’ll keep that tone consistent with you.`;
   if (field === 'goals') return 'Clear direction. We can now translate this into daily aligned momentum.';
   return 'Thank you for sharing that.';
 };
+
+const SacredGeometryMandala = () => (
+  <div className="sacred-mandala" aria-hidden="true">
+    <svg viewBox="0 0 100 100" focusable="false">
+      <defs>
+        <linearGradient id="onboardingPrismGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.45" />
+          <stop offset="50%" stopColor="#ec4899" stopOpacity="0.42" />
+          <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.24" />
+        </linearGradient>
+      </defs>
+      <circle cx="50" cy="50" r="35" className="mandala-glow grid-pulse mandala-glow-purple" />
+      <circle cx="50" cy="50" r="25" className="mandala-glow grid-pulse mandala-glow-cyan" />
+      <g className="mandala-layer-1" stroke="url(#onboardingPrismGrad)" strokeWidth="0.15" fill="none">
+        {Array.from({ length: 12 }).map((_, index) => (
+          <circle key={`circle-${index}`} cx="50" cy="50" r="30" transform={`rotate(${index * 30} 50 50)`} />
+        ))}
+        {Array.from({ length: 6 }).map((_, index) => (
+          <polygon
+            key={`polygon-${index}`}
+            points="50,15 80,32.5 80,67.5 50,85 20,67.5 20,32.5"
+            transform={`rotate(${index * 15} 50 50)`}
+          />
+        ))}
+      </g>
+      <g className="mandala-layer-2" stroke="url(#onboardingPrismGrad)" strokeWidth="0.2" fill="none">
+        {Array.from({ length: 8 }).map((_, index) => (
+          <rect key={`rect-${index}`} x="30" y="30" width="40" height="40" transform={`rotate(${index * 45} 50 50)`} />
+        ))}
+        <circle cx="50" cy="50" r="10" stroke="#22d3ee" strokeWidth="0.1" strokeDasharray="1,1" />
+      </g>
+    </svg>
+  </div>
+);
 
 const clearStaleAuthState = () => {
   localStorage.removeItem('user');
@@ -228,6 +297,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
   if (!currentStep) {
     return (
       <main className="onboarding-shell onboarding-prism-shell">
+        <SacredGeometryMandala />
         <section className="onboarding-stage onboarding-wide onboarding-prism-card">
           <div className="iridescent-shimmer" />
           <h2>You’re all set.</h2>
@@ -245,18 +315,28 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
   const isShort = currentStep.type === 'short';
   const isLong = currentStep.type === 'long';
   const isMultiChoice = currentStep.type === 'multi-choice';
+  const isConcernStep = currentStep.key === 'primaryConcern';
+  const currentReflection = generateSystemReflection(form.lifeStage);
 
   return (
     <main className="onboarding-shell onboarding-prism-shell">
+      <SacredGeometryMandala />
       <section className={`onboarding-stage onboarding-prism-card ${isLong ? 'onboarding-wide' : isShort ? 'onboarding-narrow' : 'onboarding-medium'}`}>
         <div className="iridescent-shimmer" />
         <header className="onboarding-header-row">
           <div>
-            <p className="auth-eyebrow">Guided Onboarding</p>
+            <p className="auth-eyebrow">{isConcernStep ? 'System Discernment' : 'Guided Onboarding'}</p>
             <h2>{currentStep.prompt}</h2>
           </div>
           <p className="onboarding-progress">{formatStageCode(stepNumber)}</p>
         </header>
+
+        {isConcernStep && (
+          <div className="sovereign-feedback-panel">
+            <span>■ Sovereign Feedback //</span>
+            <p>{currentReflection}</p>
+          </div>
+        )}
 
         <label className="onboarding-field-label">
           {isMultiChoice ? '[ Select all frequency fields that apply ]' : currentStep.label}
@@ -350,7 +430,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
           </>
         )}
 
-        {mentorResponse && <p className="mentor-muted">{mentorResponse}</p>}
+        {mentorResponse && !isConcernStep && <p className="mentor-muted mentor-response-line">{mentorResponse}</p>}
 
         <div className="onboarding-footer-row">
           <button
@@ -362,7 +442,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
             Back
           </button>
           <button type="button" className="entry-primary-button" onClick={nextStep} disabled={!hasValue(form[currentStep.key])}>
-            Continue
+            {isConcernStep ? 'Synchronize Matrix' : 'Continue'}
           </button>
         </div>
       </section>
