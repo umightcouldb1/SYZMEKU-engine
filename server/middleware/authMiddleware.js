@@ -3,6 +3,7 @@ const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const AuthSession = require('../models/AuthSession');
 const { logAuditEvent } = require('../utils/audit');
+const { getJwtSecret } = require('../utils/jwtSecret');
 
 const getCookieToken = (cookieHeader = '') => {
     const sessionCookie = cookieHeader
@@ -32,7 +33,7 @@ const protect = asyncHandler(async (req, res, next) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, getJwtSecret());
 
         if (!decoded?.sid) {
             res.status(401);
