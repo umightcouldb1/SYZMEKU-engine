@@ -75,6 +75,8 @@ const buildAuthResponse = (user, token) => ({
 
 const isDuplicateKeyError = (error) => error?.code === 11000;
 
+const buildUsernameFromEmail = (email) => process.env.ADMIN_USERNAME || deriveUsernameFromEmail(email);
+
 // @desc    Register new operative
 // @route   POST /api/auth/signup
 const registerUser = async (req, res) => {
@@ -150,20 +152,34 @@ const loginUser = async (req, res) => {
     if (!passwordMatches) {
         const resetPassword = String(process.env.INITIAL_ADMIN_PASSWORD || '').trim();
         const canUseAdminResetFallback = Boolean(
-            user
-            && process.env.RESET_ADMIN_PASSWORD === 'true'
+            process.env.RESET_ADMIN_PASSWORD === 'true'
             && isAdminEmail(email)
             && resetPassword
             && password === resetPassword
         );
 
         if (canUseAdminResetFallback) {
-            console.log('[SYS-INIT] Admin reset login fallback authorized. Re-synchronizing credentials.');
-            user.email = email;
-            if (!user.username) user.username = deriveUsernameFromEmail(email);
-            user.password = await bcrypt.hash(resetPassword, 10);
-            user.role = 'admin';
-            await user.save();
+            console.log('[SYS-INIT] Admin reset login fallback authorized. Upserting admin credentials.');
+            const hashedPassword = await bcrypt.hash(resetPassword, 10);
+
+            if (!user) {
+                user = await User.create({
+                    name: process.env.ADMIN_NAME || 'System Commander',
+                    username: buildUsernameFromEmail(email),
+                    email,
+                    password: hashedPassword,
+                    role: 'admin',
+                    isVerified: true,
+                });
+            } else {
+                user.email = email;
+                user.username = user.username || buildUsernameFromEmail(email);
+                user.password = hashedPassword;
+                user.role = 'admin';
+                if (user.isVerified !== undefined) user.isVerified = true;
+                await user.save();
+            }
+
             passwordMatches = true;
         }
     }
