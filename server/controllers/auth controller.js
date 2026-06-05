@@ -4,6 +4,7 @@ const AuthSession = require('../models/AuthSession');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { logAuditEvent } = require('../utils/audit');
+const { getJwtSecret } = require('../utils/jwtSecret');
 const {
     deriveUsernameFromEmail,
     ensureAdminRoleForUser,
@@ -15,18 +16,6 @@ const {
 
 const SESSION_TTL_DAYS = 30;
 const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
-
-const getJwtSecret = () => {
-    const configuredSecret = process.env.JWT_SECRET || [process.env.ENGINE_SIGNATURE, process.env.SYSTEM_VECTOR]
-        .filter(Boolean)
-        .join(':');
-
-    if (!configuredSecret) {
-        throw new Error('JWT secret is not configured. Set JWT_SECRET or ENGINE_SIGNATURE/SYSTEM_VECTOR.');
-    }
-
-    return configuredSecret;
-};
 
 const buildTokenPayload = (user, sessionId) => ({
     id: user._id,
