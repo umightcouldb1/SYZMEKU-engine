@@ -5,9 +5,7 @@ const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 
 const escapeRegExp = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const getAdminEmail = () => normalizeEmail(process.env.ADMIN_EMAIL);
-
-const findAdminByEmail = async (email) => {
+const findUserByEmail = async (email) => {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) return null;
 
@@ -15,6 +13,10 @@ const findAdminByEmail = async (email) => {
     email: { $regex: `^${escapeRegExp(normalizedEmail)}$`, $options: 'i' },
   });
 };
+
+const getAdminEmail = () => normalizeEmail(process.env.ADMIN_EMAIL);
+
+const findAdminByEmail = (email) => findUserByEmail(email);
 
 const isAdminEmail = (email = '') => {
   const adminEmail = getAdminEmail();
@@ -110,6 +112,7 @@ const initializeAdminSystem = async () => {
 module.exports = {
   ensureAdminRoleForUser,
   findAdminByEmail,
+  findUserByEmail,
   initializeAdminSystem,
   isAdminEmail,
   normalizeEmail,
