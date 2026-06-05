@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { login, register, reset } from './features/auth/authSlice';
+import './authTypography.css';
 
 const AuthPage = ({ mode = 'login' }) => {
   const isSignup = mode === 'signup';
