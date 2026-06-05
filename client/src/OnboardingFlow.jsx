@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import './interactionEnhancements.css';
 
 const LIFE_STAGE_OPTIONS = [
   'I’m figuring things out',
