@@ -4,11 +4,10 @@ const AuthSession = require('../models/AuthSession');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { logAuditEvent } = require('../utils/audit');
+const { ensureAdminRoleForUser, isAdminEmail, normalizeEmail } = require('../utils/adminIdentity');
 
 const SESSION_TTL_DAYS = 30;
 const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
-
-const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 
 const getJwtSecret = () => {
     const configuredSecret = process.env.JWT_SECRET || [process.env.ENGINE_SIGNATURE, process.env.SYSTEM_VECTOR]
@@ -89,16 +88,18 @@ const registerUser = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const user = await User.create({
+        let user = await User.create({
             name: username,
             email,
             password: hashedPassword,
+            role: isAdminEmail(email) ? 'admin' : 'user',
         });
 
         if (!user) {
             return res.status(400).json({ message: 'Invalid operative data.' });
         }
 
+        user = await ensureAdminRoleForUser(user);
         const { sessionId } = await createPersistentSession(user, req);
         const token = createAuthToken(user, sessionId);
         setSessionCookie(res, token);
@@ -134,7 +135,7 @@ const loginUser = async (req, res) => {
         return res.status(400).json({ message: 'Email and password are required.' });
     }
 
-    const user = await User.findOne({ email });
+    let user = await User.findOne({ email });
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
         await logAuditEvent({
@@ -149,6 +150,7 @@ const loginUser = async (req, res) => {
         return res.status(401).json({ message: 'Access Denied: Invalid credentials.' });
     }
 
+    user = await ensureAdminRoleForUser(user);
     const { sessionId } = await createPersistentSession(user, req);
     const token = createAuthToken(user, sessionId);
     setSessionCookie(res, token);
