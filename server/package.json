@@ -4,21 +4,23 @@
   "description": "Backend API for SYZMEKU engine",
   "main": "server.js",
   "scripts": {
-    "dev": "nodemon server.cjs",
-    "server": "node server.cjs",
-    "start": "node server.cjs"
+    "dev": "nodemon server.js",
+    "server": "node server.js",
+    "start": "node server.js",
+    "check": "node --check server.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "colors": "^1.4.0",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-async-handler": "^1.2.0",
-    "express-rate-limit": "^7.2.0",
+    "express-mongo-sanitize": "^2.2.0",
+    "express-rate-limit": "^7.3.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.3.1",
-    "cross-env": "^7.0.3",
+    "mongoose": "^8.4.4",
     "stripe": "^14.0.0"
   },
   "devDependencies": {
