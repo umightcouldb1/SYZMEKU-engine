@@ -47,19 +47,19 @@ const AuthPage = ({ mode = 'login' }) => {
         <div className="iridescent-shimmer" />
         <div className="auth-panel auth-prism-panel">
           <div className="auth-heading-block">
-            <p className="auth-eyebrow">Big SYZ Core Access</p>
-            <h1>{isSignup ? 'Create your account' : 'Welcome back'}</h1>
+            <p className="auth-eyebrow">Sovereign Architecture</p>
+            <h1>{isSignup ? 'New Node' : 'Big SYZ'}</h1>
             <p className="auth-copy">
               {isSignup
-                ? 'Start your guided alignment journey in less than two minutes.'
-                : 'Align credentials to resume system measures.'}
+                ? '[ Initialize identity to enter the sovereign system ]'
+                : '[ Verify identity to resume measures ]'}
             </p>
           </div>
 
           <form className="auth-form-grid" onSubmit={onSubmit}>
             {isSignup && (
               <label>
-                Preferred name
+                Preferred Name
                 <input
                   type="text"
                   value={form.username}
@@ -69,17 +69,17 @@ const AuthPage = ({ mode = 'login' }) => {
               </label>
             )}
             <label>
-              Email
+              System Email
               <input
                 type="email"
                 value={form.email}
                 onChange={(event) => onChange('email', event.target.value)}
-                placeholder="commander@toisouljahacademy.com"
+                placeholder="umightcouldb1@toisouljahacademy.com"
                 required
               />
             </label>
             <label>
-              Password
+              Access Cipher
               <input
                 type="password"
                 value={form.password}
@@ -89,7 +89,7 @@ const AuthPage = ({ mode = 'login' }) => {
             </label>
 
             <button type="submit" disabled={isLoading} className="entry-primary-button prism-submit-button">
-              <span>{isLoading ? 'Please wait...' : isSignup ? 'Create account' : 'Log in'}</span>
+              <span>{isLoading ? 'Synchronizing...' : isSignup ? 'Initialize Node' : 'Initialize Connection'}</span>
             </button>
           </form>
 
@@ -97,10 +97,10 @@ const AuthPage = ({ mode = 'login' }) => {
 
           <div className="auth-footer-row">
             <p className="auth-footer-copy">
-              {isSignup ? 'Already have an account?' : 'New to Big SYZ?'}{' '}
+              {isSignup ? 'Existing node?' : 'New to Big SYZ?'}{' '}
               <Link to={isSignup ? '/login' : '/signup'}>{isSignup ? 'Log in' : 'Create account'}</Link>
             </p>
-            <span className="auth-version-chip">v5.0.0-GSI</span>
+            <span className="auth-version-chip">SYS_STATUS: ONLINE | v5.0.0-GSI</span>
           </div>
         </div>
       </section>
