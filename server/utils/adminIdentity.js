@@ -11,13 +11,15 @@ const deriveUsernameFromEmail = (email = '') => {
 
 const escapeRegExp = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const emailQuery = (email) => ({
+  email: { $regex: `^${escapeRegExp(normalizeEmail(email))}$`, $options: 'i' },
+});
+
 const findUserByEmail = async (email) => {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) return null;
 
-  return User.findOne({
-    email: { $regex: `^${escapeRegExp(normalizedEmail)}$`, $options: 'i' },
-  });
+  return User.findOne(emailQuery(normalizedEmail));
 };
 
 const resolveUniqueUsername = async (preferredUsername, currentUserId = null) => {
@@ -41,7 +43,7 @@ const resolveUniqueUsername = async (preferredUsername, currentUserId = null) =>
   }
 };
 
-const getAdminEmail = () => normalizeEmail(process.env.ADMIN_EMAIL);
+const getAdminEmail = () => normalizeEmail(process.env.ADMIN_EMAIL || 'umightcouldb1@toisouljahacademy.com');
 
 const findAdminByEmail = (email) => findUserByEmail(email);
 
@@ -78,10 +80,23 @@ const ensureAdminRoleForUser = async (user) => {
   return user;
 };
 
+const createFreshAdmin = async (adminEmail, initialPassword) => {
+  const hashedPassword = await bcrypt.hash(initialPassword, 10);
+  const username = await resolveUniqueUsername(process.env.ADMIN_USERNAME || deriveUsernameFromEmail(adminEmail));
+
+  return User.create({
+    name: process.env.ADMIN_NAME || 'System Commander',
+    username,
+    email: adminEmail,
+    password: hashedPassword,
+    role: 'admin',
+    isVerified: true,
+  });
+};
+
 const initializeAdminSystem = async () => {
   const adminEmail = getAdminEmail();
   const initialPassword = getInitialAdminPassword();
-  const derivedUsername = process.env.ADMIN_USERNAME || deriveUsernameFromEmail(adminEmail);
 
   if (!adminEmail) {
     console.warn('[SYS-INIT] ADMIN_EMAIL not configured; admin auto-initialization skipped.');
@@ -89,6 +104,23 @@ const initializeAdminSystem = async () => {
   }
 
   try {
+    if (process.env.RESET_ADMIN_PASSWORD === 'true') {
+      if (!initialPassword) {
+        console.warn('[SYS-INIT] RESET_ADMIN_PASSWORD is true, but INITIAL_ADMIN_PASSWORD is not configured.');
+        return;
+      }
+
+      console.log(`[SYS-INIT] Initiating master clearance for: ${adminEmail}`);
+      const deleteResult = await User.deleteMany(emailQuery(adminEmail));
+      if (deleteResult.deletedCount > 0) {
+        console.log(`[SYS-INIT] Cleared ${deleteResult.deletedCount} old/stuck admin records from database.`);
+      }
+
+      const admin = await createFreshAdmin(adminEmail, initialPassword);
+      console.log(`[SYS-INIT] SUCCESS: Master Admin account freshly deployed and synchronized with username: ${admin.username}.`);
+      return;
+    }
+
     let admin = await findAdminByEmail(adminEmail);
 
     if (!admin) {
@@ -98,22 +130,13 @@ const initializeAdminSystem = async () => {
       }
 
       console.log('[SYS-INIT] Admin identity not found. Provisioning system commander.');
-      const hashedPassword = await bcrypt.hash(initialPassword, 10);
-      const username = await resolveUniqueUsername(derivedUsername);
-
-      admin = await User.create({
-        name: process.env.ADMIN_NAME || 'System Commander',
-        username,
-        email: adminEmail,
-        password: hashedPassword,
-        role: 'admin',
-      });
-
+      admin = await createFreshAdmin(adminEmail, initialPassword);
       console.log(`[SYS-INIT] Master Admin account securely deployed with username: ${admin.username}.`);
       return;
     }
 
     let changed = false;
+    const derivedUsername = process.env.ADMIN_USERNAME || deriveUsernameFromEmail(adminEmail);
 
     if (admin.email !== adminEmail) {
       admin.email = adminEmail;
@@ -130,24 +153,14 @@ const initializeAdminSystem = async () => {
       changed = true;
     }
 
-    if (process.env.RESET_ADMIN_PASSWORD === 'true') {
-      if (!initialPassword) {
-        console.warn('[SYS-INIT] RESET_ADMIN_PASSWORD is true, but INITIAL_ADMIN_PASSWORD is not configured.');
-      } else {
-        console.log('[SYS-INIT] Password reset flag detected. Updating admin credentials.');
-        admin.password = await bcrypt.hash(initialPassword, 10);
-        changed = true;
-      }
-    }
-
     if (changed) {
       await admin.save();
-      console.log('[SYS-INIT] Admin identity updated. Clear RESET_ADMIN_PASSWORD after successful login.');
+      console.log('[SYS-INIT] Admin identity updated.');
     } else {
       console.log('[SYS-INIT] Admin identity verified. Integrity: Secure.');
     }
   } catch (error) {
-    console.error('[SYS-INIT] Error initializing admin system:', error?.message || error);
+    console.error('[SYS-INIT] CRITICAL CRASH during admin initialization:', error?.message || error);
   }
 };
 
