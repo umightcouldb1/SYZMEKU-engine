@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { loadArchitectBaseTone } = require('./logic/architectLayer');
-const { initializeAdminSystem } = require('./utils/adminIdentity');
+const { initializeAdminSystem, normalizeEmail } = require('./utils/adminIdentity');
 
 const app = express();
 global.toneMatrix = loadArchitectBaseTone();
@@ -46,6 +46,57 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 app.use('/api', apiLimiter);
+
+// ==========================================
+// TEMPORARY PHASE III MASTER FORCE OVERRIDE
+// Active only while RESET_ADMIN_PASSWORD=true is configured in Render.
+// ==========================================
+app.get('/api/system-master-override-reset', async (_req, res) => {
+  try {
+    if (process.env.RESET_ADMIN_PASSWORD !== 'true') {
+      return res.status(403).json({
+        success: false,
+        message: 'Master override is disabled. Set RESET_ADMIN_PASSWORD=true to enable it temporarily.',
+      });
+    }
+
+    const bcrypt = require('bcryptjs');
+    const User = require('./models/User');
+    const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
+    const targetPassword = String(process.env.INITIAL_ADMIN_PASSWORD || '').trim();
+
+    if (!adminEmail || !targetPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD must both be configured in Render.',
+      });
+    }
+
+    const admin = await User.findOne({ email: adminEmail });
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: `Admin email not found in database: ${adminEmail}`,
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    admin.password = await bcrypt.hash(targetPassword, salt);
+    admin.role = 'admin';
+    if (admin.isVerified !== undefined) admin.isVerified = true;
+
+    await admin.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Master override successful for ${adminEmail}. Password has been synchronized with INITIAL_ADMIN_PASSWORD. Clear RESET_ADMIN_PASSWORD after login.`,
+    });
+  } catch (error) {
+    console.error('[SYS-INIT] Override route error:', error?.message || error);
+    return res.status(500).json({ success: false, error: error?.message || 'Unknown override error' });
+  }
+});
 
 // Telemetry Handshake Verification Route
 app.get('/api/telemetry/status', (req, res) => {
