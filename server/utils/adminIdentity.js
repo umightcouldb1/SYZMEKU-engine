@@ -20,6 +20,27 @@ const findUserByEmail = async (email) => {
   });
 };
 
+const resolveUniqueUsername = async (preferredUsername, currentUserId = null) => {
+  const base = String(preferredUsername || 'user')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '')
+    .slice(0, 48) || 'user';
+
+  let candidate = base;
+  let suffix = 1;
+
+  while (true) {
+    const existing = await User.findOne({ username: candidate }).select('_id');
+    if (!existing || (currentUserId && String(existing._id) === String(currentUserId))) {
+      return candidate;
+    }
+
+    suffix += 1;
+    candidate = `${base.slice(0, Math.max(1, 48 - String(suffix).length - 1))}-${suffix}`;
+  }
+};
+
 const getAdminEmail = () => normalizeEmail(process.env.ADMIN_EMAIL);
 
 const findAdminByEmail = (email) => findUserByEmail(email);
@@ -36,7 +57,7 @@ const ensureAdminRoleForUser = async (user) => {
 
   let changed = false;
   const normalizedEmail = normalizeEmail(user.email);
-  const derivedUsername = deriveUsernameFromEmail(normalizedEmail);
+  const derivedUsername = process.env.ADMIN_USERNAME || deriveUsernameFromEmail(normalizedEmail);
 
   if (user.email !== normalizedEmail) {
     user.email = normalizedEmail;
@@ -44,7 +65,7 @@ const ensureAdminRoleForUser = async (user) => {
   }
 
   if (!user.username) {
-    user.username = derivedUsername;
+    user.username = await resolveUniqueUsername(derivedUsername, user._id);
     changed = true;
   }
 
@@ -60,7 +81,7 @@ const ensureAdminRoleForUser = async (user) => {
 const initializeAdminSystem = async () => {
   const adminEmail = getAdminEmail();
   const initialPassword = getInitialAdminPassword();
-  const derivedUsername = deriveUsernameFromEmail(adminEmail);
+  const derivedUsername = process.env.ADMIN_USERNAME || deriveUsernameFromEmail(adminEmail);
 
   if (!adminEmail) {
     console.warn('[SYS-INIT] ADMIN_EMAIL not configured; admin auto-initialization skipped.');
@@ -78,10 +99,11 @@ const initializeAdminSystem = async () => {
 
       console.log('[SYS-INIT] Admin identity not found. Provisioning system commander.');
       const hashedPassword = await bcrypt.hash(initialPassword, 10);
+      const username = await resolveUniqueUsername(derivedUsername);
 
       admin = await User.create({
         name: process.env.ADMIN_NAME || 'System Commander',
-        username: process.env.ADMIN_USERNAME || derivedUsername,
+        username,
         email: adminEmail,
         password: hashedPassword,
         role: 'admin',
@@ -99,7 +121,7 @@ const initializeAdminSystem = async () => {
     }
 
     if (!admin.username) {
-      admin.username = process.env.ADMIN_USERNAME || derivedUsername;
+      admin.username = await resolveUniqueUsername(derivedUsername, admin._id);
       changed = true;
     }
 
@@ -137,4 +159,5 @@ module.exports = {
   initializeAdminSystem,
   isAdminEmail,
   normalizeEmail,
+  resolveUniqueUsername,
 };
