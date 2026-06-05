@@ -94,6 +94,29 @@ const createFreshAdmin = async (adminEmail, initialPassword) => {
   });
 };
 
+const applyAdminPasswordReset = async (adminEmail, initialPassword) => {
+  let admin = await findAdminByEmail(adminEmail);
+
+  if (!admin) {
+    admin = await createFreshAdmin(adminEmail, initialPassword);
+    console.log(`[SYS-INIT] Admin identity created with username: ${admin.username}.`);
+    return admin;
+  }
+
+  admin.email = adminEmail;
+  admin.username = admin.username || await resolveUniqueUsername(
+    process.env.ADMIN_USERNAME || deriveUsernameFromEmail(adminEmail),
+    admin._id,
+  );
+  admin.password = await bcrypt.hash(initialPassword, 10);
+  admin.role = 'admin';
+  if (admin.isVerified !== undefined) admin.isVerified = true;
+
+  await admin.save();
+  console.log(`[SYS-INIT] Admin credentials refreshed in place for username: ${admin.username}.`);
+  return admin;
+};
+
 const initializeAdminSystem = async () => {
   const adminEmail = getAdminEmail();
   const initialPassword = getInitialAdminPassword();
@@ -110,14 +133,9 @@ const initializeAdminSystem = async () => {
         return;
       }
 
-      console.log(`[SYS-INIT] Initiating master clearance for: ${adminEmail}`);
-      const deleteResult = await User.deleteMany(emailQuery(adminEmail));
-      if (deleteResult.deletedCount > 0) {
-        console.log(`[SYS-INIT] Cleared ${deleteResult.deletedCount} old/stuck admin records from database.`);
-      }
-
-      const admin = await createFreshAdmin(adminEmail, initialPassword);
-      console.log(`[SYS-INIT] SUCCESS: Master Admin account freshly deployed and synchronized with username: ${admin.username}.`);
+      console.log(`[SYS-INIT] Password reset flag detected for: ${adminEmail}`);
+      await applyAdminPasswordReset(adminEmail, initialPassword);
+      console.log('[SYS-INIT] Admin reset completed without deleting the user record. Clear RESET_ADMIN_PASSWORD after successful login.');
       return;
     }
 
