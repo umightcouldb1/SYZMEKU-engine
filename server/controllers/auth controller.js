@@ -4,7 +4,13 @@ const AuthSession = require('../models/AuthSession');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { logAuditEvent } = require('../utils/audit');
-const { ensureAdminRoleForUser, findUserByEmail, isAdminEmail, normalizeEmail } = require('../utils/adminIdentity');
+const {
+    deriveUsernameFromEmail,
+    ensureAdminRoleForUser,
+    findUserByEmail,
+    isAdminEmail,
+    normalizeEmail,
+} = require('../utils/adminIdentity');
 
 const SESSION_TTL_DAYS = 30;
 const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
@@ -57,7 +63,8 @@ const createPersistentSession = async (user, req) => {
 
 const buildAuthResponse = (user, token) => ({
     _id: user._id,
-    username: user.name,
+    username: user.username || user.name,
+    name: user.name,
     email: user.email,
     role: user.role || 'user',
     mirrorMode: user.mirrorMode,
@@ -87,9 +94,11 @@ const registerUser = async (req, res) => {
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
+        const normalizedUsername = deriveUsernameFromEmail(username.includes('@') ? username : `${username}@local.user`);
 
         let user = await User.create({
             name: username,
+            username: normalizedUsername,
             email,
             password: hashedPassword,
             role: isAdminEmail(email) ? 'admin' : 'user',
@@ -151,6 +160,7 @@ const loginUser = async (req, res) => {
     }
 
     user.email = email;
+    if (!user.username) user.username = deriveUsernameFromEmail(email);
     user = await ensureAdminRoleForUser(user);
     const { sessionId } = await createPersistentSession(user, req);
     const token = createAuthToken(user, sessionId);
