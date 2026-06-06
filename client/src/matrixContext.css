@@ -1,0 +1,31 @@
+.mentor-matrix-note-card {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(34, 211, 238, 0.32);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(34, 211, 238, 0.14), transparent 34%),
+    radial-gradient(circle at 88% 85%, rgba(236, 72, 153, 0.12), transparent 34%),
+    #ffffff;
+}
+
+.mentor-matrix-note-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-top: 3px solid rgba(34, 211, 238, 0.65);
+  pointer-events: none;
+}
+
+.mentor-matrix-note-card .mentor-section-label {
+  color: #0f8aa0;
+}
+
+.mentor-matrix-note-card h2 {
+  color: #10213f;
+}
+
+.mentor-matrix-note-card p:not(.mentor-section-label):not(.mentor-muted) {
+  color: #15294d;
+  font-weight: 600;
+  line-height: 1.65;
+}
