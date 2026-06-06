@@ -35,6 +35,14 @@ const sovereignContextSchema = new mongoose.Schema(
       trim: true,
       maxlength: 6000,
     },
+    lifeStageChoices: {
+      type: [String],
+      default: [],
+      set: (choices = []) =>
+        Array.isArray(choices)
+          ? choices.map((choice) => String(choice || '').trim()).filter(Boolean)
+          : [],
+    },
   },
   { _id: false }
 );
@@ -61,6 +69,8 @@ const memorySchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+memorySchema.index({ updatedAt: -1 });
 
 memorySchema.methods.appendConversationTurns = function appendConversationTurns(turns = []) {
   const cleanTurns = turns
