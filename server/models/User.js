@@ -119,6 +119,8 @@ const userSchema = mongoose.Schema(
                 lifeStage: { type: String, default: '' },
                 supportAreas: { type: [String], default: [] },
                 mentorStyle: { type: String, default: 'gentle' },
+                sovereignMatrixNote: { type: String, default: '' },
+                onboardingReflection: { type: String, default: '' },
                 baseline: {
                     sleep: { type: Number, default: 0 },
                     stress: { type: Number, default: 0 },
