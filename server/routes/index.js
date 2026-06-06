@@ -15,6 +15,7 @@ router.use('/onboarding', require('./onboardingRoutes'));
 router.use('/admin', require('./adminRoutes'));
 router.use('/vision', require('./visionRoutes'));
 router.use('/memory', require('./memoryRoutes'));
+router.use('/monetization', require('./billingRoutes'));
 
 // Keep the lineage-aware analyzer ahead of the legacy core router.
 router.use('/core/analyze', require('./memoryAnalyzeRoutes'));
