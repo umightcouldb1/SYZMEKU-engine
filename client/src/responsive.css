@@ -1,0 +1,369 @@
+/* Responsive optimization layer for mobile app surfaces and desktop browsers. */
+html {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  min-height: 100svh;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+#root {
+  min-width: 0;
+  min-height: 100svh;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+video,
+canvas,
+iframe,
+svg {
+  max-width: 100%;
+}
+
+button,
+a,
+input,
+select,
+textarea,
+[role='button'] {
+  touch-action: manipulation;
+}
+
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+.entry-shell,
+.onboarding-shell,
+.mentor-shell,
+.mentor-home-shell,
+.crystalline-container {
+  width: 100%;
+  min-width: 0;
+  min-height: 100svh;
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+.auth-prism-frame,
+.auth-prism-panel,
+.welcome-panel,
+.auth-panel,
+.onboarding-stage,
+.onboarding-support-panel,
+.mentor-card,
+.mentor-chat-panel,
+.mentor-admin-signature-card,
+.mentor-matrix-note-card {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.auth-prism-frame {
+  width: min(560px, 100%);
+}
+
+.auth-prism-panel {
+  overflow-wrap: anywhere;
+}
+
+.auth-prism-panel h1 {
+  font-size: 3rem;
+  line-height: 1.02;
+}
+
+.auth-prism-panel .auth-copy,
+.auth-prism-panel .auth-footer-copy,
+.mentor-message,
+.mentor-card,
+.onboarding-stage {
+  overflow-wrap: anywhere;
+}
+
+.auth-form-grid input,
+.onboarding-input,
+.onboarding-textarea,
+.mentor-card input,
+.mentor-ask-row-stacked textarea {
+  min-height: 48px;
+  width: 100%;
+}
+
+.entry-primary-button,
+.entry-secondary-button,
+.prism-submit-button,
+.mentor-button,
+.mentor-chip,
+.mentor-voice-button,
+.mentor-vision-upload {
+  min-height: 44px;
+}
+
+.google-auth-slot,
+.google-auth-slot > div,
+.google-auth-slot iframe {
+  width: 100% !important;
+}
+
+.google-auth-slot {
+  align-items: center;
+}
+
+.auth-footer-row,
+.mentor-header,
+.mentor-chat-intro,
+.mentor-compose-actions,
+.mentor-ask-row,
+.mentor-quick-actions,
+.mentor-vision-row,
+.mentor-voice-row,
+.mentor-memory-status {
+  min-width: 0;
+}
+
+.mentor-home-layout,
+.mentor-grid,
+.mentor-support-grid,
+.ui-grid,
+.crystal-grid {
+  min-width: 0;
+}
+
+.mentor-message {
+  width: fit-content;
+  max-width: min(780px, 100%);
+}
+
+.mentor-message-user {
+  max-width: min(680px, 92%);
+}
+
+.overlay-panel {
+  width: min(860px, calc(100vw - 2rem));
+}
+
+@media (min-width: 961px) {
+  .mentor-home-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+    align-items: start;
+  }
+
+  .mentor-chat-panel {
+    min-height: 620px;
+  }
+
+  .entry-shell,
+  .onboarding-shell,
+  .mentor-shell,
+  .mentor-home-shell {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (max-width: 960px) {
+  .ui-grid,
+  .crystal-grid,
+  .mentor-home-layout,
+  .mentor-support-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mentor-header,
+  .mentor-chat-intro,
+  .mentor-compose-actions,
+  .mentor-ask-row,
+  .mentor-quick-actions,
+  .mentor-vision-row,
+  .mentor-voice-row,
+  .mentor-memory-status {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mentor-button,
+  .mentor-chip,
+  .mentor-voice-button,
+  .mentor-vision-upload,
+  .mentor-vision-row .mentor-link,
+  .mentor-memory-status .mentor-link {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .mentor-message,
+  .mentor-message-user {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 680px) {
+  .entry-shell,
+  .onboarding-shell,
+  .mentor-shell,
+  .mentor-home-shell,
+  .crystalline-container {
+    padding: 0.85rem;
+  }
+
+  .auth-prism-shell {
+    place-items: start center;
+    overflow-y: auto;
+  }
+
+  .auth-prism-frame {
+    border-radius: 14px;
+    margin: 0.35rem 0;
+  }
+
+  .auth-prism-panel,
+  .welcome-panel,
+  .auth-panel,
+  .onboarding-stage,
+  .mentor-chat-panel,
+  .mentor-card {
+    padding: 1rem;
+    border-radius: 14px;
+  }
+
+  .auth-prism-panel h1 {
+    font-size: 2.35rem;
+  }
+
+  .auth-prism-panel .auth-eyebrow,
+  .auth-prism-panel .auth-copy,
+  .auth-prism-panel .auth-form-grid label,
+  .prism-submit-button,
+  .auth-version-chip,
+  .mentor-eyebrow,
+  .mentor-section-label {
+    letter-spacing: 0.08em;
+  }
+
+  .auth-prism-panel .auth-copy {
+    font-size: 0.88rem;
+  }
+
+  .auth-footer-row {
+    gap: 0.55rem;
+  }
+
+  .auth-version-chip {
+    white-space: normal;
+  }
+
+  .onboarding-header-row,
+  .onboarding-footer-row {
+    flex-direction: column;
+  }
+
+  .onboarding-progress {
+    white-space: normal;
+  }
+
+  .onboarding-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .crystal-title {
+    font-size: 1.15rem;
+    letter-spacing: 0.18em;
+  }
+
+  .crystal-status {
+    text-align: left;
+  }
+
+  .crystal-prism {
+    width: 220px;
+    height: 220px;
+  }
+
+  .ring-1 {
+    width: 220px;
+    height: 220px;
+  }
+
+  .ring-2 {
+    width: 250px;
+    height: 250px;
+  }
+
+  .overlay-panel {
+    bottom: auto;
+    left: 0.85rem;
+    right: 0.85rem;
+    top: 0.85rem;
+    transform: none;
+    width: auto;
+    max-height: calc(100svh - 1.7rem);
+  }
+}
+
+@media (max-width: 420px) {
+  .entry-shell,
+  .onboarding-shell,
+  .mentor-shell,
+  .mentor-home-shell,
+  .crystalline-container {
+    padding: 0.65rem;
+  }
+
+  .auth-prism-panel h1 {
+    font-size: 2rem;
+  }
+
+  .auth-prism-panel .auth-eyebrow,
+  .auth-prism-panel .auth-form-grid label,
+  .auth-divider,
+  .prism-submit-button,
+  .auth-version-chip {
+    letter-spacing: 0.04em;
+  }
+
+  .google-auth-slot {
+    min-height: 42px;
+  }
+
+  .welcome-actions,
+  .mentor-inline-actions,
+  .operator-strip {
+    flex-direction: column;
+  }
+
+  .welcome-actions > *,
+  .mentor-inline-actions > *,
+  .operator-strip > * {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
