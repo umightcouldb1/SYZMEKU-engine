@@ -191,6 +191,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
       supportAreas: [...form.lifeStage, form.primaryConcern, form.goals].filter(Boolean),
       mentorStyle: form.interactionStyle,
       onboardingReflection: smartReflection,
+      sovereignMatrixNote: smartReflection,
     }),
     [form, smartReflection],
   );
@@ -291,13 +292,19 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
       }
 
       const completionResponse = await axios.post('/api/core/onboarding/complete', payload);
-      const syncResult = await onComplete?.(completionResponse.data);
-      const onboardingComplete = Boolean(syncResult?.completed ?? completionResponse.data?.onboarding?.completed);
+      const profileContextResponse = await axios.post('/api/onboarding/profile-context', payload).catch(() => ({ data: null }));
+      const completionData = {
+        ...completionResponse.data,
+        onboarding: profileContextResponse.data?.onboarding || completionResponse.data?.onboarding,
+      };
+      const syncResult = await onComplete?.(completionData);
+      const onboardingComplete = Boolean(syncResult?.completed ?? completionData?.onboarding?.completed);
 
       console.info('[onboarding] completion flow success', {
         completed: onboardingComplete,
         source: syncResult?.source || 'component',
         targetRoute: syncResult?.targetRoute || appHomeRoute,
+        matrixContextSaved: Boolean(profileContextResponse.data?.onboarding?.profile?.sovereignMatrixNote),
       });
 
       if (!onboardingComplete) {
