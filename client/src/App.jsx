@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useSelector } from 'react-redux';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AuthPage from './AuthPage';
-import Dashboard from './Dashboard';
+import Dashboard from './sovereign-shield/Dashboard';
 import OnboardingFlow from './OnboardingFlow';
 import WelcomeScreen from './WelcomeScreen';
 import RequireAuth from './components/RequireAuth';
