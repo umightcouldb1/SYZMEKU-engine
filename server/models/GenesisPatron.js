@@ -61,7 +61,7 @@ const genesisPatronSchema = new mongoose.Schema(
     },
     payment: {
       provider: { type: String, default: 'manual', trim: true, maxlength: 80 },
-      reference: { type: String, trim: true, maxlength: 180, sparse: true, unique: true },
+      reference: { type: String, trim: true, maxlength: 180 },
       amountCents: { type: Number, min: 0, default: 0 },
       currency: { type: String, default: 'usd', trim: true, lowercase: true, maxlength: 12 },
       paidAt: { type: Date },
