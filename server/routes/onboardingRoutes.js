@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const { protect } = require('../middleware/authMiddleware');
+const User = require('../models/User');
 const { requestModelText } = require('../services/modelRouter');
 
 const cleanList = (value) =>
@@ -70,6 +71,43 @@ Return only the 2-sentence note. Do not include labels, markdown, bullets, quote
       customAnswer: fallbackReflection({ choices, typedText }),
     });
   }
+});
+
+router.post('/profile-context', protect, async (req, res) => {
+  const sovereignMatrixNote = String(req.body?.sovereignMatrixNote || req.body?.onboardingReflection || '').trim();
+  const lifeStage = String(req.body?.lifeStage || '').trim();
+  const supportAreas = cleanList(req.body?.supportAreas || req.body?.lifeStages || req.body?.choices);
+  const primaryConcern = String(req.body?.primaryConcern || req.body?.typedText || '').trim();
+  const mentorStyle = String(req.body?.mentorStyle || req.body?.interactionStyle || '').trim();
+  const goals = cleanList(req.body?.goals);
+
+  if (!sovereignMatrixNote && !lifeStage && !supportAreas.length && !primaryConcern && !mentorStyle && !goals.length) {
+    return res.status(400).json({ message: 'No onboarding profile context provided.' });
+  }
+
+  const setPatch = {};
+  if (sovereignMatrixNote) {
+    setPatch['onboarding.profile.sovereignMatrixNote'] = sovereignMatrixNote;
+    setPatch['onboarding.profile.onboardingReflection'] = sovereignMatrixNote;
+  }
+  if (lifeStage) setPatch['onboarding.profile.lifeStage'] = lifeStage;
+  if (supportAreas.length || primaryConcern || goals.length) {
+    setPatch['onboarding.profile.supportAreas'] = [...supportAreas, primaryConcern, ...goals].filter(Boolean);
+  }
+  if (mentorStyle) setPatch['onboarding.profile.mentorStyle'] = mentorStyle;
+  if (goals.length) setPatch['onboarding.profile.goals'] = goals;
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: setPatch },
+    { new: true },
+  ).select('onboarding name username email role');
+
+  return res.json({
+    success: true,
+    onboarding: user?.onboarding || null,
+    user,
+  });
 });
 
 module.exports = router;
