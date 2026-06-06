@@ -81,6 +81,7 @@ const OnboardingVoiceBridge = () => {
     recognition.continuous = false;
     recognition.interimResults = true;
 
+    const baseValue = textarea.value.trim();
     let finalTranscript = '';
     setListening(true);
 
@@ -95,9 +96,8 @@ const OnboardingVoiceBridge = () => {
         }
       }
 
-      const existingValue = textarea.value.trim();
       const nextChunk = `${finalTranscript}${interimTranscript}`.trim();
-      const nextValue = [existingValue, nextChunk].filter(Boolean).join(existingValue ? ' ' : '');
+      const nextValue = [baseValue, nextChunk].filter(Boolean).join(baseValue ? ' ' : '');
       writeTextareaValue(textarea, nextValue);
     };
 
