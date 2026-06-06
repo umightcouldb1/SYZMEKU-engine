@@ -8,6 +8,8 @@ const MODEL_ALIASES = {
   code_model: process.env.CODE_MODEL || DEFAULT_MODEL,
 };
 
+const getGeminiApiKey = () => process.env.GEMINI_API_KEY || process.env.Gemini_API_Key || process.env.Gemini_API_KEY || '';
+
 const resolveModelAlias = (mode = 'strategic') => {
   if (['mentor', 'reflect', 'reframe'].includes(mode)) return MODEL_ALIASES.mentor_model;
   if (['strategic', 'plan', 'build', 'analyze'].includes(mode)) return MODEL_ALIASES.strategic_model;
@@ -19,14 +21,14 @@ const resolveModelAlias = (mode = 'strategic') => {
 
 const requestModelJson = async ({ mode, prompt }) => {
   const modelName = resolveModelAlias(mode);
-  const apiKey = process.env.Gemini_API_Key || '';
+  const apiKey = getGeminiApiKey();
   if (!apiKey) {
     return {
       error: {
         objectives: ['Model provider key is missing on the server.'],
         constraints: [],
-        risks: ['Gemini_API_Key is not configured.'],
-        leverage: ['Set Gemini_API_Key and optional *_MODEL aliases.'],
+        risks: ['GEMINI_API_KEY is not configured.'],
+        leverage: ['Set GEMINI_API_KEY and optional *_MODEL aliases.'],
         next_actions: ['Configure environment and retry.'],
       },
     };
@@ -56,6 +58,19 @@ const requestModelJson = async ({ mode, prompt }) => {
   return { data, model: modelName };
 };
 
+const extractModelText = (modelResult = {}) =>
+  modelResult?.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+const requestModelText = async ({ mode = 'mentor', prompt }) => {
+  const modelResult = await requestModelJson({ mode, prompt });
+  if (modelResult?.error || modelResult?.providerError) return modelResult;
+
+  return {
+    text: extractModelText(modelResult),
+    model: modelResult.model,
+  };
+};
+
 const getModelRoutingConfig = () => ({ ...MODEL_ALIASES });
 
-module.exports = { requestModelJson, resolveModelAlias, getModelRoutingConfig };
+module.exports = { requestModelJson, requestModelText, resolveModelAlias, getModelRoutingConfig };
