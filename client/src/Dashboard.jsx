@@ -33,14 +33,21 @@ const PATH_STAGES = [
 
 const normalizeFocusTasks = (tasks = []) => tasks.map((task) => task?.description).filter(Boolean);
 
-const buildConversation = ({ user, summary, chatAnswer, loading }) => {
+const getOnboardingProfile = (user = {}) => user?.onboarding?.profile || {};
+
+const getMatrixNote = (profile = {}) =>
+  profile.sovereignMatrixNote || profile.onboardingReflection || '';
+
+const buildConversation = ({ user, summary, chatAnswer, loading, matrixNote }) => {
   const userName = user?.username || user?.name || 'there';
   const transcript = [
     {
       id: 'welcome',
       speaker: 'syz',
       label: 'Big SYZ',
-      text: `${DAILY_GREETING()}, ${userName}. I’m here to help you slow the noise down, name what matters, and choose the next grounded move. Start with how you feel, what you’re carrying, or what decision needs clarity today.`,
+      text: matrixNote
+        ? `${DAILY_GREETING()}, ${userName}. Your Matrix Note is active, so I’ll keep guidance anchored to that profile while we choose the next grounded move.`
+        : `${DAILY_GREETING()}, ${userName}. I’m here to help you slow the noise down, name what matters, and choose the next grounded move. Start with how you feel, what you’re carrying, or what decision needs clarity today.`,
     },
   ];
 
@@ -99,6 +106,18 @@ const Dashboard = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [operatorVisibility, setOperatorVisibility] = useState(null);
 
+  const onboardingProfile = useMemo(() => getOnboardingProfile(user), [user]);
+  const matrixNote = getMatrixNote(onboardingProfile);
+  const mentorContext = useMemo(() => ({
+    onboardingProfile,
+    sovereignMatrixNote: matrixNote,
+    preferredName: onboardingProfile.preferredName || user?.username || user?.name || '',
+    lifeStage: onboardingProfile.lifeStage || '',
+    supportAreas: onboardingProfile.supportAreas || [],
+    mentorStyle: onboardingProfile.mentorStyle || '',
+    goals: onboardingProfile.goals || [],
+  }), [matrixNote, onboardingProfile, user]);
+
   const canAccessOperatorMode = Boolean(operatorVisibility?.canAccessOperatorMode || ['founder', 'admin'].includes(String(user?.role || '').toLowerCase()));
 
   const refreshMentorData = async () => {
@@ -131,8 +150,8 @@ const Dashboard = ({ user }) => {
 
   const topFocus = useMemo(() => normalizeFocusTasks(tasks).slice(0, 3), [tasks]);
   const conversation = useMemo(
-    () => buildConversation({ user, summary, chatAnswer, loading }),
-    [user, summary, chatAnswer, loading],
+    () => buildConversation({ user, summary, chatAnswer, loading, matrixNote }),
+    [user, summary, chatAnswer, loading, matrixNote],
   );
 
   const submitCheckIn = async () => {
@@ -141,6 +160,7 @@ const Dashboard = ({ user }) => {
       await axios.post('/api/core/signals', signals);
       const analysis = await axios.post('/api/core/analyze', {
         text: `sleep=${signals.sleep} stress=${signals.stress} symptoms=${signals.symptoms}`,
+        context: mentorContext,
       });
       setLatestInsight(analysis.data);
       await refreshMentorData();
@@ -156,6 +176,7 @@ const Dashboard = ({ user }) => {
       const internalCommand = `analyze ${chatInput.trim()}`;
       const response = await axios.post('/api/core/analyze', {
         text: internalCommand.replace(/^analyze\s+/i, ''),
+        context: mentorContext,
       });
       setChatAnswer({
         question: chatInput,
@@ -284,6 +305,15 @@ const Dashboard = ({ user }) => {
 
         <section className="mentor-support-panel">
           <div className="mentor-support-grid mentor-grid">
+            {matrixNote && (
+              <section className="mentor-card mentor-matrix-note-card">
+                <p className="mentor-section-label">Sovereign Matrix Note</p>
+                <h2>Active operating context</h2>
+                <p>{matrixNote}</p>
+                <p className="mentor-muted">This note now travels with mentor prompts so Big SYZ keeps the same onboarding signal active.</p>
+              </section>
+            )}
+
             <section className="mentor-card">
               <p className="mentor-section-label">Today’s Insight</p>
               <h2>Your grounded next step</h2>
