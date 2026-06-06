@@ -70,3 +70,28 @@
   gap: 8px;
   margin-top: 14px;
 }
+
+.mentor-memory-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(47, 111, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(245, 248, 255, 0.82);
+}
+
+.mentor-memory-status .mentor-link {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+@media (max-width: 620px) {
+  .mentor-memory-status .mentor-link {
+    margin-left: 0;
+    width: 100%;
+    text-align: left;
+  }
+}
