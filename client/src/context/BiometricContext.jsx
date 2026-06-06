@@ -261,7 +261,8 @@ export function BiometricProvider({ children }) {
         const sampleCount = compactFrame.length || 1;
         const motionVelocity = previous ? diff / sampleCount : 0;
         const averageBrightness = brightness / Math.max(1, Math.floor(frame.length / 16));
-        const previousBrightness = visualSamplesRef.current.at(-1)?.brightness;
+        const lastVisualSample = visualSamplesRef.current[visualSamplesRef.current.length - 1];
+        const previousBrightness = lastVisualSample?.brightness;
         const blinkCandidate = previousBrightness && previousBrightness - averageBrightness > 18;
         const sample = { motionVelocity, brightness: averageBrightness, blink: Boolean(blinkCandidate), timestamp: Date.now() };
         const samples = [...visualSamplesRef.current, sample].slice(-180);
