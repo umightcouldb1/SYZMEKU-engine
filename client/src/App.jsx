@@ -8,6 +8,7 @@ import OnboardingFlow from './OnboardingFlow';
 import OnboardingVoiceBridge from './OnboardingVoiceBridge';
 import WelcomeScreen from './WelcomeScreen';
 import RequireAuth from './components/RequireAuth';
+import { BiometricProvider } from './context/BiometricContext';
 import PrivateLayout from './layouts/PrivateLayout';
 import './entryFlow.css';
 
@@ -184,45 +185,47 @@ function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/welcome" element={<WelcomeScreen />} />
-      <Route path="/login" element={isAuthenticated ? <Navigate to={onboardingCompleted ? APP_HOME_ROUTE : '/onboarding'} replace /> : <AuthPage mode="login" />} />
-      <Route path="/signup" element={isAuthenticated ? <Navigate to={onboardingCompleted ? APP_HOME_ROUTE : '/onboarding'} replace /> : <AuthPage mode="signup" />} />
-      <Route
-        path="/onboarding"
-        element={
-          <RequireAuth>
-            {onboardingCompleted ? (
-              <Navigate to={APP_HOME_ROUTE} replace />
-            ) : (
-              <>
-                <OnboardingFlow user={user} onComplete={completeOnboarding} appHomeRoute={APP_HOME_ROUTE} />
-                <OnboardingVoiceBridge />
-              </>
-            )}
-          </RequireAuth>
-        }
-      />
-      <Route
-        element={
-          <RequireAuth>
-            <PrivateLayout />
-          </RequireAuth>
-        }
-      >
-        <Route path={APP_HOME_ROUTE} element={onboardingCompleted ? <Dashboard user={user} /> : <Navigate to="/onboarding" replace />} />
-        <Route path="/dashboard" element={<Navigate to={APP_HOME_ROUTE} replace />} />
-      </Route>
-      <Route
-        path="*"
-        element={
-          <Navigate
-            to={isAuthenticated ? (onboardingCompleted ? APP_HOME_ROUTE : '/onboarding') : '/welcome'}
-            replace
-          />
-        }
-      />
-    </Routes>
+    <BiometricProvider>
+      <Routes>
+        <Route path="/welcome" element={<WelcomeScreen />} />
+        <Route path="/login" element={isAuthenticated ? <Navigate to={onboardingCompleted ? APP_HOME_ROUTE : '/onboarding'} replace /> : <AuthPage mode="login" />} />
+        <Route path="/signup" element={isAuthenticated ? <Navigate to={onboardingCompleted ? APP_HOME_ROUTE : '/onboarding'} replace /> : <AuthPage mode="signup" />} />
+        <Route
+          path="/onboarding"
+          element={
+            <RequireAuth>
+              {onboardingCompleted ? (
+                <Navigate to={APP_HOME_ROUTE} replace />
+              ) : (
+                <>
+                  <OnboardingFlow user={user} onComplete={completeOnboarding} appHomeRoute={APP_HOME_ROUTE} />
+                  <OnboardingVoiceBridge />
+                </>
+              )}
+            </RequireAuth>
+          }
+        />
+        <Route
+          element={
+            <RequireAuth>
+              <PrivateLayout />
+            </RequireAuth>
+          }
+        >
+          <Route path={APP_HOME_ROUTE} element={onboardingCompleted ? <Dashboard user={user} /> : <Navigate to="/onboarding" replace />} />
+          <Route path="/dashboard" element={<Navigate to={APP_HOME_ROUTE} replace />} />
+        </Route>
+        <Route
+          path="*"
+          element={
+            <Navigate
+              to={isAuthenticated ? (onboardingCompleted ? APP_HOME_ROUTE : '/onboarding') : '/welcome'}
+              replace
+            />
+          }
+        />
+      </Routes>
+    </BiometricProvider>
   );
 }
 
