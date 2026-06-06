@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
+import { GoogleLogin } from '@react-oauth/google';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { login, register, reset } from './features/auth/authSlice';
+import { googleLogin, login, register, reset } from './features/auth/authSlice';
 import './authTypography.css';
+
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 
 const AuthPage = ({ mode = 'login' }) => {
   const isSignup = mode === 'signup';
@@ -38,6 +41,26 @@ const AuthPage = ({ mode = 'login' }) => {
     navigate(isSignup ? '/onboarding' : '/app', { replace: true });
   };
 
+  const onGoogleSuccess = async (credentialResponse) => {
+    setError('');
+
+    if (!credentialResponse?.credential) {
+      setError('Google did not return a usable credential.');
+      return;
+    }
+
+    const result = await dispatch(googleLogin({ credential: credentialResponse.credential }));
+
+    if (result.meta.requestStatus !== 'fulfilled') {
+      setError(result.payload || 'Google authentication failed.');
+      dispatch(reset());
+      return;
+    }
+
+    const completed = Boolean(result.payload?.onboarding?.completed);
+    navigate(completed ? '/app' : '/onboarding', { replace: true });
+  };
+
   return (
     <main className="entry-shell auth-prism-shell">
       <div className="prism-light-stream prism-light-stream-cyan" />
@@ -56,6 +79,22 @@ const AuthPage = ({ mode = 'login' }) => {
                 : '[ Verify identity to resume measures ]'}
             </p>
           </div>
+
+          {googleClientId && (
+            <div className="google-auth-slot" aria-label="Sign in with Google">
+              <GoogleLogin
+                onSuccess={onGoogleSuccess}
+                onError={() => setError('Google authentication was cancelled or failed.')}
+                useOneTap={!isSignup}
+                theme="filled_black"
+                size="large"
+                shape="pill"
+                width="100%"
+              />
+            </div>
+          )}
+
+          {googleClientId && <div className="auth-divider"><span>or</span></div>}
 
           <form className="auth-form-grid" onSubmit={onSubmit}>
             {isSignup && (
