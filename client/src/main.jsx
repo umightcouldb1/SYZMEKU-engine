@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Provider } from 'react-redux'; // Identity Anchor
 import { BrowserRouter } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { store } from './app/store';     // Redux Store
 import './index.css';
 import './Crystalline.css';
@@ -16,6 +17,7 @@ function FallbackUI({ error }) {
 }
 
 const rootElement = document.getElementById('root');
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 
 if (!rootElement) {
   console.error('CRITICAL: Root element not found. The Engine has no anchor.');
@@ -24,11 +26,13 @@ if (!rootElement) {
     <React.StrictMode>
       <ErrorBoundary FallbackComponent={FallbackUI}>
         <Provider store={store}>
-          <AuthProvider>
-            <BrowserRouter>
-              <App />
-            </BrowserRouter>
-          </AuthProvider>
+          <GoogleOAuthProvider clientId={googleClientId}>
+            <AuthProvider>
+              <BrowserRouter>
+                <App />
+              </BrowserRouter>
+            </AuthProvider>
+          </GoogleOAuthProvider>
         </Provider>
       </ErrorBoundary>
     </React.StrictMode>,
