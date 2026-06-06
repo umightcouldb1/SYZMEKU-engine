@@ -56,6 +56,38 @@
   letter-spacing: 0;
 }
 
+.google-auth-slot {
+  display: flex;
+  justify-content: center;
+  margin: 1.25rem 0 0.9rem;
+  min-height: 44px;
+}
+
+.google-auth-slot > div,
+.google-auth-slot iframe {
+  max-width: 100%;
+}
+
+.auth-divider {
+  align-items: center;
+  color: rgba(148, 163, 184, 0.76);
+  display: flex;
+  font-size: 0.62rem;
+  font-weight: 800;
+  gap: 0.75rem;
+  letter-spacing: 0.16em;
+  margin: 0 0 1rem;
+  text-transform: uppercase;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  background: linear-gradient(90deg, transparent, rgba(103, 232, 249, 0.38), transparent);
+  content: '';
+  flex: 1;
+  height: 1px;
+}
+
 .prism-submit-button {
   font-size: 0.72rem;
   font-weight: 900;
