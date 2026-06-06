@@ -165,6 +165,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [mentorResponse, setMentorResponse] = useState('');
+  const [smartReflection, setSmartReflection] = useState('');
   const [completionError, setCompletionError] = useState('');
   const [customLifeStageActive, setCustomLifeStageActive] = useState(false);
   const [customLifeStageText, setCustomLifeStageText] = useState('');
@@ -189,8 +190,9 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
       preferredName: form.name,
       supportAreas: [...form.lifeStage, form.primaryConcern, form.goals].filter(Boolean),
       mentorStyle: form.interactionStyle,
+      onboardingReflection: smartReflection,
     }),
-    [form],
+    [form, smartReflection],
   );
 
   const updateField = (key, value) => {
@@ -236,9 +238,36 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
     }
   };
 
-  const nextStep = () => {
+  const getOnboardingReflection = async () => {
+    const fallback = generateSystemReflection(form.lifeStage);
+
+    try {
+      const response = await axios.post('/api/onboarding', {
+        choices: form.lifeStage,
+        typedText: form.primaryConcern,
+      });
+
+      return response.data?.customAnswer || fallback;
+    } catch (error) {
+      console.warn('[onboarding] Gemini reflection fallback', error?.response?.data?.message || error?.message);
+      return fallback;
+    }
+  };
+
+  const nextStep = async () => {
     const value = form[currentStep.key];
-    if (!hasValue(value)) return;
+    if (!hasValue(value) || loading) return;
+
+    if (currentStep.key === 'primaryConcern') {
+      setLoading(true);
+      const reflection = await getOnboardingReflection();
+      setSmartReflection(reflection);
+      setMentorResponse(reflection);
+      setLoading(false);
+      setCurrentIndex((prev) => prev + 1);
+      return;
+    }
+
     setMentorResponse(getResponse(currentStep.key, value));
     setCurrentIndex((prev) => prev + 1);
   };
@@ -316,7 +345,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
   const isLong = currentStep.type === 'long';
   const isMultiChoice = currentStep.type === 'multi-choice';
   const isConcernStep = currentStep.key === 'primaryConcern';
-  const currentReflection = generateSystemReflection(form.lifeStage);
+  const currentReflection = smartReflection || generateSystemReflection(form.lifeStage);
 
   return (
     <main className="onboarding-shell onboarding-prism-shell">
@@ -437,12 +466,12 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
             type="button"
             className="entry-secondary-button"
             onClick={() => setCurrentIndex((prev) => Math.max(prev - 1, 0))}
-            disabled={currentIndex === 0}
+            disabled={currentIndex === 0 || loading}
           >
             Back
           </button>
-          <button type="button" className="entry-primary-button" onClick={nextStep} disabled={!hasValue(form[currentStep.key])}>
-            {isConcernStep ? 'Synchronize Matrix' : 'Continue'}
+          <button type="button" className="entry-primary-button" onClick={nextStep} disabled={!hasValue(form[currentStep.key]) || loading}>
+            {loading ? 'Synchronizing...' : isConcernStep ? 'Synchronize Matrix' : 'Continue'}
           </button>
         </div>
       </section>
