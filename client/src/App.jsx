@@ -54,6 +54,27 @@ const persistUserOnboardingState = (completed, onboarding = null) => {
   }
 };
 
+const buildAdminOnboardingState = (signatureData = {}, fallbackName = '') => {
+  const profile = signatureData.profile || {};
+
+  return {
+    completed: true,
+    completedAt: new Date().toISOString(),
+    profile: {
+      preferredName: profile.identifier || fallbackName,
+      lifeStage: profile.missionObjective || 'Admin development session',
+      supportAreas: [
+        profile.originVector,
+        profile.missionObjective,
+      ].filter(Boolean),
+      mentorStyle: 'Strategic and focused',
+      sovereignMatrixNote: profile.missionObjective || '',
+      onboardingReflection: profile.missionObjective || '',
+      goals: [profile.missionObjective].filter(Boolean),
+    },
+  };
+};
+
 function App() {
   const auth = useSelector((state) => state.auth || {});
   const [onboardingReady, setOnboardingReady] = useState(false);
@@ -80,6 +101,24 @@ function App() {
     }
 
     try {
+      const adminSignatureResponse = await axios.get('/api/admin/signature').catch(() => ({ data: null }));
+      if (adminSignatureResponse.data?.success) {
+        const adminOnboarding = buildAdminOnboardingState(
+          adminSignatureResponse.data,
+          user?.username || user?.name || '',
+        );
+
+        console.info('[onboarding] admin signature bypass active', {
+          targetRoute: APP_HOME_ROUTE,
+          identifier: adminSignatureResponse.data?.profile?.identifier,
+        });
+        setOnboardingCompleted(true);
+        localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
+        persistUserOnboardingState(true, adminOnboarding);
+        setOnboardingReady(true);
+        return { completed: true, source: 'admin-signature', data: adminSignatureResponse.data };
+      }
+
       const response = await axios.get('/api/core/onboarding/status');
       const completed = Boolean(response.data?.completed || localState);
       console.info('[onboarding] status sync success', {
@@ -101,7 +140,7 @@ function App() {
     } finally {
       setOnboardingReady(true);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.name, user?.username]);
 
   useEffect(() => {
     let cancelled = false;
