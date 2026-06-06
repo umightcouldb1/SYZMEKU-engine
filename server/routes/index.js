@@ -13,6 +13,7 @@ router.use('/mentor-system', require('./mentorSystemRoutes'));
 router.use('/starburst-core', require('../starburst-core/ancestralRoutes'));
 router.use('/onboarding', require('./onboardingRoutes'));
 router.use('/admin', require('./adminRoutes'));
+router.use('/vision', require('./visionRoutes'));
 
 router.use('/core', require('./API/coreRoutes'));
 
