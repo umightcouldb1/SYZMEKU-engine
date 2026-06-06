@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { googleLogin, login, register, reset } from './features/auth/authSlice';
 import './authTypography.css';
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
 const AuthPage = ({ mode = 'login' }) => {
   const isSignup = mode === 'signup';
@@ -80,7 +80,7 @@ const AuthPage = ({ mode = 'login' }) => {
             </p>
           </div>
 
-          {googleClientId && (
+          {hasGoogleClientId && (
             <div className="google-auth-slot" aria-label="Sign in with Google">
               <GoogleLogin
                 onSuccess={onGoogleSuccess}
@@ -94,7 +94,7 @@ const AuthPage = ({ mode = 'login' }) => {
             </div>
           )}
 
-          {googleClientId && <div className="auth-divider"><span>or</span></div>}
+          {hasGoogleClientId && <div className="auth-divider"><span>or</span></div>}
 
           <form className="auth-form-grid" onSubmit={onSubmit}>
             {isSignup && (
