@@ -51,6 +51,30 @@ const getMentorResponseText = (response) =>
 const buildRecentConversationCommands = (chatMemory = []) =>
   chatMemory.slice(-8).map((entry) => `${entry.label}: ${entry.text}`);
 
+const mapPersistentHistoryToChatMemory = (history = []) =>
+  history.map((turn, index) => ({
+    id: `memory-${turn.timestamp || index}-${index}`,
+    speaker: turn.role === 'model' ? 'syz' : 'user',
+    label: turn.role === 'model' ? 'Big SYZ' : 'You',
+    text: turn.text,
+    detail: turn.timestamp ? new Date(turn.timestamp).toLocaleString() : '',
+  }));
+
+const getSpeechRecognition = () => {
+  if (typeof window === 'undefined') return null;
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+};
+
+const speakText = (text) => {
+  if (!text || typeof window === 'undefined' || !window.speechSynthesis) return false;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 0.92;
+  utterance.pitch = 0.96;
+  window.speechSynthesis.speak(utterance);
+  return true;
+};
+
 const fileToMediaAttachment = (file) =>
   new Promise((resolve, reject) => {
     if (!file) return resolve(null);
@@ -84,8 +108,8 @@ const buildConversation = ({ user, summary, chatMemory, loading, matrixNote }) =
       speaker: 'syz',
       label: 'Big SYZ',
       text: matrixNote
-        ? `${DAILY_GREETING()}, ${userName}. Your Matrix Note is active, so I’ll keep guidance anchored to that profile while we choose the next grounded move.`
-        : `${DAILY_GREETING()}, ${userName}. I’m here to help you slow the noise down, name what matters, and choose the next grounded move. Start with how you feel, what you’re carrying, or what decision needs clarity today.`,
+        ? `${DAILY_GREETING()}, ${userName}. Your Matrix Note is active, so I will keep guidance anchored to that profile while we choose the next grounded move.`
+        : `${DAILY_GREETING()}, ${userName}. I am here to help you slow the noise down, name what matters, and choose the next grounded move. Start with how you feel, what you are carrying, or what decision needs clarity today.`,
     },
   ];
 
@@ -96,7 +120,7 @@ const buildConversation = ({ user, summary, chatMemory, loading, matrixNote }) =
       id: 'mentor-nudge',
       speaker: 'syz',
       label: 'Big SYZ',
-      text: `Right now I’d guide you toward this: ${summary.recommended_next_move}`,
+      text: `Right now I would guide you toward this: ${summary.recommended_next_move}`,
     });
   }
 
@@ -105,7 +129,7 @@ const buildConversation = ({ user, summary, chatMemory, loading, matrixNote }) =
       id: 'loading',
       speaker: 'syz',
       label: 'Big SYZ',
-      text: 'Listening… translating your signals into a grounded response.',
+      text: 'Listening... translating your signals into a grounded response.',
       pending: true,
     });
   }
@@ -121,6 +145,10 @@ const Dashboard = ({ user }) => {
   const [signals, setSignals] = useState({ sleep: 6, stress: 3, symptoms: 'calm' });
   const [chatInput, setChatInput] = useState('');
   const [chatMemory, setChatMemory] = useState([]);
+  const [lineageStatus, setLineageStatus] = useState('Lineage Sync Pending');
+  const [sovereignContext, setSovereignContext] = useState(null);
+  const [listening, setListening] = useState(false);
+  const [voiceError, setVoiceError] = useState('');
   const [mediaAttachment, setMediaAttachment] = useState(null);
   const [mediaError, setMediaError] = useState('');
   const [latestInsight, setLatestInsight] = useState(null);
@@ -129,10 +157,15 @@ const Dashboard = ({ user }) => {
   const [operatorVisibility, setOperatorVisibility] = useState(null);
 
   const onboardingProfile = useMemo(() => getOnboardingProfile(user), [user]);
-  const matrixNote = getMatrixNote(onboardingProfile);
+  const matrixNote = sovereignContext?.sovereignMatrixNote || getMatrixNote(onboardingProfile);
+  const latestMentorText = useMemo(
+    () => [...chatMemory].reverse().find((entry) => entry.speaker === 'syz')?.text || '',
+    [chatMemory],
+  );
   const mentorContext = useMemo(() => ({
     onboardingProfile,
-    sovereignMatrixNote: matrixNote,
+    sovereignMatrixNote: sovereignContext?.sovereignMatrixNote || matrixNote,
+    onboardingReflection: sovereignContext?.onboardingReflection || onboardingProfile.onboardingReflection || '',
     preferredName: onboardingProfile.preferredName || user?.username || user?.name || '',
     lifeStage: onboardingProfile.lifeStage || '',
     supportAreas: onboardingProfile.supportAreas || [],
@@ -140,23 +173,30 @@ const Dashboard = ({ user }) => {
     goals: onboardingProfile.goals || [],
     recentCommands: buildRecentConversationCommands(chatMemory),
     conversationHistory: chatMemory.map(({ speaker, text }) => ({ role: speaker === 'syz' ? 'model' : 'user', text })),
-  }), [chatMemory, matrixNote, onboardingProfile, user]);
+  }), [chatMemory, matrixNote, onboardingProfile, sovereignContext, user]);
 
   const canAccessOperatorMode = Boolean(operatorVisibility?.canAccessOperatorMode || ['founder', 'admin'].includes(String(user?.role || '').toLowerCase()));
 
   const refreshMentorData = async () => {
-    const [summaryRes, tasksRes, alertsRes, signalsRes, operatorRes] = await Promise.all([
+    const [summaryRes, tasksRes, alertsRes, signalsRes, operatorRes, memoryRes] = await Promise.all([
       axios.get('/api/core/summary').catch(() => ({ data: null })),
       axios.get('/api/core/tasks').catch(() => ({ data: { tasks: [] } })),
       axios.get('/api/core/alerts').catch(() => ({ data: { alerts: [] } })),
       axios.get('/api/core/signals').catch(() => ({ data: { entries: [] } })),
       axios.get('/api/core/operator/visibility').catch(() => ({ data: null })),
+      axios.get('/api/memory').catch(() => ({ data: null })),
     ]);
 
     setSummary(summaryRes.data || null);
     setTasks(tasksRes.data?.tasks || []);
     setAlerts(alertsRes.data?.alerts || []);
     setOperatorVisibility(operatorRes.data || null);
+
+    if (memoryRes.data?.success) {
+      setChatMemory(mapPersistentHistoryToChatMemory(memoryRes.data.conversationHistory || []));
+      setSovereignContext(memoryRes.data.sovereignContext || null);
+      setLineageStatus(memoryRes.data.status || 'Lineage Sync Established');
+    }
 
     const latestSignal = signalsRes.data?.entries?.[0];
     if (latestSignal) {
@@ -177,6 +217,56 @@ const Dashboard = ({ user }) => {
     () => buildConversation({ user, summary, chatMemory, loading, matrixNote }),
     [user, summary, chatMemory, loading, matrixNote],
   );
+
+  const startDashboardVoiceInput = () => {
+    const Recognition = getSpeechRecognition();
+    setVoiceError('');
+
+    if (!Recognition) {
+      setVoiceError('Voice input is not available in this browser.');
+      return;
+    }
+
+    const recognition = new Recognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    recognition.onstart = () => setListening(true);
+    recognition.onerror = () => {
+      setListening(false);
+      setVoiceError('Voice input stopped before a clear phrase was captured.');
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results || [])
+        .map((result) => result?.[0]?.transcript || '')
+        .join(' ')
+        .trim();
+
+      if (transcript) {
+        setChatInput((current) => `${current ? `${current} ` : ''}${transcript}`.trim());
+      }
+    };
+
+    recognition.start();
+  };
+
+  const readLatestMentorResponse = () => {
+    setVoiceError('');
+    const spoken = speakText(latestMentorText);
+    if (!spoken) setVoiceError('Audio output is not available yet.');
+  };
+
+  const clearLineageMemory = async () => {
+    setLoading(true);
+    try {
+      await axios.delete('/api/memory/conversation');
+      await refreshMentorData();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const submitCheckIn = async () => {
     setLoading(true);
@@ -247,13 +337,18 @@ const Dashboard = ({ user }) => {
         text: getMentorResponseText(response.data),
         detail: mediaAttachment
           ? `Vision processed: ${mediaAttachment.name}`
-          : `Memory turns: ${contextWithCurrentTurn.conversationHistory.length}`,
+          : `Memory turns: ${response.data?.memory_turns || contextWithCurrentTurn.conversationHistory.length}`,
       };
 
-      setChatMemory((prev) => [...prev, mentorEntry].slice(-12));
       setLatestInsight(response.data);
       setChatInput('');
       setMediaAttachment(null);
+
+      if (mediaAttachment) {
+        setChatMemory((prev) => [...prev, mentorEntry].slice(-12));
+      } else {
+        await refreshMentorData();
+      }
     } finally {
       setLoading(false);
     }
@@ -341,15 +436,13 @@ const Dashboard = ({ user }) => {
             ))}
           </div>
 
-          {chatMemory.length > 0 && (
-            <div className="mentor-memory-status">
-              <span className="mentor-pill success">Memory active</span>
-              <span className="mentor-pill">{chatMemory.length} recent turns held</span>
-              <button type="button" className="mentor-link" onClick={() => setChatMemory([])}>
-                Clear thread memory
-              </button>
-            </div>
-          )}
+          <div className="mentor-memory-status">
+            <span className="mentor-pill success">{lineageStatus}</span>
+            <span className="mentor-pill">{chatMemory.length} persistent turns held</span>
+            <button type="button" className="mentor-link" onClick={clearLineageMemory} disabled={loading || chatMemory.length === 0}>
+              Clear lineage memory
+            </button>
+          </div>
 
           <div className="mentor-example-prompt-block">
             <p className="mentor-section-label">Example prompts</p>
@@ -372,6 +465,15 @@ const Dashboard = ({ user }) => {
                 placeholder="I need help making today feel manageable without shutting down."
                 rows="4"
               />
+              <div className="mentor-voice-row">
+                <button type="button" className={`mentor-voice-button${listening ? ' listening' : ''}`} onClick={startDashboardVoiceInput} disabled={listening}>
+                  {listening ? 'Listening...' : 'Use voice input'}
+                </button>
+                <button type="button" className="mentor-voice-button" onClick={readLatestMentorResponse} disabled={!latestMentorText}>
+                  Read latest response
+                </button>
+              </div>
+              {voiceError && <p className="mentor-warning-inline">{voiceError}</p>}
               <div className="mentor-vision-row">
                 <label className="mentor-vision-upload">
                   Attach image/video
@@ -411,7 +513,7 @@ const Dashboard = ({ user }) => {
             )}
 
             <section className="mentor-card">
-              <p className="mentor-section-label">Today’s Insight</p>
+              <p className="mentor-section-label">Today's Insight</p>
               <h2>Your grounded next step</h2>
               <p>{buildInsightMessage(summary, latestInsight)}</p>
               <p className="mentor-muted">Emotions are indicators, not commands. Big SYZ reads emotional signals as pattern data and responds with empathy.</p>
@@ -423,7 +525,7 @@ const Dashboard = ({ user }) => {
 
             <section className="mentor-card">
               <p className="mentor-section-label">Quick Check-In</p>
-              <h2>Capture today’s state</h2>
+              <h2>Capture today's state</h2>
               <label>How did you sleep? ({signals.sleep} hours)</label>
               <input type="range" min="0" max="12" value={signals.sleep} onChange={(event) => setSignals((prev) => ({ ...prev, sleep: Number(event.target.value) }))} />
               <label>Stress level today? ({signals.stress})</label>
@@ -457,7 +559,7 @@ const Dashboard = ({ user }) => {
               <h2>What needs attention</h2>
               {alerts.length ? alerts.slice(0, 2).map((alert, index) => (
                 <div key={`${index}-${alert?.message || alert}`} className="mentor-warning">
-                  <strong>⚠ Pattern detected</strong>
+                  <strong>Pattern detected</strong>
                   <p>{typeof alert === 'string' ? alert : alert?.message}</p>
                 </div>
               )) : <p>No risk patterns detected.</p>}
