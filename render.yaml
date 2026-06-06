@@ -12,3 +12,7 @@ services:
         value: "EL_KAI_THARION_KAI_ZHUN"
       - key: SYSTEM_VECTOR
         value: "TRIANGULUM_THETA_7"
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
