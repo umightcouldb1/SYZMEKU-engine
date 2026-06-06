@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import OperatorConsole from './OperatorConsole';
+import { useBiometric } from './context/BiometricContext';
 import './dashboard.css';
 import './matrixContext.css';
 
@@ -100,8 +101,8 @@ const fileToMediaAttachment = (file) =>
     reader.readAsDataURL(file);
   });
 
-const buildConversation = ({ user, summary, chatMemory, loading, matrixNote }) => {
-  const userName = user?.username || user?.name || 'there';
+const buildConversation = ({ user, summary, chatMemory, loading, matrixNote, displayName }) => {
+  const userName = displayName || user?.username || user?.name || 'there';
   const transcript = [
     {
       id: 'welcome',
@@ -155,6 +156,13 @@ const Dashboard = ({ user }) => {
   const [showReasoning, setShowReasoning] = useState(false);
   const [loading, setLoading] = useState(false);
   const [operatorVisibility, setOperatorVisibility] = useState(null);
+  const {
+    coherenceVector,
+    startAcousticStream,
+    startVisualStream,
+    updateContextualMetrics,
+    getLatestCoherencePayload,
+  } = useBiometric();
 
   const onboardingProfile = useMemo(() => getOnboardingProfile(user), [user]);
   const matrixNote = sovereignContext?.sovereignMatrixNote || getMatrixNote(onboardingProfile);
@@ -176,6 +184,8 @@ const Dashboard = ({ user }) => {
   }), [chatMemory, matrixNote, onboardingProfile, sovereignContext, user]);
 
   const canAccessOperatorMode = Boolean(operatorVisibility?.canAccessOperatorMode || ['founder', 'admin'].includes(String(user?.role || '').toLowerCase()));
+  const adminSignatureVerified = Boolean(canAccessOperatorMode);
+  const displayName = adminSignatureVerified ? 'Commander Toi' : onboardingProfile.preferredName || user?.name || 'there';
 
   const refreshMentorData = async () => {
     const [summaryRes, tasksRes, alertsRes, signalsRes, operatorRes, memoryRes] = await Promise.all([
@@ -200,11 +210,13 @@ const Dashboard = ({ user }) => {
 
     const latestSignal = signalsRes.data?.entries?.[0];
     if (latestSignal) {
-      setSignals({
+      const nextSignals = {
         sleep: latestSignal.sleep ?? 6,
         stress: latestSignal.stress ?? 3,
         symptoms: latestSignal.symptoms ?? 'calm',
-      });
+      };
+      setSignals(nextSignals);
+      updateContextualMetrics(nextSignals);
     }
   };
 
@@ -212,10 +224,14 @@ const Dashboard = ({ user }) => {
     refreshMentorData();
   }, []);
 
+  useEffect(() => {
+    updateContextualMetrics(signals);
+  }, [signals, updateContextualMetrics]);
+
   const topFocus = useMemo(() => normalizeFocusTasks(tasks).slice(0, 3), [tasks]);
   const conversation = useMemo(
-    () => buildConversation({ user, summary, chatMemory, loading, matrixNote }),
-    [user, summary, chatMemory, loading, matrixNote],
+    () => buildConversation({ user, summary, chatMemory, loading, matrixNote, displayName }),
+    [user, summary, chatMemory, loading, matrixNote, displayName],
   );
 
   const startDashboardVoiceInput = () => {
@@ -271,10 +287,13 @@ const Dashboard = ({ user }) => {
   const submitCheckIn = async () => {
     setLoading(true);
     try {
+      updateContextualMetrics(signals);
       await axios.post('/api/core/signals', signals);
+      const biometricMetadata = getLatestCoherencePayload();
       const analysis = await axios.post('/api/core/analyze', {
         text: `sleep=${signals.sleep} stress=${signals.stress} symptoms=${signals.symptoms}`,
         context: mentorContext,
+        biometricMetadata,
       });
       setLatestInsight(analysis.data);
       await refreshMentorData();
@@ -317,6 +336,7 @@ const Dashboard = ({ user }) => {
           { role: 'user', text: `${question || 'Analyze this attachment.'}${mediaLabel}` },
         ].slice(-10),
       };
+      const biometricMetadata = getLatestCoherencePayload();
       const internalCommand = `analyze ${question || 'visual attachment'}`;
       setChatMemory((prev) => [...prev, userEntry].slice(-12));
 
@@ -325,10 +345,12 @@ const Dashboard = ({ user }) => {
             text: question,
             media: mediaAttachment,
             context: contextWithCurrentTurn,
+            biometricMetadata,
           })
         : await axios.post('/api/core/analyze', {
             text: internalCommand.replace(/^analyze\s+/i, ''),
             context: contextWithCurrentTurn,
+            biometricMetadata,
           });
       const mentorEntry = {
         id: `mentor-${Date.now()}`,
@@ -381,7 +403,7 @@ const Dashboard = ({ user }) => {
           <p className="mentor-eyebrow">Big SYZ Home</p>
           <h1>Mentor first. Dashboard second.</h1>
           <p className="mentor-subtitle">Emotionally intelligent support anchored in your real signals.</p>
-          <p className="mentor-warmth">{DAILY_GREETING()}, {user.username}. Bring the honest version of today and let Big SYZ help you find the next clear move.</p>
+          <p className="mentor-warmth">{DAILY_GREETING()}, {displayName}. Bring the honest version of today and let Big SYZ help you find the next clear move.</p>
           <p className="mentor-muted">Powered by the SYZMEKU Engine.</p>
         </div>
 
@@ -389,7 +411,7 @@ const Dashboard = ({ user }) => {
           <p className="mentor-section-label">Operator Access</p>
           {canAccessOperatorMode ? (
             <>
-              <h2>Founder/Admin entry unlocked</h2>
+              <h2>Founder/Admin entry unlocked for Commander Toi</h2>
               <p className="mentor-muted">This account can open the operator console for deeper system control and diagnostics.</p>
               <div className="mentor-operator-meta">
                 <span className="mentor-pill success">Role: {operatorVisibility?.effectiveRole || user?.role || 'founder'}</span>
@@ -439,9 +461,21 @@ const Dashboard = ({ user }) => {
           <div className="mentor-memory-status">
             <span className="mentor-pill success">{lineageStatus}</span>
             <span className="mentor-pill">{chatMemory.length} persistent turns held</span>
+            <span className="mentor-pill">Coherence: {coherenceVector.coherenceLabel}</span>
             <button type="button" className="mentor-link" onClick={clearLineageMemory} disabled={loading || chatMemory.length === 0}>
               Clear lineage memory
             </button>
+          </div>
+
+          <div className="mentor-voice-row">
+            <button type="button" className="mentor-voice-button" onClick={startAcousticStream}>
+              Start acoustic coherence
+            </button>
+            <button type="button" className="mentor-voice-button" onClick={startVisualStream}>
+              Start visual coherence
+            </button>
+            <span className="mentor-pill">Typing: {coherenceVector.kinetic?.label || 'Pending'}</span>
+            <span className="mentor-pill">Check-in: {coherenceVector.contextual?.label || 'Pending'}</span>
           </div>
 
           <div className="mentor-example-prompt-block">
