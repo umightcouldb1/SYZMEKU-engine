@@ -29,3 +29,44 @@
   font-weight: 600;
   line-height: 1.65;
 }
+
+.mentor-admin-signature-card {
+  width: min(980px, calc(100% - 32px));
+  margin: 18px auto 0;
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(20, 184, 166, 0.44);
+  background:
+    radial-gradient(circle at 10% 10%, rgba(20, 184, 166, 0.18), transparent 34%),
+    radial-gradient(circle at 92% 82%, rgba(132, 204, 22, 0.14), transparent 32%),
+    rgba(255, 255, 255, 0.98);
+}
+
+.mentor-admin-signature-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-top: 3px solid rgba(20, 184, 166, 0.75);
+  pointer-events: none;
+}
+
+.mentor-admin-signature-card .mentor-section-label {
+  color: #0f766e;
+}
+
+.mentor-admin-signature-card h2 {
+  color: #0f172a;
+}
+
+.mentor-admin-title-line {
+  color: #134e4a;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.mentor-admin-context-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
