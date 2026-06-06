@@ -10,6 +10,7 @@ router.use('/crystalline', require('./crystallineRoutes'));
 router.use('/scroll-intake', require('./scrollIntakeRoutes'));
 router.use('/scroll-match', require('./scrollMatchRoutes'));
 router.use('/mentor-system', require('./mentorSystemRoutes'));
+router.use('/starburst-core', require('../starburst-core/ancestralRoutes'));
 
 router.use('/core', require('./API/coreRoutes'));
 
