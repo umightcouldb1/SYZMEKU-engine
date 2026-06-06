@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { googleLogin, login, register, reset } from './features/auth/authSlice';
 import './authTypography.css';
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.REACT_APP_GOOGLE_CLIENT_ID || '';
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 const AuthPage = ({ mode = 'login' }) => {
   const isSignup = mode === 'signup';
