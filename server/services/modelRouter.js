@@ -11,7 +11,7 @@ const MODEL_ALIASES = {
 const getGeminiApiKey = () => process.env.GEMINI_API_KEY || process.env.Gemini_API_Key || process.env.Gemini_API_KEY || '';
 
 const resolveModelAlias = (mode = 'strategic') => {
-  if (['mentor', 'reflect', 'reframe'].includes(mode)) return MODEL_ALIASES.mentor_model;
+  if (['mentor', 'reflect', 'reframe', 'vision'].includes(mode)) return MODEL_ALIASES.mentor_model;
   if (['strategic', 'plan', 'build', 'analyze'].includes(mode)) return MODEL_ALIASES.strategic_model;
   if (['signal', 'trend', 'pattern', 'recommend'].includes(mode)) return MODEL_ALIASES.signal_model;
   if (['sentinel', 'safety'].includes(mode)) return MODEL_ALIASES.safety_model;
@@ -19,7 +19,37 @@ const resolveModelAlias = (mode = 'strategic') => {
   return MODEL_ALIASES.strategic_model;
 };
 
-const requestModelJson = async ({ mode, prompt }) => {
+const normalizeGeminiPart = (part = {}) => {
+  if (typeof part.text === 'string') return { text: part.text };
+
+  const inlineData = part.inlineData || part.inline_data;
+  if (inlineData?.mimeType && inlineData?.data) {
+    return {
+      inline_data: {
+        mime_type: inlineData.mimeType,
+        data: inlineData.data,
+      },
+    };
+  }
+
+  if (part.mimeType && part.data) {
+    return {
+      inline_data: {
+        mime_type: part.mimeType,
+        data: part.data,
+      },
+    };
+  }
+
+  return null;
+};
+
+const buildGeminiParts = ({ prompt, parts = [] }) => {
+  const normalizedParts = parts.map(normalizeGeminiPart).filter(Boolean);
+  return [{ text: prompt }, ...normalizedParts];
+};
+
+const requestModelJson = async ({ mode, prompt, parts = [] }) => {
   const modelName = resolveModelAlias(mode);
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
@@ -40,7 +70,7 @@ const requestModelJson = async ({ mode, prompt }) => {
       'Content-Type': 'application/json',
       'x-goog-api-key': apiKey,
     },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    body: JSON.stringify({ contents: [{ parts: buildGeminiParts({ prompt, parts }) }] }),
   });
 
   if (!response.ok) {
@@ -61,8 +91,8 @@ const requestModelJson = async ({ mode, prompt }) => {
 const extractModelText = (modelResult = {}) =>
   modelResult?.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-const requestModelText = async ({ mode = 'mentor', prompt }) => {
-  const modelResult = await requestModelJson({ mode, prompt });
+const requestModelText = async ({ mode = 'mentor', prompt, parts = [] }) => {
+  const modelResult = await requestModelJson({ mode, prompt, parts });
   if (modelResult?.error || modelResult?.providerError) return modelResult;
 
   return {
