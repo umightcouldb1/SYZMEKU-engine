@@ -28,11 +28,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22.16.0
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            server/package-lock.json
-            client/package-lock.json
+
+      - name: Cache npm package downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json', 'server/package.json', 'client/package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
 
       - name: Install root, server, and client dependencies
         run: npm run setup
