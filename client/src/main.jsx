@@ -8,6 +8,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { store } from './app/store';     // Redux Store
 import './index.css';
 import './Crystalline.css';
+import './responsive.css';
 import App from './App.jsx';
 import { AuthProvider } from './hooks/useAuth.jsx';
 
