@@ -19,6 +19,24 @@ function FallbackUI({ error }) {
 const rootElement = document.getElementById('root');
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 
+const AppShell = () => {
+  const shell = (
+    <AuthProvider>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </AuthProvider>
+  );
+
+  if (!googleClientId) return shell;
+
+  return (
+    <GoogleOAuthProvider clientId={googleClientId}>
+      {shell}
+    </GoogleOAuthProvider>
+  );
+};
+
 if (!rootElement) {
   console.error('CRITICAL: Root element not found. The Engine has no anchor.');
 } else {
@@ -26,13 +44,7 @@ if (!rootElement) {
     <React.StrictMode>
       <ErrorBoundary FallbackComponent={FallbackUI}>
         <Provider store={store}>
-          <GoogleOAuthProvider clientId={googleClientId}>
-            <AuthProvider>
-              <BrowserRouter>
-                <App />
-              </BrowserRouter>
-            </AuthProvider>
-          </GoogleOAuthProvider>
+          <AppShell />
         </Provider>
       </ErrorBoundary>
     </React.StrictMode>,
