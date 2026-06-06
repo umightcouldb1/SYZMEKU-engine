@@ -3,6 +3,7 @@ const User = require('../models/User');
 const AuthSession = require('../models/AuthSession');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const { logAuditEvent } = require('../utils/audit');
 const { getJwtSecret } = require('../utils/jwtSecret');
 const {
@@ -16,6 +17,7 @@ const {
 
 const SESSION_TTL_DAYS = 30;
 const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
+const googleOAuthClient = new OAuth2Client();
 
 const buildTokenPayload = (user, sessionId) => ({
     id: user._id,
@@ -66,6 +68,43 @@ const buildAuthResponse = (user, token) => ({
 const isDuplicateKeyError = (error) => error?.code === 11000;
 
 const buildUsernameFromEmail = (email) => process.env.ADMIN_USERNAME || deriveUsernameFromEmail(email);
+
+const verifyGoogleCredential = async (credential) => {
+    const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.REACT_APP_GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+
+    if (!googleClientId) {
+        const error = new Error('Google OAuth client ID is not configured.');
+        error.statusCode = 503;
+        throw error;
+    }
+
+    const ticket = await googleOAuthClient.verifyIdToken({
+        idToken: credential,
+        audience: googleClientId,
+    });
+
+    const payload = ticket.getPayload();
+    const email = normalizeEmail(payload?.email);
+
+    if (!payload?.sub || !email || payload?.email_verified !== true) {
+        const error = new Error('Google credential is invalid or email is not verified.');
+        error.statusCode = 401;
+        throw error;
+    }
+
+    return {
+        googleId: payload.sub,
+        email,
+        name: String(payload.name || payload.given_name || email.split('@')[0] || 'Google User').trim(),
+        givenName: String(payload.given_name || '').trim(),
+        picture: String(payload.picture || '').trim(),
+    };
+};
+
+const buildGooglePasswordHash = async (googleId) => {
+    const opaquePassword = `GOOGLE_OAUTH:${googleId}:${randomUUID()}`;
+    return bcrypt.hash(opaquePassword, 10);
+};
 
 // @desc    Register new operative
 // @route   POST /api/auth/signup
@@ -196,6 +235,106 @@ const loginUser = async (req, res) => {
     res.json(buildAuthResponse(user, token));
 };
 
+// @desc    Authenticate operative with Google Identity Services
+// @route   POST /api/auth/google
+const googleLoginUser = async (req, res) => {
+    const credential = String(req.body?.credential || req.body?.idToken || '').trim();
+
+    if (!credential) {
+        return res.status(400).json({ message: 'Google credential is required.' });
+    }
+
+    try {
+        const googleProfile = await verifyGoogleCredential(credential);
+        let user = await findUserByEmail(googleProfile.email);
+        let isNewUser = false;
+
+        if (!user) {
+            const preferredUsername = googleProfile.givenName || deriveUsernameFromEmail(googleProfile.email);
+            const username = await resolveUniqueUsername(preferredUsername);
+            const password = await buildGooglePasswordHash(googleProfile.googleId);
+
+            user = await User.create({
+                name: googleProfile.name,
+                username,
+                email: googleProfile.email,
+                password,
+                role: 'user',
+                onboarding: {
+                    completed: false,
+                    completedAt: null,
+                    profile: {
+                        preferredName: googleProfile.givenName || googleProfile.name || '',
+                        lifeStage: '',
+                        supportAreas: [],
+                        mentorStyle: 'gentle',
+                        sovereignMatrixNote: '',
+                        onboardingReflection: '',
+                        baseline: {
+                            sleep: 0,
+                            stress: 0,
+                            energy: 0,
+                            mood: '',
+                            symptoms: '',
+                            focusChallenge: '',
+                        },
+                        goals: [],
+                        signalSetup: 'manual',
+                    },
+                },
+            });
+            isNewUser = true;
+        } else {
+            let changed = false;
+            if (!user.name && googleProfile.name) {
+                user.name = googleProfile.name;
+                changed = true;
+            }
+            if (!user.username) {
+                user.username = await resolveUniqueUsername(deriveUsernameFromEmail(googleProfile.email), user._id);
+                changed = true;
+            }
+            if (!user.onboarding) {
+                user.onboarding = { completed: false, profile: {} };
+                changed = true;
+            }
+            if (changed) await user.save();
+        }
+
+        const { sessionId } = await createPersistentSession(user, req);
+        const token = createAuthToken(user, sessionId);
+        setSessionCookie(res, token);
+
+        await logAuditEvent({
+            category: 'auth',
+            event: isNewUser ? 'google_register_success' : 'google_login_success',
+            req,
+            userId: user._id,
+            role: user.role || 'user',
+            success: true,
+            details: { email: user.email },
+        });
+
+        return res.status(isNewUser ? 201 : 200).json({
+            ...buildAuthResponse(user, token),
+            authProvider: 'google',
+            picture: googleProfile.picture,
+            isNewUser,
+        });
+    } catch (error) {
+        const statusCode = error?.statusCode || 401;
+        await logAuditEvent({
+            category: 'auth',
+            event: 'google_login_failed',
+            req,
+            success: false,
+            details: { message: error?.message || 'Google login failed' },
+        });
+        console.error('[AUTH_ERR] Google OAuth failed:', error?.message || error);
+        return res.status(statusCode).json({ message: error?.message || 'Google authentication failed.' });
+    }
+};
+
 // @desc    Logout operative
 // @route   POST /api/auth/logout
 const logoutUser = async (req, res) => {
@@ -237,4 +376,4 @@ const logoutUser = async (req, res) => {
     res.status(200).json({ message: 'Logout successful.' });
 };
 
-module.exports = { registerUser, loginUser, logoutUser };
+module.exports = { registerUser, loginUser, googleLoginUser, logoutUser };
