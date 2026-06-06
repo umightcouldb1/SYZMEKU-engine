@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const GENESIS_SEAT_LIMIT = 13000;
+const PAID_GENESIS_STATUSES = ['paid', 'active'];
 
 const genesisCounterSchema = new mongoose.Schema(
   {
@@ -48,15 +49,22 @@ const genesisPatronSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['reserved', 'payment_pending', 'active', 'cancelled'],
-      default: 'reserved',
+      enum: ['paid', 'active', 'cancelled'],
+      default: 'paid',
       index: true,
     },
     source: {
       type: String,
-      default: 'genesis-lock',
+      default: 'payment-confirmation',
       trim: true,
       maxlength: 80,
+    },
+    payment: {
+      provider: { type: String, default: 'manual', trim: true, maxlength: 80 },
+      reference: { type: String, trim: true, maxlength: 180, sparse: true, unique: true },
+      amountCents: { type: Number, min: 0, default: 0 },
+      currency: { type: String, default: 'usd', trim: true, lowercase: true, maxlength: 12 },
+      paidAt: { type: Date },
     },
     metadata: {
       userAgent: { type: String, default: '', trim: true, maxlength: 300 },
@@ -67,12 +75,14 @@ const genesisPatronSchema = new mongoose.Schema(
 );
 
 genesisPatronSchema.index({ tier: 1, status: 1, seatNumber: 1 });
+genesisPatronSchema.index({ 'payment.reference': 1 }, { unique: true, sparse: true });
 
 const GenesisCounter = mongoose.model('GenesisCounter', genesisCounterSchema);
 const GenesisPatron = mongoose.model('GenesisPatron', genesisPatronSchema);
 
 module.exports = {
   GENESIS_SEAT_LIMIT,
+  PAID_GENESIS_STATUSES,
   GenesisCounter,
   GenesisPatron,
 };
