@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const Memory = require('../models/Memory');
 const { protect } = require('../middleware/authMiddleware');
 const { requestModelJson } = require('../services/modelRouter');
 const { getOrCreateLineageMemory } = require('../services/lineageMemoryService');
@@ -56,6 +57,9 @@ ${sovereignContext.sovereignMatrixNote || context.sovereignMatrixNote || '(none 
 Onboarding Reflection:
 ${sovereignContext.onboardingReflection || context.onboardingReflection || '(none saved)'}
 
+Life Stage Choices:
+${Array.isArray(sovereignContext.lifeStageChoices) && sovereignContext.lifeStageChoices.length ? sovereignContext.lifeStageChoices.join(', ') : context.lifeStage || '(none saved)'}
+
 Current User Request:
 ${text}
 
@@ -72,20 +76,24 @@ ${JSON.stringify({
 }).slice(0, 3000)}
 `.trim();
 
+const getModelText = (modelResult = {}) =>
+  modelResult?.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
 router.post('/', protect, async (req, res) => {
   const text = String(req.body?.text || '').trim();
   if (!text) return res.status(400).json({ message: 'Command text is required.' });
 
-  const rawContext = req.body?.context && typeof req.body.context === 'object' ? req.body.context : {};
-  const { memory, sovereignContext } = await getOrCreateLineageMemory(req.user._id);
-  const prompt = buildLineagePrompt({
-    text,
-    context: rawContext,
-    sovereignContext,
-    history: memory.conversationHistory || [],
-  });
-
   try {
+    const userId = req.user.id || req.user._id;
+    const rawContext = req.body?.context && typeof req.body.context === 'object' ? req.body.context : {};
+    const { memory, sovereignContext } = await getOrCreateLineageMemory(userId);
+    const prompt = buildLineagePrompt({
+      text,
+      context: rawContext,
+      sovereignContext,
+      history: memory.conversationHistory || [],
+    });
+
     const modelResult = await requestModelJson({ mode: 'mentor', prompt });
 
     if (modelResult?.providerError) {
@@ -98,29 +106,44 @@ router.post('/', protect, async (req, res) => {
 
     if (modelResult?.error) return res.json(modelResult.error);
 
-    const modelText = modelResult?.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const parsed = parseModelAnalysis(modelText);
-    const modelSummary = parsed.objectives[0] || parsed.next_actions[0] || 'Big SYZ reviewed the request through the active lineage context.';
-    const responsePayload = {
+    const rawModelText = getModelText(modelResult);
+    const parsed = parseModelAnalysis(rawModelText);
+    const modelSummary = parsed.objectives[0] || parsed.next_actions[0] || rawModelText || 'Big SYZ reviewed the request through the active lineage context.';
+    const now = new Date();
+    const turns = [
+      { role: 'user', text, timestamp: now },
+      { role: 'model', text: modelSummary, timestamp: now },
+    ];
+
+    const updatedMemory = await Memory.findOneAndUpdate(
+      { userId },
+      {
+        $set: { sovereignContext },
+        $push: {
+          conversationHistory: {
+            $each: turns,
+            $slice: -80,
+          },
+        },
+      },
+      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+    ).lean();
+
+    return res.json({
       ...parsed,
+      text: modelSummary,
       summary: modelSummary,
       reasoning_summary: modelSummary,
       lineage_status: 'Lineage Sync Established',
-      memory_turns: (memory.conversationHistory || []).length + 2,
-      sovereign_context: sovereignContext,
+      memory_turns: updatedMemory?.conversationHistory?.length || 0,
+      conversationHistory: updatedMemory?.conversationHistory || [],
+      sovereignContext: updatedMemory?.sovereignContext || sovereignContext,
+      sovereign_context: updatedMemory?.sovereignContext || sovereignContext,
       model: modelResult.model,
-    };
-
-    memory.appendConversationTurns([
-      { role: 'user', text },
-      { role: 'model', text: modelSummary },
-    ]);
-    await memory.save();
-
-    return res.json(responsePayload);
+    });
   } catch (error) {
-    return res.status(502).json({
-      message: 'Gemini request failed.',
+    return res.status(500).json({
+      message: 'Lineage memory analysis failed.',
       details: String(error?.message || error).slice(0, 500),
     });
   }
