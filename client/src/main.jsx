@@ -17,7 +17,7 @@ function FallbackUI({ error }) {
 }
 
 const rootElement = document.getElementById('root');
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
 const AppShell = () => {
   const shell = (
@@ -28,10 +28,10 @@ const AppShell = () => {
     </AuthProvider>
   );
 
-  if (!googleClientId) return shell;
+  if (!hasGoogleClientId) return shell;
 
   return (
-    <GoogleOAuthProvider clientId={googleClientId}>
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
       {shell}
     </GoogleOAuthProvider>
   );
