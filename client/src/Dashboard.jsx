@@ -32,6 +32,8 @@ const PATH_STAGES = [
   { name: 'Mastery', detail: 'Full pattern intelligence and advanced planning.' },
 ];
 
+const MAX_VISION_UPLOAD_BYTES = 6 * 1024 * 1024;
+
 const normalizeFocusTasks = (tasks = []) => tasks.map((task) => task?.description).filter(Boolean);
 
 const getOnboardingProfile = (user = {}) => user?.onboarding?.profile || {};
@@ -48,6 +50,31 @@ const getMentorResponseText = (response) =>
 
 const buildRecentConversationCommands = (chatMemory = []) =>
   chatMemory.slice(-8).map((entry) => `${entry.label}: ${entry.text}`);
+
+const fileToMediaAttachment = (file) =>
+  new Promise((resolve, reject) => {
+    if (!file) return resolve(null);
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+      return reject(new Error('Attach an image or video file.'));
+    }
+    if (file.size > MAX_VISION_UPLOAD_BYTES) {
+      return reject(new Error('Use an image or short video under 6 MB.'));
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const data = result.includes(',') ? result.split(',')[1] : result;
+      resolve({
+        name: file.name,
+        mimeType: file.type,
+        size: file.size,
+        data,
+      });
+    };
+    reader.onerror = () => reject(new Error('Could not read attached file.'));
+    reader.readAsDataURL(file);
+  });
 
 const buildConversation = ({ user, summary, chatMemory, loading, matrixNote }) => {
   const userName = user?.username || user?.name || 'there';
@@ -94,6 +121,8 @@ const Dashboard = ({ user }) => {
   const [signals, setSignals] = useState({ sleep: 6, stress: 3, symptoms: 'calm' });
   const [chatInput, setChatInput] = useState('');
   const [chatMemory, setChatMemory] = useState([]);
+  const [mediaAttachment, setMediaAttachment] = useState(null);
+  const [mediaError, setMediaError] = useState('');
   const [latestInsight, setLatestInsight] = useState(null);
   const [showReasoning, setShowReasoning] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -164,43 +193,67 @@ const Dashboard = ({ user }) => {
     }
   };
 
+  const handleMediaAttachment = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    setMediaError('');
+
+    try {
+      const attachment = await fileToMediaAttachment(file);
+      setMediaAttachment(attachment);
+    } catch (error) {
+      setMediaAttachment(null);
+      setMediaError(error?.message || 'Could not attach media.');
+    }
+  };
+
   const askMentor = async () => {
     const question = chatInput.trim();
-    if (!question) return;
+    if (!question && !mediaAttachment) return;
     setLoading(true);
     try {
+      const mediaLabel = mediaAttachment ? ` [Attached ${mediaAttachment.mimeType}: ${mediaAttachment.name}]` : '';
       const userEntry = {
         id: `user-${Date.now()}`,
         speaker: 'user',
         label: 'You',
-        text: question,
+        text: `${question || 'Analyze this attachment.'}${mediaLabel}`,
       };
       const contextWithCurrentTurn = {
         ...mentorContext,
-        recentCommands: [...buildRecentConversationCommands(chatMemory), `You: ${question}`].slice(-10),
+        recentCommands: [...buildRecentConversationCommands(chatMemory), `You: ${question}${mediaLabel}`].slice(-10),
         conversationHistory: [
           ...chatMemory.map(({ speaker, text }) => ({ role: speaker === 'syz' ? 'model' : 'user', text })),
-          { role: 'user', text: question },
+          { role: 'user', text: `${question || 'Analyze this attachment.'}${mediaLabel}` },
         ].slice(-10),
       };
-      const internalCommand = `analyze ${question}`;
+      const internalCommand = `analyze ${question || 'visual attachment'}`;
       setChatMemory((prev) => [...prev, userEntry].slice(-12));
 
-      const response = await axios.post('/api/core/analyze', {
-        text: internalCommand.replace(/^analyze\s+/i, ''),
-        context: contextWithCurrentTurn,
-      });
+      const response = mediaAttachment
+        ? await axios.post('/api/vision/analyze', {
+            text: question,
+            media: mediaAttachment,
+            context: contextWithCurrentTurn,
+          })
+        : await axios.post('/api/core/analyze', {
+            text: internalCommand.replace(/^analyze\s+/i, ''),
+            context: contextWithCurrentTurn,
+          });
       const mentorEntry = {
         id: `mentor-${Date.now()}`,
         speaker: 'syz',
         label: 'Big SYZ',
         text: getMentorResponseText(response.data),
-        detail: `Memory turns: ${contextWithCurrentTurn.conversationHistory.length}`,
+        detail: mediaAttachment
+          ? `Vision processed: ${mediaAttachment.name}`
+          : `Memory turns: ${contextWithCurrentTurn.conversationHistory.length}`,
       };
 
       setChatMemory((prev) => [...prev, mentorEntry].slice(-12));
       setLatestInsight(response.data);
       setChatInput('');
+      setMediaAttachment(null);
     } finally {
       setLoading(false);
     }
@@ -271,9 +324,9 @@ const Dashboard = ({ user }) => {
             <div>
               <p className="mentor-section-label">Primary conversation</p>
               <h2>Talk to Big SYZ</h2>
-              <p className="mentor-muted">Start with a feeling, a friction point, or a decision. Recent turns stay active so follow-up questions keep their context.</p>
+              <p className="mentor-muted">Start with a feeling, a friction point, a decision, or a visual attachment. Recent turns stay active so follow-up questions keep their context.</p>
             </div>
-            <button type="button" className="mentor-button" onClick={askMentor} disabled={loading || !chatInput.trim()}>
+            <button type="button" className="mentor-button" onClick={askMentor} disabled={loading || (!chatInput.trim() && !mediaAttachment)}>
               Talk to Big SYZ
             </button>
           </div>
@@ -319,8 +372,25 @@ const Dashboard = ({ user }) => {
                 placeholder="I need help making today feel manageable without shutting down."
                 rows="4"
               />
+              <div className="mentor-vision-row">
+                <label className="mentor-vision-upload">
+                  Attach image/video
+                  <input type="file" accept="image/*,video/*" onChange={handleMediaAttachment} />
+                </label>
+                {mediaAttachment && (
+                  <span className="mentor-pill success">
+                    {mediaAttachment.mimeType.startsWith('video/') ? 'Video' : 'Image'} attached: {mediaAttachment.name}
+                  </span>
+                )}
+                {mediaAttachment && (
+                  <button type="button" className="mentor-link" onClick={() => setMediaAttachment(null)}>
+                    Remove attachment
+                  </button>
+                )}
+              </div>
+              {mediaError && <p className="mentor-warning-inline">{mediaError}</p>}
               <div className="mentor-compose-actions">
-                <button type="button" className="mentor-button" onClick={askMentor} disabled={loading || !chatInput.trim()}>
+                <button type="button" className="mentor-button" onClick={askMentor} disabled={loading || (!chatInput.trim() && !mediaAttachment)}>
                   Talk to Big SYZ
                 </button>
                 <p className="mentor-muted">Big SYZ responds with emotionally intelligent pattern guidance, not diagnosis.</p>
