@@ -39,7 +39,17 @@ const getOnboardingProfile = (user = {}) => user?.onboarding?.profile || {};
 const getMatrixNote = (profile = {}) =>
   profile.sovereignMatrixNote || profile.onboardingReflection || '';
 
-const buildConversation = ({ user, summary, chatAnswer, loading, matrixNote }) => {
+const getMentorResponseText = (response) =>
+  response?.reasoning_summary ||
+  response?.summary ||
+  response?.objectives?.[0] ||
+  response?.next_actions?.[0] ||
+  'I analyzed your pattern and prepared a grounded next step.';
+
+const buildRecentConversationCommands = (chatMemory = []) =>
+  chatMemory.slice(-8).map((entry) => `${entry.label}: ${entry.text}`);
+
+const buildConversation = ({ user, summary, chatMemory, loading, matrixNote }) => {
   const userName = user?.username || user?.name || 'there';
   const transcript = [
     {
@@ -52,26 +62,8 @@ const buildConversation = ({ user, summary, chatAnswer, loading, matrixNote }) =
     },
   ];
 
-  if (chatAnswer?.question) {
-    transcript.push({
-      id: 'user-question',
-      speaker: 'user',
-      label: 'You',
-      text: chatAnswer.question,
-    });
-  }
-
-  if (chatAnswer?.response) {
-    transcript.push({
-      id: 'mentor-answer',
-      speaker: 'syz',
-      label: 'Big SYZ',
-      text:
-        chatAnswer.response?.reasoning_summary ||
-        chatAnswer.response?.summary ||
-        'I analyzed your pattern and prepared a grounded next step.',
-      detail: chatAnswer.internalCommand ? `Internal route: ${chatAnswer.internalCommand}` : '',
-    });
+  if (chatMemory.length) {
+    transcript.push(...chatMemory);
   } else if (summary?.recommended_next_move) {
     transcript.push({
       id: 'mentor-nudge',
@@ -101,7 +93,7 @@ const Dashboard = ({ user }) => {
   const [alerts, setAlerts] = useState([]);
   const [signals, setSignals] = useState({ sleep: 6, stress: 3, symptoms: 'calm' });
   const [chatInput, setChatInput] = useState('');
-  const [chatAnswer, setChatAnswer] = useState(null);
+  const [chatMemory, setChatMemory] = useState([]);
   const [latestInsight, setLatestInsight] = useState(null);
   const [showReasoning, setShowReasoning] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -117,7 +109,9 @@ const Dashboard = ({ user }) => {
     supportAreas: onboardingProfile.supportAreas || [],
     mentorStyle: onboardingProfile.mentorStyle || '',
     goals: onboardingProfile.goals || [],
-  }), [matrixNote, onboardingProfile, user]);
+    recentCommands: buildRecentConversationCommands(chatMemory),
+    conversationHistory: chatMemory.map(({ speaker, text }) => ({ role: speaker === 'syz' ? 'model' : 'user', text })),
+  }), [chatMemory, matrixNote, onboardingProfile, user]);
 
   const canAccessOperatorMode = Boolean(operatorVisibility?.canAccessOperatorMode || ['founder', 'admin'].includes(String(user?.role || '').toLowerCase()));
 
@@ -151,8 +145,8 @@ const Dashboard = ({ user }) => {
 
   const topFocus = useMemo(() => normalizeFocusTasks(tasks).slice(0, 3), [tasks]);
   const conversation = useMemo(
-    () => buildConversation({ user, summary, chatAnswer, loading, matrixNote }),
-    [user, summary, chatAnswer, loading, matrixNote],
+    () => buildConversation({ user, summary, chatMemory, loading, matrixNote }),
+    [user, summary, chatMemory, loading, matrixNote],
   );
 
   const submitCheckIn = async () => {
@@ -171,19 +165,40 @@ const Dashboard = ({ user }) => {
   };
 
   const askMentor = async () => {
-    if (!chatInput.trim()) return;
+    const question = chatInput.trim();
+    if (!question) return;
     setLoading(true);
     try {
-      const internalCommand = `analyze ${chatInput.trim()}`;
+      const userEntry = {
+        id: `user-${Date.now()}`,
+        speaker: 'user',
+        label: 'You',
+        text: question,
+      };
+      const contextWithCurrentTurn = {
+        ...mentorContext,
+        recentCommands: [...buildRecentConversationCommands(chatMemory), `You: ${question}`].slice(-10),
+        conversationHistory: [
+          ...chatMemory.map(({ speaker, text }) => ({ role: speaker === 'syz' ? 'model' : 'user', text })),
+          { role: 'user', text: question },
+        ].slice(-10),
+      };
+      const internalCommand = `analyze ${question}`;
+      setChatMemory((prev) => [...prev, userEntry].slice(-12));
+
       const response = await axios.post('/api/core/analyze', {
         text: internalCommand.replace(/^analyze\s+/i, ''),
-        context: mentorContext,
+        context: contextWithCurrentTurn,
       });
-      setChatAnswer({
-        question: chatInput,
-        response: response.data,
-        internalCommand,
-      });
+      const mentorEntry = {
+        id: `mentor-${Date.now()}`,
+        speaker: 'syz',
+        label: 'Big SYZ',
+        text: getMentorResponseText(response.data),
+        detail: `Memory turns: ${contextWithCurrentTurn.conversationHistory.length}`,
+      };
+
+      setChatMemory((prev) => [...prev, mentorEntry].slice(-12));
       setLatestInsight(response.data);
       setChatInput('');
     } finally {
@@ -256,7 +271,7 @@ const Dashboard = ({ user }) => {
             <div>
               <p className="mentor-section-label">Primary conversation</p>
               <h2>Talk to Big SYZ</h2>
-              <p className="mentor-muted">Start with a feeling, a friction point, or a decision. The cards below stay available as support context.</p>
+              <p className="mentor-muted">Start with a feeling, a friction point, or a decision. Recent turns stay active so follow-up questions keep their context.</p>
             </div>
             <button type="button" className="mentor-button" onClick={askMentor} disabled={loading || !chatInput.trim()}>
               Talk to Big SYZ
@@ -272,6 +287,16 @@ const Dashboard = ({ user }) => {
               </article>
             ))}
           </div>
+
+          {chatMemory.length > 0 && (
+            <div className="mentor-memory-status">
+              <span className="mentor-pill success">Memory active</span>
+              <span className="mentor-pill">{chatMemory.length} recent turns held</span>
+              <button type="button" className="mentor-link" onClick={() => setChatMemory([])}>
+                Clear thread memory
+              </button>
+            </div>
+          )}
 
           <div className="mentor-example-prompt-block">
             <p className="mentor-section-label">Example prompts</p>
