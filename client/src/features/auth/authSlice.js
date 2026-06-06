@@ -83,6 +83,17 @@ const authService = {
         return response.data;
     },
 
+    // Login or register user with Google Identity Services
+    googleLogin: async (googleCredential) => {
+        const response = await axios.post(API_URL + 'google', googleCredential);
+
+        if (response.data) {
+            persistAuthUser(response.data);
+        }
+
+        return response.data;
+    },
+
     // Logout user
     logout: async () => {
         try {
@@ -119,6 +130,18 @@ export const login = createAsyncThunk(
     async (user, thunkAPI) => {
         try {
             return await authService.login(user);
+        } catch (error) {
+            return thunkAPI.rejectWithValue(getAuthErrorMessage(error));
+        }
+    }
+);
+
+// Google Login Thunk
+export const googleLogin = createAsyncThunk(
+    'auth/googleLogin',
+    async (credential, thunkAPI) => {
+        try {
+            return await authService.googleLogin(credential);
         } catch (error) {
             return thunkAPI.rejectWithValue(getAuthErrorMessage(error));
         }
@@ -178,6 +201,24 @@ export const authSlice = createSlice({
                 state.isError = true;
                 state.message = action.payload;
                 state.user = null; // Login failed, ensure user is null
+                setAuthHeader(null);
+            })
+            // --- GOOGLE LOGIN ---
+            .addCase(googleLogin.pending, (state) => {
+                state.isLoading = true;
+                state.message = '';
+            })
+            .addCase(googleLogin.fulfilled, (state, action) => {
+                state.isLoading = false;
+                state.isSuccess = true;
+                state.user = action.payload;
+                persistAuthUser(action.payload);
+            })
+            .addCase(googleLogin.rejected, (state, action) => {
+                state.isLoading = false;
+                state.isError = true;
+                state.message = action.payload;
+                state.user = null;
                 setAuthHeader(null);
             })
             // --- LOGOUT ---
