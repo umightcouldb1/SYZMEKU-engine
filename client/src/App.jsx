@@ -5,6 +5,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import AuthPage from './AuthPage';
 import Dashboard from './sovereign-shield/Dashboard';
 import OnboardingFlow from './OnboardingFlow';
+import OnboardingVoiceBridge from './OnboardingVoiceBridge';
 import WelcomeScreen from './WelcomeScreen';
 import RequireAuth from './components/RequireAuth';
 import PrivateLayout from './layouts/PrivateLayout';
@@ -191,7 +192,14 @@ function App() {
         path="/onboarding"
         element={
           <RequireAuth>
-            {onboardingCompleted ? <Navigate to={APP_HOME_ROUTE} replace /> : <OnboardingFlow user={user} onComplete={completeOnboarding} appHomeRoute={APP_HOME_ROUTE} />}
+            {onboardingCompleted ? (
+              <Navigate to={APP_HOME_ROUTE} replace />
+            ) : (
+              <>
+                <OnboardingFlow user={user} onComplete={completeOnboarding} appHomeRoute={APP_HOME_ROUTE} />
+                <OnboardingVoiceBridge />
+              </>
+            )}
           </RequireAuth>
         }
       />
