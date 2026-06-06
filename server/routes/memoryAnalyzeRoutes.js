@@ -42,11 +42,92 @@ const toConversationLines = (history = []) =>
     .map((turn, index) => `${index + 1}. ${turn.role}: ${String(turn.text || '').slice(0, 700)}`)
     .join('\n');
 
-const buildLineagePrompt = ({ text, context = {}, sovereignContext = {}, history = [] }) => `
+const cleanString = (value, maxLength = 500) => String(value || '').trim().slice(0, maxLength);
+const cleanNumber = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+
+const sanitizeMetric = (metric = {}) => ({
+  status: cleanString(metric.status || 'unavailable', 80),
+  label: cleanString(metric.label || 'Unavailable', 80),
+  sampleCount: cleanNumber(metric.sampleCount) || 0,
+  amplitudeStability: cleanNumber(metric.amplitudeStability),
+  pitchVariance: cleanNumber(metric.pitchVariance),
+  rhythm: cleanString(metric.rhythm, 80),
+  dwellAverageMs: cleanNumber(metric.dwellAverageMs),
+  flightAverageMs: cleanNumber(metric.flightAverageMs),
+  blinkFrequencyPerMinute: cleanNumber(metric.blinkFrequencyPerMinute),
+  motionVelocity: cleanNumber(metric.motionVelocity),
+  sleepHours: cleanNumber(metric.sleepHours),
+  stressLevel: cleanNumber(metric.stressLevel),
+  symptoms: cleanString(metric.symptoms, 240),
+  error: cleanString(metric.error, 500),
+});
+
+const sanitizeBiometricMetadata = (metadata = {}) => {
+  if (!metadata || typeof metadata !== 'object') {
+    return {
+      capturedAt: new Date(),
+      coherenceScore: null,
+      coherenceLabel: 'Unavailable',
+      acoustic: sanitizeMetric(),
+      kinetic: sanitizeMetric(),
+      visual: sanitizeMetric(),
+      contextual: sanitizeMetric(),
+      guidance: [],
+    };
+  }
+
+  return {
+    capturedAt: metadata.capturedAt ? new Date(metadata.capturedAt) : new Date(),
+    coherenceScore: cleanNumber(metadata.coherenceScore),
+    coherenceLabel: cleanString(metadata.coherenceLabel || 'Unknown', 80),
+    acoustic: sanitizeMetric(metadata.acoustic),
+    kinetic: sanitizeMetric(metadata.kinetic),
+    visual: sanitizeMetric(metadata.visual),
+    contextual: sanitizeMetric(metadata.contextual),
+    guidance: Array.isArray(metadata.guidance) ? metadata.guidance.map((item) => cleanString(item, 240)).filter(Boolean).slice(0, 8) : [],
+  };
+};
+
+const buildBiometricSummary = (metadata = {}) => JSON.stringify({
+  coherenceScore: metadata.coherenceScore,
+  coherenceLabel: metadata.coherenceLabel,
+  acoustic: {
+    label: metadata.acoustic?.label,
+    amplitudeStability: metadata.acoustic?.amplitudeStability,
+    pitchVariance: metadata.acoustic?.pitchVariance,
+  },
+  kinetic: {
+    label: metadata.kinetic?.label,
+    rhythm: metadata.kinetic?.rhythm,
+    dwellAverageMs: metadata.kinetic?.dwellAverageMs,
+    flightAverageMs: metadata.kinetic?.flightAverageMs,
+  },
+  visual: {
+    label: metadata.visual?.label,
+    blinkFrequencyPerMinute: metadata.visual?.blinkFrequencyPerMinute,
+    motionVelocity: metadata.visual?.motionVelocity,
+  },
+  contextual: {
+    label: metadata.contextual?.label,
+    sleepHours: metadata.contextual?.sleepHours,
+    stressLevel: metadata.contextual?.stressLevel,
+    symptoms: metadata.contextual?.symptoms,
+  },
+}).slice(0, 2500);
+
+const buildLineagePrompt = ({ text, context = {}, sovereignContext = {}, history = [], biometricMetadata = {} }) => `
 [SYSTEM ARCHITECTURE DIRECTIVE: BIG SYZ LINEAGE MEMORY]
 You are Big SYZ, an emotionally intelligent mentor and strategic operating system.
 The user's onboarding blueprint must govern every response across the entire app.
-Treat emotions as signal context, not commands. Do not diagnose, do not imitate therapy, and do not make unsafe promises.
+Treat emotions and biometric coherence as adaptive signal context, not diagnosis, identity verification, or medical evidence.
+Use the real-time coherence vector to adjust tone, pacing, and strategic load:
+- If coherence is Aligned, be concise, direct, and action-oriented.
+- If coherence is Stabilizing, slow the response cadence and give one clear next move.
+- If coherence is Support Needed, reduce complexity, emphasize grounding, and avoid overwhelming action lists.
+Do not diagnose, do not imitate therapy, and do not make unsafe promises.
 Return ONLY valid JSON with this exact shape:
 {"objectives":[],"constraints":[],"risks":[],"leverage":[],"next_actions":[]}
 Each field must be an array of concise strings.
@@ -59,6 +140,9 @@ ${sovereignContext.onboardingReflection || context.onboardingReflection || '(non
 
 Life Stage Choices:
 ${Array.isArray(sovereignContext.lifeStageChoices) && sovereignContext.lifeStageChoices.length ? sovereignContext.lifeStageChoices.join(', ') : context.lifeStage || '(none saved)'}
+
+Real-Time Biometric Coherence Vector:
+${buildBiometricSummary(biometricMetadata)}
 
 Current User Request:
 ${text}
@@ -86,12 +170,14 @@ router.post('/', protect, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
     const rawContext = req.body?.context && typeof req.body.context === 'object' ? req.body.context : {};
+    const biometricMetadata = sanitizeBiometricMetadata(req.body?.biometricMetadata);
     const { memory, sovereignContext } = await getOrCreateLineageMemory(userId);
     const prompt = buildLineagePrompt({
       text,
       context: rawContext,
       sovereignContext,
       history: memory.conversationHistory || [],
+      biometricMetadata,
     });
 
     const modelResult = await requestModelJson({ mode: 'mentor', prompt });
@@ -111,8 +197,8 @@ router.post('/', protect, async (req, res) => {
     const modelSummary = parsed.objectives[0] || parsed.next_actions[0] || rawModelText || 'Big SYZ reviewed the request through the active lineage context.';
     const now = new Date();
     const turns = [
-      { role: 'user', text, timestamp: now },
-      { role: 'model', text: modelSummary, timestamp: now },
+      { role: 'user', text, timestamp: now, biometricMetadata },
+      { role: 'model', text: modelSummary, timestamp: now, biometricMetadata },
     ];
 
     const updatedMemory = await Memory.findOneAndUpdate(
@@ -139,6 +225,7 @@ router.post('/', protect, async (req, res) => {
       conversationHistory: updatedMemory?.conversationHistory || [],
       sovereignContext: updatedMemory?.sovereignContext || sovereignContext,
       sovereign_context: updatedMemory?.sovereignContext || sovereignContext,
+      biometricMetadata,
       model: modelResult.model,
     });
   } catch (error) {
