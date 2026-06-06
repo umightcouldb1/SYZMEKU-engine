@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "setup": "npm install && npm install --prefix server && npm install --prefix client",
-    "client-build": "npm run build --prefix client",
+    "prepare-client-env": "node scripts/prepare-client-env.cjs",
+    "client-build": "npm run prepare-client-env && npm run build --prefix client",
     "server-check": "node --check server.js && node --check server/server.js",
     "render-build": "npm run setup && npm run client-build",
     "start": "node server.js",
