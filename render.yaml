@@ -3,6 +3,8 @@ services:
     name: syzmeku-engine
     env: node
     plan: free
+    branch: main
+    autoDeploy: true
     buildCommand: npm run render-build
     startCommand: npm run start
     envVars:
