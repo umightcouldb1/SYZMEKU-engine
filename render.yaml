@@ -10,6 +10,12 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22.16.0
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
       - key: ENGINE_SIGNATURE
         value: "EL_KAI_THARION_KAI_ZHUN"
       - key: SYSTEM_VECTOR
