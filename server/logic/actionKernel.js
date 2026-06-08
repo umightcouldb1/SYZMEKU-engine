@@ -2,57 +2,62 @@ const Task = require("../models/Task");
 const AlertRecord = require("../models/AlertRecord");
 const StrategicMemory = require("../models/StrategicMemory");
 const ProtocolExecutionRecord = require("../models/ProtocolExecutionRecord");
+const { getRequestContext } = require("../utils/requestContext");
 
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const createToolRegistry = ({ runProtocolIfNeeded, generateReport, userId = null }) => ({
-  createTask: async ({ description, source = "action-kernel" }) => {
-    if (!userId) throw new Error("Cannot create a task without an authenticated user scope.");
-    return Task.create({ userId, description, source });
-  },
-  completeTask: async ({ id }) => {
-    if (!userId) throw new Error("Cannot complete a task without an authenticated user scope.");
-    const task = await Task.findOne({ _id: id, userId });
-    if (!task) throw new Error(`Task not found: ${id}`);
-    task.status = "done";
-    task.completedAt = new Date();
-    await task.save();
-    return task;
-  },
-  createAlert: async ({ message, severity = "medium", source = "action-kernel" }) => {
-    const fingerprint = normalizeText(message);
-    const existing = await AlertRecord.findOne({ fingerprint });
-    if (existing) {
-      existing.count += 1;
-      existing.last_seen_at = new Date();
-      existing.status = "open";
-      await existing.save();
-      return existing;
-    }
+const createToolRegistry = ({ runProtocolIfNeeded, generateReport, userId = null }) => {
+  const scopedUserId = userId || getRequestContext().userId || null;
 
-    return AlertRecord.create({ fingerprint, message, severity, source });
-  },
-  updateAlert: async ({ message, status = "resolved" }) => {
-    const alert = await AlertRecord.findOne({ message: { $regex: `^${escapeRegex(message)}$`, $options: "i" } });
-    if (!alert) throw new Error(`Alert not found: ${message}`);
-    alert.status = status;
-    alert.last_seen_at = new Date();
-    await alert.save();
-    return alert;
-  },
-  runProtocol: async ({ protocolName }) => runProtocolIfNeeded(protocolName),
-  saveMemory: async ({ title, content, sourceCommand = "action kernel", tags = [] }) =>
-    StrategicMemory.create({ title, category: "kernel", content, sourceCommand, tags }),
-  generateReport: async ({ reasoningOutput, operatorState }) =>
-    generateReport({ reasoningOutput, operatorState }),
-});
+  return {
+    createTask: async ({ description, source = "action-kernel" }) => {
+      if (!scopedUserId) throw new Error("Cannot create a task without an authenticated user scope.");
+      return Task.create({ userId: scopedUserId, description, source });
+    },
+    completeTask: async ({ id }) => {
+      if (!scopedUserId) throw new Error("Cannot complete a task without an authenticated user scope.");
+      const task = await Task.findOne({ _id: id, userId: scopedUserId });
+      if (!task) throw new Error(`Task not found: ${id}`);
+      task.status = "done";
+      task.completedAt = new Date();
+      await task.save();
+      return task;
+    },
+    createAlert: async ({ message, severity = "medium", source = "action-kernel" }) => {
+      const fingerprint = normalizeText(message);
+      const existing = await AlertRecord.findOne({ fingerprint });
+      if (existing) {
+        existing.count += 1;
+        existing.last_seen_at = new Date();
+        existing.status = "open";
+        await existing.save();
+        return existing;
+      }
+
+      return AlertRecord.create({ fingerprint, message, severity, source });
+    },
+    updateAlert: async ({ message, status = "resolved" }) => {
+      const alert = await AlertRecord.findOne({ message: { $regex: `^${escapeRegex(message)}$`, $options: "i" } });
+      if (!alert) throw new Error(`Alert not found: ${message}`);
+      alert.status = status;
+      alert.last_seen_at = new Date();
+      await alert.save();
+      return alert;
+    },
+    runProtocol: async ({ protocolName }) => runProtocolIfNeeded(protocolName),
+    saveMemory: async ({ title, content, sourceCommand = "action kernel", tags = [] }) =>
+      StrategicMemory.create({ title, category: "kernel", content, sourceCommand, tags }),
+    generateReport: async ({ reasoningOutput, operatorState }) =>
+      generateReport({ reasoningOutput, operatorState }),
+  };
+};
 
 const buildActionPolicy = ({ reasoningOutput, operatorState }) => {
   const urgency = Number(reasoningOutput?.urgency_score) || 0;
   const nextActions = Array.isArray(reasoningOutput?.next_actions) ? reasoningOutput.next_actions : [];
   const repeatedPattern = operatorState?.isRepeatedPattern;
-  const hasUserScope = Boolean(operatorState?.userId);
+  const hasUserScope = Boolean(operatorState?.userId || getRequestContext().userId);
   const shouldRunProtocol = Boolean(reasoningOutput?.should_run_protocol && reasoningOutput?.protocol_to_run);
 
   if (urgency < 4) {
