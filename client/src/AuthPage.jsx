@@ -1,11 +1,39 @@
-import React, { useState } from 'react';
-import { GoogleLogin } from '@react-oauth/google';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { googleLogin, login, register, reset } from './features/auth/authSlice';
 import './authTypography.css';
 
-const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+const GOOGLE_SCRIPT_ID = 'google-identity-services-sdk';
+let googleSdkPromise = null;
+
+const getGoogleClientId = () => import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+const ensureGoogleIdentityScript = () => {
+  if (window.google?.accounts?.id) return Promise.resolve(window.google);
+  if (googleSdkPromise) return googleSdkPromise;
+
+  googleSdkPromise = new Promise((resolve, reject) => {
+    const existingScript = document.getElementById(GOOGLE_SCRIPT_ID);
+
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(window.google), { once: true });
+      existingScript.addEventListener('error', reject, { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = GOOGLE_SCRIPT_ID;
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve(window.google);
+    script.onerror = () => reject(new Error('Google Identity Services SDK failed to load.'));
+    document.head.appendChild(script);
+  });
+
+  return googleSdkPromise;
+};
 
 const AuthPage = ({ mode = 'login' }) => {
   const isSignup = mode === 'signup';
@@ -13,6 +41,9 @@ const AuthPage = ({ mode = 'login' }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoading, message } = useSelector((state) => state.auth || {});
+  const googleButtonRef = useRef(null);
+  const googleClientId = getGoogleClientId();
+  const hasGoogleClientId = Boolean(googleClientId);
 
   const [form, setForm] = useState({
     username: '',
@@ -25,23 +56,7 @@ const AuthPage = ({ mode = 'login' }) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const onSubmit = async (event) => {
-    event.preventDefault();
-    setError('');
-
-    const action = isSignup ? register(form) : login({ email: form.email, password: form.password });
-    const result = await dispatch(action);
-
-    if (result.meta.requestStatus !== 'fulfilled') {
-      setError(result.payload || 'Unable to authenticate right now.');
-      dispatch(reset());
-      return;
-    }
-
-    navigate(isSignup ? '/onboarding' : '/app', { replace: true });
-  };
-
-  const onGoogleSuccess = async (credentialResponse) => {
+  const onGoogleSuccess = useCallback(async (credentialResponse) => {
     setError('');
 
     if (!credentialResponse?.credential) {
@@ -59,6 +74,60 @@ const AuthPage = ({ mode = 'login' }) => {
 
     const completed = Boolean(result.payload?.onboarding?.completed);
     navigate(completed ? '/app' : '/onboarding', { replace: true });
+  }, [dispatch, navigate]);
+
+  useEffect(() => {
+    if (!hasGoogleClientId) return undefined;
+
+    let cancelled = false;
+
+    const renderGoogleButton = async () => {
+      try {
+        const google = await ensureGoogleIdentityScript();
+        if (cancelled || !googleButtonRef.current || !google?.accounts?.id) return;
+
+        google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: onGoogleSuccess,
+        });
+
+        googleButtonRef.current.innerHTML = '';
+        google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: 'filled_black',
+          size: 'large',
+          shape: 'pill',
+          type: 'standard',
+          text: isSignup ? 'signup_with' : 'signin_with',
+          width: Math.min(400, googleButtonRef.current.offsetWidth || 400),
+        });
+      } catch (sdkError) {
+        if (!cancelled) {
+          setError(sdkError?.message || 'Google sign-in failed to initialize.');
+        }
+      }
+    };
+
+    renderGoogleButton();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [googleClientId, hasGoogleClientId, isSignup, onGoogleSuccess]);
+
+  const onSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+
+    const action = isSignup ? register(form) : login({ email: form.email, password: form.password });
+    const result = await dispatch(action);
+
+    if (result.meta.requestStatus !== 'fulfilled') {
+      setError(result.payload || 'Unable to authenticate right now.');
+      dispatch(reset());
+      return;
+    }
+
+    navigate(isSignup ? '/onboarding' : '/app', { replace: true });
   };
 
   return (
@@ -80,19 +149,13 @@ const AuthPage = ({ mode = 'login' }) => {
             </p>
           </div>
 
-          {hasGoogleClientId && (
-            <div className="google-auth-slot" aria-label="Sign in with Google">
-              <GoogleLogin
-                onSuccess={onGoogleSuccess}
-                onError={() => setError('Google authentication was cancelled or failed.')}
-                useOneTap={!isSignup}
-                theme="filled_black"
-                size="large"
-                shape="pill"
-                width="100%"
-              />
-            </div>
-          )}
+          <div className="google-auth-slot" aria-label="Sign in with Google">
+            {hasGoogleClientId ? (
+              <div id="google-signin-button" className="google-signin-button" ref={googleButtonRef} />
+            ) : (
+              <p className="google-auth-unavailable">Google sign-in requires VITE_GOOGLE_CLIENT_ID in the frontend build.</p>
+            )}
+          </div>
 
           {hasGoogleClientId && <div className="auth-divider"><span>or</span></div>}
 
