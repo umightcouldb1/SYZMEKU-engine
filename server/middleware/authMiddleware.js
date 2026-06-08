@@ -4,6 +4,7 @@ const User = require('../models/User');
 const AuthSession = require('../models/AuthSession');
 const { logAuditEvent } = require('../utils/audit');
 const { getJwtSecret } = require('../utils/jwtSecret');
+const { runWithRequestContext } = require('../utils/requestContext');
 
 const getCookieToken = (cookieHeader = '') => {
     const sessionCookie = cookieHeader
@@ -55,7 +56,7 @@ const protect = asyncHandler(async (req, res, next) => {
         }
 
         req.sessionId = decoded.sid;
-        next();
+        runWithRequestContext({ userId: req.user._id, sessionId: decoded.sid }, next);
     } catch (error) {
         console.error(error);
         res.status(401);
