@@ -55,7 +55,8 @@ const initialState = {
     message: '',
 };
 
-const API_URL = '/api/auth/'; // Base URL for Auth API routes
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://syzmeku-api.onrender.com').replace(/\/+$/, '');
+const API_URL = `${API_BASE_URL}/api/auth/`; // Base URL for Auth API routes
 
 // --- AUTH SERVICE (API Interaction) ---
 const authService = {
