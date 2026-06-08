@@ -5,7 +5,7 @@ const rootDir = path.resolve(__dirname, '..');
 const clientEnvPath = path.join(rootDir, 'client', '.env.production');
 
 const viteGoogleClientId = process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || '';
-const viteApiUrl = process.env.VITE_API_URL || '';
+const viteApiUrl = process.env.VITE_API_URL || 'https://syzmeku-api.onrender.com';
 
 const lines = [];
 
