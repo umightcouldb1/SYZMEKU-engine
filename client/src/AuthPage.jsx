@@ -42,6 +42,7 @@ const AuthPage = ({ mode = 'login' }) => {
   const location = useLocation();
   const { isLoading, message } = useSelector((state) => state.auth || {});
   const googleButtonRef = useRef(null);
+  const googleRenderFrameRef = useRef(null);
   const googleClientId = getGoogleClientId();
   const hasGoogleClientId = Boolean(googleClientId);
 
@@ -81,25 +82,42 @@ const AuthPage = ({ mode = 'login' }) => {
 
     let cancelled = false;
 
-    const renderGoogleButton = async () => {
+    const drawGoogleButton = (google) => {
+      const buttonHost = googleButtonRef.current;
+      if (!buttonHost || !google?.accounts?.id) return false;
+
+      const slotWidth = Math.floor(buttonHost.getBoundingClientRect().width);
+      if (slotWidth <= 0) return false;
+
+      google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: onGoogleSuccess,
+      });
+
+      buttonHost.innerHTML = '';
+      google.accounts.id.renderButton(buttonHost, {
+        theme: 'filled_black',
+        size: 'large',
+        shape: 'pill',
+        type: 'standard',
+        text: isSignup ? 'signup_with' : 'signin_with',
+        width: Math.min(400, slotWidth),
+      });
+
+      return true;
+    };
+
+    const renderGoogleButton = async (attempt = 0) => {
       try {
         const google = await ensureGoogleIdentityScript();
-        if (cancelled || !googleButtonRef.current || !google?.accounts?.id) return;
+        if (cancelled) return;
 
-        google.accounts.id.initialize({
-          client_id: googleClientId,
-          callback: onGoogleSuccess,
-        });
-
-        googleButtonRef.current.innerHTML = '';
-        google.accounts.id.renderButton(googleButtonRef.current, {
-          theme: 'filled_black',
-          size: 'large',
-          shape: 'pill',
-          type: 'standard',
-          text: isSignup ? 'signup_with' : 'signin_with',
-          width: Math.min(400, googleButtonRef.current.offsetWidth || 400),
-        });
+        const rendered = drawGoogleButton(google);
+        if (!rendered && attempt < 8) {
+          googleRenderFrameRef.current = window.requestAnimationFrame(() => {
+            renderGoogleButton(attempt + 1);
+          });
+        }
       } catch (sdkError) {
         if (!cancelled) {
           setError(sdkError?.message || 'Google sign-in failed to initialize.');
@@ -109,8 +127,20 @@ const AuthPage = ({ mode = 'login' }) => {
 
     renderGoogleButton();
 
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => renderGoogleButton())
+      : null;
+
+    if (resizeObserver && googleButtonRef.current) {
+      resizeObserver.observe(googleButtonRef.current);
+    }
+
     return () => {
       cancelled = true;
+      resizeObserver?.disconnect();
+      if (googleRenderFrameRef.current) {
+        window.cancelAnimationFrame(googleRenderFrameRef.current);
+      }
     };
   }, [googleClientId, hasGoogleClientId, isSignup, onGoogleSuccess]);
 
@@ -151,7 +181,9 @@ const AuthPage = ({ mode = 'login' }) => {
 
           <div className="google-auth-slot" aria-label="Sign in with Google">
             {hasGoogleClientId ? (
-              <div id="google-signin-button" className="google-signin-button" ref={googleButtonRef} />
+              <div className="google-button-frame">
+                <div id="google-signin-button" className="google-signin-button" ref={googleButtonRef} />
+              </div>
             ) : (
               <p className="google-auth-unavailable">Google sign-in requires VITE_GOOGLE_CLIENT_ID in the frontend build.</p>
             )}
