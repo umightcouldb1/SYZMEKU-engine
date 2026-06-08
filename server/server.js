@@ -7,13 +7,7 @@ const mongoose = require('mongoose');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { loadArchitectBaseTone } = require('./logic/architectLayer');
-const {
-  deriveUsernameFromEmail,
-  findAdminByEmail,
-  initializeAdminSystem,
-  normalizeEmail,
-  resolveUniqueUsername,
-} = require('./utils/adminIdentity');
+const { initializeAdminSystem } = require('./utils/adminIdentity');
 
 const app = express();
 global.toneMatrix = loadArchitectBaseTone();
@@ -40,8 +34,27 @@ connectDB();
 // ==========================================
 // PHASE III SECURITY LAYER INTEGRATION
 // ==========================================
+const configuredClientOrigins = String(process.env.CLIENT_ORIGIN || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const allowedClientOrigins = configuredClientOrigins.length
+  ? configuredClientOrigins
+  : process.env.NODE_ENV === 'production'
+    ? []
+    : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+
+const corsOptions = {
+  credentials: true,
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedClientOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('CORS origin not allowed.'));
+  },
+};
+
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || true, credentials: true }));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 
 const apiLimiter = rateLimit({
@@ -52,70 +65,6 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 app.use('/api', apiLimiter);
-
-// ==========================================
-// TEMPORARY PHASE III MASTER FORCE OVERRIDE
-// Active only while RESET_ADMIN_PASSWORD=true is configured in Render.
-// ==========================================
-app.get('/api/system-master-override-reset', async (req, res) => {
-  try {
-    if (process.env.RESET_ADMIN_PASSWORD !== 'true') {
-      return res.status(403).json({
-        success: false,
-        message: 'Master override is disabled. Set RESET_ADMIN_PASSWORD=true to enable it temporarily.',
-      });
-    }
-
-    const bcrypt = require('bcryptjs');
-    const User = require('./models/User');
-    const adminEmail = normalizeEmail(req.query.email || process.env.ADMIN_EMAIL);
-    const targetPassword = String(process.env.INITIAL_ADMIN_PASSWORD || '').trim();
-
-    if (!adminEmail || !targetPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'A target email and INITIAL_ADMIN_PASSWORD must both be configured. Use ADMIN_EMAIL or ?email=target@example.com.',
-      });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    let admin = await findAdminByEmail(adminEmail);
-    let action = 'updated';
-
-    if (!admin) {
-      action = 'created';
-      const username = await resolveUniqueUsername(process.env.ADMIN_USERNAME || deriveUsernameFromEmail(adminEmail));
-      admin = await User.create({
-        name: process.env.ADMIN_NAME || 'System Commander',
-        username,
-        email: adminEmail,
-        password: await bcrypt.hash(targetPassword, salt),
-        role: 'admin',
-      });
-    } else {
-      admin.email = adminEmail;
-      admin.username = admin.username || await resolveUniqueUsername(
-        process.env.ADMIN_USERNAME || deriveUsernameFromEmail(adminEmail),
-        admin._id,
-      );
-      admin.password = await bcrypt.hash(targetPassword, salt);
-      admin.role = 'admin';
-      if (admin.isVerified !== undefined) admin.isVerified = true;
-      await admin.save();
-    }
-
-    return res.status(200).json({
-      success: true,
-      action,
-      email: admin.email,
-      username: admin.username,
-      message: `Master override ${action} admin access for ${admin.email}. Clear RESET_ADMIN_PASSWORD after login.`,
-    });
-  } catch (error) {
-    console.error('[SYS-INIT] Override route error:', error?.message || error);
-    return res.status(500).json({ success: false, error: error?.message || 'Unknown override error' });
-  }
-});
 
 // Telemetry Handshake Verification Route
 app.get('/api/telemetry/status', (req, res) => {
