@@ -116,14 +116,14 @@ textarea {
   min-height: 44px;
 }
 
-.google-auth-slot,
-.google-auth-slot > div,
-.google-auth-slot iframe {
-  width: 100% !important;
+.google-auth-slot {
+  width: 100%;
 }
 
-.google-auth-slot {
-  align-items: center;
+.google-button-frame,
+.google-signin-button,
+.google-signin-button iframe {
+  max-width: 100%;
 }
 
 .auth-footer-row,
@@ -341,7 +341,11 @@ textarea {
   }
 
   .google-auth-slot {
-    min-height: 42px;
+    min-height: 48px;
+  }
+
+  .google-signin-button {
+    min-width: 100%;
   }
 
   .welcome-actions,
