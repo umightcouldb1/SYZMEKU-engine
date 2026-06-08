@@ -1,6 +1,7 @@
 // File: client/src/main.jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import axios from 'axios';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Provider } from 'react-redux'; // Identity Anchor
 import { BrowserRouter } from 'react-router-dom';
@@ -19,6 +20,10 @@ function FallbackUI({ error }) {
 
 const rootElement = document.getElementById('root');
 const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+const apiOrigin = (import.meta.env.VITE_API_URL || 'https://syzmeku-api.onrender.com').replace(/\/+$/, '');
+
+axios.defaults.baseURL = apiOrigin;
+axios.defaults.withCredentials = true;
 
 const AppShell = () => {
   const shell = (
