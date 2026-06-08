@@ -1,6 +1,6 @@
 import { useAuth } from '../hooks/useAuth.jsx';
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL = (import.meta.env.VITE_API_URL || 'https://syzmeku-api.onrender.com').replace(/\/+$/, '');
 
 const useApi = () => {
     const { getToken, logout } = useAuth() ?? {};
