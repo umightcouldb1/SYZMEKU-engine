@@ -6,10 +6,14 @@ const ProtocolExecutionRecord = require("../models/ProtocolExecutionRecord");
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const createToolRegistry = ({ runProtocolIfNeeded, generateReport }) => ({
-  createTask: async ({ description, source = "action-kernel" }) => Task.create({ description, source }),
+const createToolRegistry = ({ runProtocolIfNeeded, generateReport, userId = null }) => ({
+  createTask: async ({ description, source = "action-kernel" }) => {
+    if (!userId) throw new Error("Cannot create a task without an authenticated user scope.");
+    return Task.create({ userId, description, source });
+  },
   completeTask: async ({ id }) => {
-    const task = await Task.findById(id);
+    if (!userId) throw new Error("Cannot complete a task without an authenticated user scope.");
+    const task = await Task.findOne({ _id: id, userId });
     if (!task) throw new Error(`Task not found: ${id}`);
     task.status = "done";
     task.completedAt = new Date();
@@ -48,6 +52,7 @@ const buildActionPolicy = ({ reasoningOutput, operatorState }) => {
   const urgency = Number(reasoningOutput?.urgency_score) || 0;
   const nextActions = Array.isArray(reasoningOutput?.next_actions) ? reasoningOutput.next_actions : [];
   const repeatedPattern = operatorState?.isRepeatedPattern;
+  const hasUserScope = Boolean(operatorState?.userId);
   const shouldRunProtocol = Boolean(reasoningOutput?.should_run_protocol && reasoningOutput?.protocol_to_run);
 
   if (urgency < 4) {
@@ -56,7 +61,7 @@ const buildActionPolicy = ({ reasoningOutput, operatorState }) => {
 
   const queued = [];
 
-  if (urgency >= 4 && urgency < 7) {
+  if (hasUserScope && urgency >= 4 && urgency < 7) {
     queued.push(
       ...nextActions.slice(0, 2).map((description) => ({
         action_name: "createTask",
