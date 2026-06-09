@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
+import useEvolutionaryState from '../../hooks/useEvolutionaryState';
 import './SovereignDashboard.css';
 
 const COMMANDER_ROLE = 'COMMANDER_IN_CHIEF';
@@ -27,6 +28,30 @@ const DEFAULT_ASSETS = [
       address: 'Cultivation boundary pending',
     },
     notes: 'Electroculture and acoustic tuning placeholder.',
+  },
+  {
+    _id: 'asset-template-3',
+    name: 'Equipment Readiness Bay',
+    category: 'EQUIPMENT',
+    status: 'CONCEPTUAL',
+    location: {
+      coordinates: [-83.9469, 39.6974],
+      county: 'Greene',
+      address: 'Operational staging pending',
+    },
+    notes: 'Tooling, transport, and field readiness container.',
+  },
+  {
+    _id: 'asset-template-4',
+    name: 'Logistics Transfer Corridor',
+    category: 'LOGISTICS',
+    status: 'CONCEPTUAL',
+    location: {
+      coordinates: [-83.9469, 39.6974],
+      county: 'Greene',
+      address: 'Route geometry pending',
+    },
+    notes: 'Movement sequence for documents, supplies, and location shifts.',
   },
 ];
 
@@ -88,8 +113,62 @@ const formatDate = (value) => {
 
 const getUserRole = (user) => user?.role || user?.user?.role || '';
 
+const getLayoutClass = (layoutFocus, layoutPriority) => {
+  if (layoutFocus === 'timeline' || layoutPriority === 'TIMELINE_FIRST') return 'sovereign-dashboard__layout--timeline-priority';
+  if (layoutFocus === 'assets' || layoutPriority === 'ASSET_FIRST') return 'sovereign-dashboard__layout--asset-priority';
+  return 'sovereign-dashboard__layout--balanced';
+};
+
 const SovereignDashboard = ({ user, assets = DEFAULT_ASSETS, milestones = DEFAULT_MILESTONES }) => {
   const role = getUserRole(user);
+  const [assetCategory, setAssetCategory] = useState('ALL');
+  const [layoutFocus, setLayoutFocus] = useState('balanced');
+  const [thresholdWeight, setThresholdWeight] = useState(54);
+  const {
+    alignmentState,
+    layoutPriority,
+    promptSuggestions,
+    resonanceScore,
+    textDensity,
+    trackClick,
+    trackSelection,
+    trackSlider,
+  } = useEvolutionaryState({ scope: role === COMMANDER_ROLE ? 'sovereign' : 'stealth' });
+
+  const handleCategoryChange = (event) => {
+    const nextCategory = event.target.value;
+    setAssetCategory(nextCategory);
+    trackSelection('sovereignAssetCategory', nextCategory, { module: 'asset-grid' });
+  };
+
+  const handleThresholdChange = (event) => {
+    const nextThreshold = Number(event.target.value);
+    setThresholdWeight(nextThreshold);
+    trackSlider('sovereignThresholdWeight', nextThreshold, { module: 'timeline-threshold' });
+  };
+
+  const handleLayoutFocus = (nextFocus) => {
+    setLayoutFocus(nextFocus);
+    trackSelection('sovereignView', nextFocus, { module: `${nextFocus}-view` });
+    trackClick(`sovereign-view:${nextFocus}`, { module: `${nextFocus}-view` });
+  };
+
+  const visibleAssets = useMemo(() => {
+    const filtered = assetCategory === 'ALL'
+      ? assets
+      : assets.filter((asset) => asset.category === assetCategory);
+
+    if (layoutPriority !== 'ASSET_FIRST') return filtered;
+    return [...filtered].sort((a, b) => String(a.status).localeCompare(String(b.status)));
+  }, [assetCategory, assets, layoutPriority]);
+
+  const visibleMilestones = useMemo(() => {
+    const ordered = [...milestones];
+    if (thresholdWeight >= 60 || layoutPriority === 'TIMELINE_FIRST') {
+      ordered.sort((a, b) => Number(b.isCriticalThreshold) - Number(a.isCriticalThreshold));
+    }
+    return ordered;
+  }, [layoutPriority, milestones, thresholdWeight]);
 
   if (role !== COMMANDER_ROLE) {
     return (
@@ -102,6 +181,7 @@ const SovereignDashboard = ({ user, assets = DEFAULT_ASSETS, milestones = DEFAUL
   const assetCount = assets.length;
   const activeAssets = assets.filter((asset) => asset.status === 'ACTIVE').length;
   const criticalMilestones = milestones.filter((milestone) => milestone.isCriticalThreshold).length;
+  const layoutClass = getLayoutClass(layoutFocus, layoutPriority);
 
   return (
     <section className="sovereign-dashboard" aria-label="Sovereign Core Dashboard">
@@ -113,6 +193,7 @@ const SovereignDashboard = ({ user, assets = DEFAULT_ASSETS, milestones = DEFAUL
           <h1>Asset and Lineage Matrix</h1>
           <p className="sovereign-dashboard__copy">
             Private command surface for geographic assets, estate milestones, and succession thresholds.
+            Current session alignment is {alignmentState.toLowerCase()} with adaptive density set to {textDensity.toLowerCase()}.
           </p>
         </div>
         <div className="sovereign-dashboard__status-grid" aria-label="Sovereign dashboard metrics">
@@ -122,8 +203,41 @@ const SovereignDashboard = ({ user, assets = DEFAULT_ASSETS, milestones = DEFAUL
         </div>
       </header>
 
-      <div className="sovereign-dashboard__layout">
-        <section className="sovereign-panel" aria-labelledby="asset-node-grid-title">
+      <section className="sovereign-dashboard__control-plane" aria-label="Adaptive command controls">
+        <div className="sovereign-resonance-readout">
+          <span>{alignmentState}</span>
+          <strong>{resonanceScore}</strong>
+          <small>{promptSuggestions[0]}</small>
+        </div>
+        <label className="sovereign-control">
+          <span>Asset Category</span>
+          <select value={assetCategory} onChange={handleCategoryChange}>
+            <option value="ALL">All Nodes</option>
+            <option value="REAL_ESTATE">Real Estate</option>
+            <option value="EQUIPMENT">Equipment</option>
+            <option value="BOTANICAL">Botanical</option>
+            <option value="LOGISTICS">Logistics</option>
+          </select>
+        </label>
+        <label className="sovereign-control sovereign-control--range">
+          <span>Critical Threshold</span>
+          <input type="range" min="0" max="100" value={thresholdWeight} onChange={handleThresholdChange} />
+        </label>
+        <div className="sovereign-view-switch" role="group" aria-label="Dashboard layout priority">
+          <button type="button" className={layoutFocus === 'assets' ? 'is-active' : ''} onClick={() => handleLayoutFocus('assets')}>
+            Assets
+          </button>
+          <button type="button" className={layoutFocus === 'balanced' ? 'is-active' : ''} onClick={() => handleLayoutFocus('balanced')}>
+            Balanced
+          </button>
+          <button type="button" className={layoutFocus === 'timeline' ? 'is-active' : ''} onClick={() => handleLayoutFocus('timeline')}>
+            Timeline
+          </button>
+        </div>
+      </section>
+
+      <div className={`sovereign-dashboard__layout ${layoutClass}`}>
+        <section className="sovereign-panel sovereign-panel--assets" aria-labelledby="asset-node-grid-title">
           <div className="sovereign-panel__title-row">
             <div>
               <p className="sovereign-panel__kicker">Asset Node Grid</p>
@@ -133,7 +247,7 @@ const SovereignDashboard = ({ user, assets = DEFAULT_ASSETS, milestones = DEFAUL
           </div>
 
           <div className="asset-node-grid">
-            {assets.map((asset) => {
+            {visibleAssets.map((asset) => {
               const [longitude, latitude] = asset.location?.coordinates || [];
 
               return (
@@ -180,7 +294,7 @@ const SovereignDashboard = ({ user, assets = DEFAULT_ASSETS, milestones = DEFAUL
           </div>
 
           <div className="chronology-timeline">
-            {milestones.map((milestone) => (
+            {visibleMilestones.map((milestone) => (
               <article
                 className={`timeline-node${milestone.isCriticalThreshold ? ' timeline-node--critical' : ''}`}
                 key={milestone._id || milestone.title}
