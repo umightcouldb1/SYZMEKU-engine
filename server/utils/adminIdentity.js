@@ -62,8 +62,7 @@ const setCommanderRole = async (user) => {
     { $set: { role: User.ROLES.COMMANDER_IN_CHIEF, updatedAt: new Date() } },
   );
 
-  user.role = User.ROLES.COMMANDER_IN_CHIEF;
-  return user;
+  return User.findById(user._id);
 };
 
 const ensureAdminRoleForUser = async (user) => {
@@ -119,7 +118,7 @@ const applyAdminPasswordReset = async (adminEmail, initialPassword) => {
   if (admin.isVerified !== undefined) admin.isVerified = true;
 
   await admin.save();
-  await setCommanderRole(admin);
+  admin = await setCommanderRole(admin);
   console.log(`[SYS-INIT] Admin credentials refreshed in place for username: ${admin.username}.`);
   return admin;
 };
