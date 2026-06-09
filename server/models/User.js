@@ -1,6 +1,11 @@
 // --- FILE: server/models/userModel.js (Verification) ---
 const mongoose = require('mongoose');
 
+const USER_ROLES = Object.freeze({
+    USER: 'USER',
+    COMMANDER_IN_CHIEF: 'COMMANDER_IN_CHIEF',
+});
+
 const userSchema = mongoose.Schema(
     {
         name: {
@@ -25,8 +30,11 @@ const userSchema = mongoose.Schema(
         },
         role: {
             type: String,
-            enum: ['founder', 'admin', 'user', 'clinician', 'support'],
-            default: 'user',
+            enum: ['USER', 'COMMANDER_IN_CHIEF'],
+            default: 'USER',
+            immutable: true,
+            required: true,
+            index: true,
         },
         mfa: {
             enabled: {
@@ -149,4 +157,8 @@ const userSchema = mongoose.Schema(
     }
 );
 
-module.exports = mongoose.model('User', userSchema);
+const User = mongoose.model('User', userSchema);
+
+User.ROLES = USER_ROLES;
+
+module.exports = User;
