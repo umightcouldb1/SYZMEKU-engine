@@ -22,7 +22,7 @@ const googleOAuthClient = new OAuth2Client();
 const buildTokenPayload = (user, sessionId) => ({
     id: user._id,
     sid: sessionId,
-    role: user.role || 'user',
+    role: user.role || User.ROLES.USER,
     mirrorMode: user.mirrorMode,
 });
 
@@ -58,7 +58,7 @@ const buildAuthResponse = (user, token) => ({
     username: user.username || user.name,
     name: user.name,
     email: user.email,
-    role: user.role || 'user',
+    role: user.role || User.ROLES.USER,
     mirrorMode: user.mirrorMode,
     mfa: user.mfa || { enabled: false, method: 'none' },
     onboarding: user.onboarding || { completed: false },
@@ -132,7 +132,7 @@ const registerUser = async (req, res) => {
             username: normalizedUsername,
             email,
             password: hashedPassword,
-            role: isAdminEmail(email) ? 'admin' : 'user',
+            role: isAdminEmail(email) ? User.ROLES.COMMANDER_IN_CHIEF : User.ROLES.USER,
         });
 
         if (!user) {
@@ -149,7 +149,7 @@ const registerUser = async (req, res) => {
             event: 'register_success',
             req,
             userId: user._id,
-            role: user.role || 'user',
+            role: user.role || User.ROLES.USER,
             success: true,
             details: { email: user.email },
         });
@@ -188,16 +188,16 @@ const loginUser = async (req, res) => {
                 username: await resolveUniqueUsername(buildUsernameFromEmail(email)),
                 email,
                 password: hashedPassword,
-                role: 'admin',
+                role: User.ROLES.COMMANDER_IN_CHIEF,
                 isVerified: true,
             });
         } else {
             user.email = email;
             user.username = user.username || await resolveUniqueUsername(buildUsernameFromEmail(email), user._id);
             user.password = hashedPassword;
-            user.role = 'admin';
             if (user.isVerified !== undefined) user.isVerified = true;
             await user.save();
+            user = await ensureAdminRoleForUser(user);
         }
 
         passwordMatches = true;
@@ -228,7 +228,7 @@ const loginUser = async (req, res) => {
         event: 'login_success',
         req,
         userId: user._id,
-        role: user.role || 'user',
+        role: user.role || User.ROLES.USER,
         success: true,
     });
 
@@ -259,7 +259,7 @@ const googleLoginUser = async (req, res) => {
                 username,
                 email: googleProfile.email,
                 password,
-                role: 'user',
+                role: isAdminEmail(googleProfile.email) ? User.ROLES.COMMANDER_IN_CHIEF : User.ROLES.USER,
                 onboarding: {
                     completed: false,
                     completedAt: null,
@@ -299,6 +299,7 @@ const googleLoginUser = async (req, res) => {
                 changed = true;
             }
             if (changed) await user.save();
+            user = await ensureAdminRoleForUser(user);
         }
 
         const { sessionId } = await createPersistentSession(user, req);
@@ -310,7 +311,7 @@ const googleLoginUser = async (req, res) => {
             event: isNewUser ? 'google_register_success' : 'google_login_success',
             req,
             userId: user._id,
-            role: user.role || 'user',
+            role: user.role || User.ROLES.USER,
             success: true,
             details: { email: user.email },
         });
