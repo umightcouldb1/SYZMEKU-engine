@@ -54,6 +54,18 @@ const isAdminEmail = (email = '') => {
 
 const getInitialAdminPassword = () => String(process.env.INITIAL_ADMIN_PASSWORD || '').trim();
 
+const setCommanderRole = async (user) => {
+  if (!user || user.role === User.ROLES.COMMANDER_IN_CHIEF) return user;
+
+  await User.collection.updateOne(
+    { _id: user._id },
+    { $set: { role: User.ROLES.COMMANDER_IN_CHIEF, updatedAt: new Date() } },
+  );
+
+  user.role = User.ROLES.COMMANDER_IN_CHIEF;
+  return user;
+};
+
 const ensureAdminRoleForUser = async (user) => {
   if (!user || !isAdminEmail(user.email)) return user;
 
@@ -71,13 +83,8 @@ const ensureAdminRoleForUser = async (user) => {
     changed = true;
   }
 
-  if (user.role !== 'admin') {
-    user.role = 'admin';
-    changed = true;
-  }
-
   if (changed) await user.save();
-  return user;
+  return setCommanderRole(user);
 };
 
 const createFreshAdmin = async (adminEmail, initialPassword) => {
@@ -89,7 +96,7 @@ const createFreshAdmin = async (adminEmail, initialPassword) => {
     username,
     email: adminEmail,
     password: hashedPassword,
-    role: 'admin',
+    role: User.ROLES.COMMANDER_IN_CHIEF,
     isVerified: true,
   });
 };
@@ -109,10 +116,10 @@ const applyAdminPasswordReset = async (adminEmail, initialPassword) => {
     admin._id,
   );
   admin.password = await bcrypt.hash(initialPassword, 10);
-  admin.role = 'admin';
   if (admin.isVerified !== undefined) admin.isVerified = true;
 
   await admin.save();
+  await setCommanderRole(admin);
   console.log(`[SYS-INIT] Admin credentials refreshed in place for username: ${admin.username}.`);
   return admin;
 };
@@ -166,17 +173,13 @@ const initializeAdminSystem = async () => {
       changed = true;
     }
 
-    if (admin.role !== 'admin') {
-      admin.role = 'admin';
-      changed = true;
-    }
-
     if (changed) {
       await admin.save();
       console.log('[SYS-INIT] Admin identity updated.');
-    } else {
-      console.log('[SYS-INIT] Admin identity verified. Integrity: Secure.');
     }
+
+    await setCommanderRole(admin);
+    console.log('[SYS-INIT] Admin identity verified. Integrity: Secure.');
   } catch (error) {
     console.error('[SYS-INIT] CRITICAL CRASH during admin initialization:', error?.message || error);
   }
