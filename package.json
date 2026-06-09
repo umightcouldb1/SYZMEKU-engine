@@ -20,6 +20,8 @@
   "author": "El Kai 'Tharion Kai Zhun",
   "license": "Sovereign",
   "dependencies": {
+    "@google/genai": "^1.6.0",
+    "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
     "colors": "^1.4.0",
     "cors": "^2.8.5",
