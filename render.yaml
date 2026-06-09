@@ -16,6 +16,14 @@ services:
         sync: false
       - key: CLIENT_ORIGIN
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: "gemini-2.0-flash"
+      - key: OLLAMA_BASE_URL
+        sync: false
+      - key: OLLAMA_MODEL
+        value: "llama3"
       - key: ENGINE_SIGNATURE
         value: "EL_KAI_THARION_KAI_ZHUN"
       - key: SYSTEM_VECTOR
