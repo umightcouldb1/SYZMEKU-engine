@@ -1,0 +1,178 @@
+.welcome-adaptive-panel,
+.sovereign-dashboard__control-plane {
+  position: relative;
+  display: grid;
+  gap: 0.8rem;
+  margin: 1rem 0;
+  padding: 0.9rem;
+  border: 1px solid rgba(103, 232, 249, 0.24);
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.68), rgba(49, 46, 129, 0.22)),
+    rgba(2, 6, 23, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.welcome-adaptive-panel::before,
+.sovereign-dashboard__control-plane::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  border: 1px solid transparent;
+  background: linear-gradient(90deg, rgba(103, 232, 249, 0.38), rgba(244, 114, 182, 0.24), rgba(251, 191, 36, 0.28)) border-box;
+  mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0.72;
+}
+
+.welcome-adaptive-panel__readout,
+.sovereign-resonance-readout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.welcome-adaptive-panel__readout span,
+.sovereign-resonance-readout span {
+  color: #67e8f9;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.welcome-adaptive-panel__readout strong,
+.sovereign-resonance-readout strong {
+  color: #f0abfc;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.sovereign-resonance-readout small {
+  grid-column: 1 / -1;
+  color: rgba(226, 232, 240, 0.72);
+  line-height: 1.45;
+}
+
+.welcome-adaptive-panel p {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.74);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.welcome-adaptive-panel--high p {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.adaptive-control,
+.sovereign-control {
+  display: grid;
+  gap: 0.35rem;
+  color: rgba(226, 232, 240, 0.72);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.adaptive-control select,
+.sovereign-control select,
+.adaptive-control input[type='range'],
+.sovereign-control input[type='range'] {
+  width: 100%;
+}
+
+.adaptive-control select,
+.sovereign-control select {
+  min-height: 2.45rem;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.86);
+  color: #eef4ff;
+  padding: 0 0.75rem;
+  outline: none;
+}
+
+.adaptive-control select:focus,
+.sovereign-control select:focus {
+  border-color: rgba(103, 232, 249, 0.72);
+  box-shadow: 0 0 0 3px rgba(103, 232, 249, 0.12);
+}
+
+.adaptive-control input[type='range'],
+.sovereign-control input[type='range'] {
+  accent-color: #67e8f9;
+}
+
+.sovereign-dashboard__control-plane {
+  grid-template-columns: minmax(220px, 1.15fr) minmax(180px, 0.8fr) minmax(180px, 0.8fr) auto;
+  align-items: end;
+  margin-top: 1rem;
+}
+
+.sovereign-view-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  min-width: max-content;
+}
+
+.sovereign-view-switch button {
+  min-height: 2.45rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.76);
+  color: rgba(226, 232, 240, 0.78);
+  padding: 0 0.72rem;
+  font-weight: 800;
+}
+
+.sovereign-view-switch button:hover,
+.sovereign-view-switch button.is-active {
+  border-color: rgba(244, 114, 182, 0.48);
+  background: rgba(244, 114, 182, 0.14);
+  color: #fff;
+}
+
+.sovereign-dashboard__layout--timeline-priority {
+  grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.28fr);
+}
+
+.sovereign-dashboard__layout--timeline-priority .sovereign-panel--timeline {
+  order: -1;
+}
+
+.sovereign-dashboard__layout--asset-priority {
+  grid-template-columns: minmax(0, 1.5fr) minmax(300px, 0.78fr);
+}
+
+@media (max-width: 960px) {
+  .sovereign-dashboard__control-plane {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sovereign-view-switch {
+    justify-content: stretch;
+  }
+
+  .sovereign-view-switch button {
+    flex: 1;
+  }
+
+  .sovereign-dashboard__layout--timeline-priority .sovereign-panel--timeline {
+    order: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .sovereign-dashboard__control-plane,
+  .welcome-adaptive-panel__readout,
+  .sovereign-resonance-readout {
+    grid-template-columns: 1fr;
+  }
+
+  .sovereign-view-switch {
+    flex-wrap: wrap;
+  }
+}
