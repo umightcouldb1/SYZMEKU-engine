@@ -66,22 +66,17 @@ const protect = asyncHandler(async (req, res, next) => {
 
 const authorizeRoles = (...allowedRoles) =>
     asyncHandler(async (req, res, next) => {
-        if (!req.user) {
-            res.status(401);
-            throw new Error('Not authorized');
-        }
-
-        if (!allowedRoles.includes(req.user.role)) {
+        if (!req.user || !allowedRoles.includes(req.user.role)) {
             await logAuditEvent({
                 category: 'access',
-                event: 'role_access_denied',
+                event: 'stealth_role_access_denied',
                 req,
-                userId: req.user._id,
-                role: req.user.role,
+                userId: req.user?._id || null,
+                role: req.user?.role || '',
                 success: false,
                 details: { allowedRoles },
-            });
-            return res.status(403).json({ message: 'Access denied' });
+            }).catch(() => {});
+            return res.status(404).json({ message: 'Not Found' });
         }
 
         next();
