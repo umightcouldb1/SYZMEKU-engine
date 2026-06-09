@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import useEvolutionaryState from './hooks/useEvolutionaryState';
 import './interactionEnhancements.css';
 
 const clearStaleAuthState = () => {
@@ -9,13 +10,54 @@ const clearStaleAuthState = () => {
   localStorage.removeItem('syz_onboarding_complete');
 };
 
+const focusCopy = {
+  patterns: 'Pattern reflection is prioritized, with prompts shaped around recurring emotional signals.',
+  guidance: 'Guidance mode is prioritized, with clearer next-step language and fewer open loops.',
+  momentum: 'Momentum mode is prioritized, bringing action-oriented prompts closer to the surface.',
+  ancestral: 'Ancestral intelligence is prioritized, keeping context, lineage, and inner knowing in view.',
+};
+
 const WelcomeScreen = () => {
   const navigate = useNavigate();
   const [showInfo, setShowInfo] = useState(false);
+  const [focusPath, setFocusPath] = useState('patterns');
+  const [guidanceDepth, setGuidanceDepth] = useState(44);
+  const {
+    alignmentState,
+    promptSuggestions,
+    resonanceScore,
+    textDensity,
+    trackClick,
+    trackSelection,
+    trackSlider,
+  } = useEvolutionaryState({ scope: 'public' });
 
   const startAuthFlow = (path) => {
+    trackClick(`auth:${path}`, { module: 'public-auth', path });
     clearStaleAuthState();
     navigate(path, { replace: true });
+  };
+
+  const handleFocusChange = (event) => {
+    const nextFocus = event.target.value;
+    setFocusPath(nextFocus);
+    trackSelection('publicFocus', nextFocus, { module: 'public-guidance' });
+  };
+
+  const handleDepthChange = (event) => {
+    const nextDepth = Number(event.target.value);
+    setGuidanceDepth(nextDepth);
+    trackSlider('guidanceDepth', nextDepth, { module: 'public-guidance' });
+  };
+
+  const openInfoPanel = () => {
+    trackClick('learn-how-it-works', { module: 'public-guidance' });
+    setShowInfo(true);
+  };
+
+  const closeInfoPanel = () => {
+    trackClick('close-info-panel', { module: 'public-guidance' });
+    setShowInfo(false);
   };
 
   return (
@@ -30,6 +72,28 @@ const WelcomeScreen = () => {
           Move with more alignment.
         </p>
 
+        <div className={`welcome-adaptive-panel welcome-adaptive-panel--${textDensity.toLowerCase()}`}>
+          <div className="welcome-adaptive-panel__readout">
+            <span>{alignmentState}</span>
+            <strong>{resonanceScore}</strong>
+          </div>
+          <label className="adaptive-control">
+            <span>Focus path</span>
+            <select value={focusPath} onChange={handleFocusChange}>
+              <option value="patterns">Patterns</option>
+              <option value="guidance">Guidance</option>
+              <option value="momentum">Momentum</option>
+              <option value="ancestral">Ancestral intelligence</option>
+            </select>
+          </label>
+          <label className="adaptive-control">
+            <span>Guidance depth</span>
+            <input type="range" min="0" max="100" value={guidanceDepth} onChange={handleDepthChange} />
+          </label>
+          <p>{focusCopy[focusPath]}</p>
+          <p>{promptSuggestions[0]}</p>
+        </div>
+
         <div className="welcome-actions">
           <button type="button" className="entry-primary-button" onClick={() => startAuthFlow('/login')}>
             Log in
@@ -42,7 +106,7 @@ const WelcomeScreen = () => {
         <button type="button" className="welcome-learn-link welcome-text-button" onClick={() => startAuthFlow('/login')}>
           Continue as returning user
         </button>
-        <button type="button" className="welcome-learn-link welcome-text-button" onClick={() => setShowInfo(true)}>
+        <button type="button" className="welcome-learn-link welcome-text-button" onClick={openInfoPanel}>
           Learn how it works
         </button>
       </section>
@@ -50,8 +114,8 @@ const WelcomeScreen = () => {
       {showInfo && (
         <div className="welcome-info-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-info-title">
           <section className="welcome-info-panel">
-            <button type="button" className="welcome-info-close" aria-label="Close information panel" onClick={() => setShowInfo(false)}>
-              ×
+            <button type="button" className="welcome-info-close" aria-label="Close information panel" onClick={closeInfoPanel}>
+              &times;
             </button>
             <p className="auth-eyebrow">Engine blueprint</p>
             <h2 id="welcome-info-title">How Big SYZ Works</h2>
@@ -66,11 +130,11 @@ const WelcomeScreen = () => {
               </article>
               <article>
                 <h3>3. Adaptive Mentorship</h3>
-                <p>Your profile persists so Big SYZ can keep its tone, context, and next steps aligned as you move.</p>
+                <p>Your session interactions now tune layout priority, prompt density, and guidance emphasis in real time.</p>
               </article>
             </div>
             <div className="welcome-info-actions">
-              <button type="button" className="entry-secondary-button" onClick={() => setShowInfo(false)}>
+              <button type="button" className="entry-secondary-button" onClick={closeInfoPanel}>
                 Keep reading later
               </button>
               <button type="button" className="entry-primary-button" onClick={() => startAuthFlow('/signup')}>
