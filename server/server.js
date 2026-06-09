@@ -53,7 +53,25 @@ const corsOptions = {
   },
 };
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      connectSrc: ["'self'", 'https://syzmeku-api.onrender.com', 'https://accounts.google.com'],
+      fontSrc: ["'self'", 'https:', 'data:'],
+      formAction: ["'self'"],
+      frameAncestors: ["'self'"],
+      frameSrc: ["'self'", 'https://accounts.google.com', 'https://*.google.com'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      objectSrc: ["'none'"],
+      scriptSrc: ["'self'", 'https://accounts.google.com', 'https://apis.google.com'],
+      scriptSrcAttr: ["'none'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
+      upgradeInsecureRequests: [],
+    },
+  },
+}));
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 
