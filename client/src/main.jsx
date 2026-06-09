@@ -12,6 +12,7 @@ import './Crystalline.css';
 import './responsive.css';
 import App from './App.jsx';
 import { AuthProvider } from './hooks/useAuth.jsx';
+import { InteractionProvider } from './context/InteractionContext.jsx';
 
 function FallbackUI({ error }) {
   const message = error?.message ?? 'Unknown error';
@@ -28,9 +29,11 @@ axios.defaults.withCredentials = true;
 const AppShell = () => {
   const shell = (
     <AuthProvider>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <InteractionProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </InteractionProvider>
     </AuthProvider>
   );
 
