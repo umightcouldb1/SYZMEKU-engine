@@ -4,7 +4,7 @@ const { logAuditEvent } = require('../utils/audit');
 
 const MASTER_ROLE = 'COMMANDER_IN_CHIEF';
 const USER_ROLE = 'USER';
-const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || process.env.MODEL_TARGET || 'gemini-2.5-flash';
 const DEFAULT_OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
 const DEFAULT_OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS || 45000);

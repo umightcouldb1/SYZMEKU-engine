@@ -10,6 +10,46 @@
   color: #eef4ff;
 }
 
+.entry-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(2, 6, 23, 0.74), rgba(2, 6, 23, 0.24) 34%, rgba(2, 6, 23, 0.78)),
+    radial-gradient(circle at 50% 48%, rgba(2, 6, 23, 0.38), rgba(2, 6, 23, 0.86) 62%),
+    url('/assets/sacred-technology-hero.png') center / cover no-repeat,
+    #020617;
+}
+
+.entry-shell::before,
+.entry-shell::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.entry-shell::before {
+  inset: 0;
+  background:
+    linear-gradient(rgba(103, 232, 249, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(103, 232, 249, 0.045) 1px, transparent 1px),
+    conic-gradient(from 30deg at 50% 50%, transparent 0 22%, rgba(250, 204, 21, 0.09) 23% 24%, transparent 25% 47%, rgba(45, 212, 191, 0.08) 48% 49%, transparent 50% 72%, rgba(168, 85, 247, 0.08) 73% 74%, transparent 75%);
+  background-size: 76px 76px;
+  mask-image: radial-gradient(circle at 50% 50%, black, transparent 78%);
+}
+
+.entry-shell::after {
+  width: min(48vw, 660px);
+  aspect-ratio: 1;
+  right: -16%;
+  top: -18%;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.28), rgba(139, 92, 246, 0.12), transparent 68%);
+  filter: blur(92px);
+  opacity: 0.72;
+}
+
 .welcome-panel,
 .auth-panel,
 .onboarding-stage,
@@ -22,8 +62,32 @@
 
 .welcome-panel,
 .auth-panel {
-  width: min(680px, 100%);
+  width: min(760px, 100%);
   padding: 2.5rem;
+}
+
+.welcome-panel {
+  justify-self: start;
+  margin-left: clamp(0rem, 4vw, 4rem);
+  border-color: rgba(167, 243, 208, 0.28);
+  background:
+    linear-gradient(135deg, rgba(3, 7, 18, 0.9), rgba(8, 13, 28, 0.78)),
+    radial-gradient(circle at 12% 10%, rgba(20, 184, 166, 0.16), transparent 36%),
+    radial-gradient(circle at 92% 84%, rgba(250, 204, 21, 0.12), transparent 38%);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.58), 0 0 34px rgba(20, 184, 166, 0.14);
+}
+
+.welcome-panel::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent 0 18%, rgba(255, 255, 255, 0.16) 20%, transparent 24% 100%),
+    linear-gradient(145deg, rgba(45, 212, 191, 0.18), transparent 32%, rgba(250, 204, 21, 0.1), transparent 68%, rgba(168, 85, 247, 0.16));
+  opacity: 0.42;
+  mix-blend-mode: screen;
 }
 
 .auth-eyebrow {
@@ -42,12 +106,152 @@
   letter-spacing: 0.02em;
 }
 
+.welcome-panel h1 {
+  max-width: 12ch;
+  font-size: clamp(2.55rem, 8vw, 5.8rem);
+  line-height: 0.92;
+  text-wrap: balance;
+}
+
 .welcome-powered,
 .auth-copy,
 .welcome-copy {
   color: #d7e2ff;
   line-height: 1.65;
 }
+
+.welcome-powered {
+  margin: 1rem 0 0.35rem;
+  color: #a7f3d0;
+  font-size: clamp(1rem, 2.2vw, 1.28rem);
+}
+
+.welcome-copy {
+  max-width: 58ch;
+  color: #edf7ff;
+}
+
+.welcome-portal-map {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+}
+
+.welcome-portal-map article {
+  position: relative;
+  min-height: 128px;
+  padding: 1rem;
+  border: 1px solid rgba(167, 243, 208, 0.24);
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.54);
+  overflow: hidden;
+}
+
+.welcome-portal-map article::before {
+  content: '';
+  position: absolute;
+  inset: -45%;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 0 42%, rgba(255, 255, 255, 0.12) 48%, transparent 54% 100%);
+  transform: translateX(-36%) rotate(8deg);
+  transition: transform 520ms ease;
+}
+
+.welcome-portal-map article:hover::before {
+  transform: translateX(36%) rotate(8deg);
+}
+
+.welcome-portal-map span {
+  display: inline-block;
+  margin-bottom: 0.55rem;
+  color: #facc15;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.welcome-portal-map strong {
+  display: block;
+  color: #f8fafc;
+}
+
+.welcome-portal-map p {
+  margin: 0.48rem 0 0;
+  color: #b8c7dd;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.welcome-node-control {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+.welcome-node-control input {
+  min-width: 0;
+  border: 1px solid rgba(167, 243, 208, 0.28);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.72);
+  color: #f8fafc;
+  padding: 0.72rem 0.78rem;
+  font: inherit;
+}
+
+.welcome-node-control input:focus {
+  outline: none;
+  border-color: #facc15;
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.22), 0 0 18px rgba(45, 212, 191, 0.12);
+}
+
+.prism-node-button {
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(115deg, #67e8f9, #facc15);
+  color: #020617;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0.72rem 0.9rem;
+  text-transform: uppercase;
+}
+
+.prism-node-button:disabled {
+  cursor: wait;
+  filter: grayscale(0.4);
+  opacity: 0.58;
+}
+
+.welcome-telemetry-console {
+  max-height: 178px;
+  overflow: auto;
+  margin: 0 0 1.5rem;
+  padding: 1rem;
+  border-left: 3px solid #67e8f9;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.46);
+  box-shadow: inset 0 0 18px rgba(103, 232, 249, 0.08);
+}
+
+.telemetry-line {
+  margin: 0;
+  color: #b8c7dd;
+  font-family: 'Courier New', monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.telemetry-line + .telemetry-line {
+  margin-top: 0.45rem;
+}
+
+.telemetry-line--success { color: #67e8f9; }
+.telemetry-line--gold { color: #facc15; }
+.telemetry-line--warning { color: #fde68a; }
+.telemetry-line--error { color: #fda4af; }
+.telemetry-line--mentor { color: #ecfeff; }
 
 .welcome-actions {
   display: flex;
@@ -68,12 +272,12 @@
 }
 
 .entry-primary-button {
-  background: linear-gradient(135deg, #5f8dff, #8f5cff);
+  background: linear-gradient(135deg, #059669, #0e7490 48%, #7c3aed);
   color: #fff;
 }
 
 .entry-secondary-button {
-  border-color: rgba(160, 195, 255, 0.6);
+  border-color: rgba(167, 243, 208, 0.58);
   color: #deebff;
   background: transparent;
 }
@@ -456,12 +660,45 @@
   .onboarding-shell {
     grid-template-columns: 1fr;
   }
+
+  .entry-shell {
+    place-items: end center;
+  }
+
+  .welcome-panel {
+    margin-left: 0;
+  }
 }
 
 @media (max-width: 560px) {
   .entry-shell,
   .onboarding-shell {
     padding: 1rem;
+  }
+
+  .welcome-panel {
+    padding: 1.35rem;
+  }
+
+  .welcome-panel h1 {
+    max-width: 10ch;
+    font-size: clamp(2.15rem, 14vw, 3.6rem);
+  }
+
+  .welcome-portal-map {
+    grid-template-columns: 1fr;
+  }
+
+  .welcome-portal-map article {
+    min-height: auto;
+  }
+
+  .welcome-node-control {
+    grid-template-columns: 1fr;
+  }
+
+  .prism-node-button {
+    width: 100%;
   }
 
   .auth-footer-row {
