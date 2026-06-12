@@ -10,55 +10,52 @@ const DEFAULT_OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost
 const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS || 45000);
 const GEMINI_TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS || 45000);
 
-let geminiClientPromise;
-
 const sanitizePrompt = (value) => String(value || '').trim();
 
 const getPromptFromRequest = (req) => sanitizePrompt(req.body?.prompt || req.body?.message || req.body?.input);
 
-const getGeminiClient = async () => {
+const getGeminiApiKey = () => {
   if (!process.env.GEMINI_API_KEY) {
     const error = new Error('GEMINI_API_KEY is not configured.');
     error.statusCode = 503;
     throw error;
   }
-
-  if (!geminiClientPromise) {
-    geminiClientPromise = import('@google/genai').then(({ GoogleGenAI }) => {
-      return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    });
-  }
-
-  return geminiClientPromise;
+  return process.env.GEMINI_API_KEY;
 };
 
-const extractGeminiText = (response) => {
-  if (!response) return '';
-  if (typeof response.text === 'function') return response.text();
-  if (typeof response.text === 'string') return response.text;
-  return JSON.stringify(response);
+const extractGeminiText = (data) => {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (Array.isArray(parts)) {
+    return parts.map((part) => part?.text || '').filter(Boolean).join('\n').trim();
+  }
+  return '';
 };
 
 const processWithGemini = async (prompt) => {
-  const ai = await getGeminiClient();
-  const response = await Promise.race([
-    ai.models.generateContent({
-      model: DEFAULT_GEMINI_MODEL,
-      contents: prompt,
-    }),
-    new Promise((_, reject) => {
-      windowlessSetTimeout(() => reject(new Error('Gemini request timed out.')), GEMINI_TIMEOUT_MS);
-    }),
-  ]);
+  const apiKey = getGeminiApiKey();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(DEFAULT_GEMINI_MODEL)}:generateContent`;
+  const { data } = await axios.post(
+    url,
+    {
+      contents: [
+        {
+          parts: [{ text: prompt }],
+        },
+      ],
+    },
+    {
+      params: { key: apiKey },
+      timeout: GEMINI_TIMEOUT_MS,
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
 
   return {
     provider: 'gemini',
     model: DEFAULT_GEMINI_MODEL,
-    response: extractGeminiText(response),
+    response: extractGeminiText(data),
   };
 };
-
-const windowlessSetTimeout = (callback, timeoutMs) => setTimeout(callback, timeoutMs);
 
 const processWithOllama = async (prompt) => {
   const baseUrl = DEFAULT_OLLAMA_BASE_URL.replace(/\/+$/, '');
