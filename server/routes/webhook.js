@@ -112,7 +112,7 @@ const fulfillCheckoutSession = async (session) => {
   return { userId, purchases: purchases.length, tier: profile.tier };
 };
 
-router.post('/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+const handleStripeWebhook = async (req, res) => {
   const signature = req.headers['stripe-signature'];
   const webhookSecret = getStripeWebhookSecret();
 
@@ -137,6 +137,9 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
     console.error('[STRIPE_WEBHOOK_ERR]', error?.message || error);
     return res.status(500).json({ error: 'Webhook fulfillment failed.' });
   }
-});
+};
+
+router.post('/', express.raw({ type: 'application/json' }), handleStripeWebhook);
+router.post('/stripe', express.raw({ type: 'application/json' }), handleStripeWebhook);
 
 module.exports = router;
