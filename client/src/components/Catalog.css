@@ -93,7 +93,7 @@
 .catalog-grid {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 18px;
   max-width: 1180px;
   margin: 0 auto;
@@ -102,7 +102,7 @@
 .catalog-card {
   position: relative;
   display: flex;
-  min-height: 320px;
+  min-height: 360px;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -114,6 +114,33 @@
     0 24px 60px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(18px);
   padding: 24px;
+}
+
+.catalog-card-gold-amber {
+  --tier-accent: #ffc85b;
+  --tier-secondary: #b8761f;
+  background:
+    linear-gradient(155deg, rgba(255, 200, 91, 0.22), rgba(255, 255, 255, 0.05)),
+    linear-gradient(45deg, rgba(184, 118, 31, 0.16), transparent 62%),
+    rgba(12, 10, 7, 0.82);
+}
+
+.catalog-card-silver-platinum {
+  --tier-accent: #e7eef8;
+  --tier-secondary: #97a9c4;
+  background:
+    linear-gradient(155deg, rgba(231, 238, 248, 0.22), rgba(255, 255, 255, 0.05)),
+    linear-gradient(45deg, rgba(151, 169, 196, 0.16), transparent 62%),
+    rgba(8, 10, 15, 0.82);
+}
+
+.catalog-card-cobalt-crystalline {
+  --tier-accent: #6aa8ff;
+  --tier-secondary: #123a82;
+  background:
+    linear-gradient(155deg, rgba(37, 87, 180, 0.3), rgba(255, 255, 255, 0.05)),
+    linear-gradient(45deg, rgba(18, 58, 130, 0.28), transparent 62%),
+    rgba(3, 8, 22, 0.86);
 }
 
 .catalog-card-shine {
@@ -129,7 +156,7 @@
 .catalog-card-header {
   position: relative;
   display: flex;
-  min-height: 76px;
+  min-height: 96px;
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
@@ -138,23 +165,32 @@
 .catalog-card h2 {
   margin: 0;
   color: #ffffff;
-  font-size: 1.38rem;
-  line-height: 1.1;
+  font-size: 1.32rem;
+  line-height: 1.12;
   letter-spacing: 0;
 }
 
 .catalog-card-header span {
   flex: 0 0 auto;
-  border: 1px solid rgba(112, 255, 226, 0.35);
-  padding: 5px 8px;
-  color: #70ffe2;
+  border: 1px solid color-mix(in srgb, var(--tier-accent, #70ffe2) 70%, transparent);
+  padding: 6px 9px;
+  color: var(--tier-accent, #70ffe2);
   font-size: 0.72rem;
   text-transform: uppercase;
 }
 
+.catalog-theme-label {
+  position: relative;
+  margin: 0 0 12px;
+  color: var(--tier-accent, #70ffe2);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
 .catalog-description {
   position: relative;
-  margin: 12px 0 24px;
+  margin: 0 0 24px;
   color: rgba(247, 251, 255, 0.72);
   line-height: 1.55;
 }
@@ -175,7 +211,7 @@
 }
 
 .catalog-price-row small {
-  color: #ff8adf;
+  color: var(--tier-accent, #ff8adf);
   font-size: 0.76rem;
   letter-spacing: 0.12em;
 }
@@ -185,8 +221,8 @@
   width: 100%;
   min-height: 46px;
   margin-top: 18px;
-  border: 1px solid rgba(112, 255, 226, 0.5);
-  background: linear-gradient(90deg, rgba(112, 255, 226, 0.92), rgba(255, 138, 223, 0.92));
+  border: 1px solid color-mix(in srgb, var(--tier-accent, #70ffe2) 54%, transparent);
+  background: linear-gradient(90deg, var(--tier-accent, #70ffe2), rgba(255, 255, 255, 0.86));
   color: #05050b;
   cursor: pointer;
   font-weight: 900;
@@ -197,11 +233,11 @@
 
 .catalog-checkout-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 14px 36px rgba(112, 255, 226, 0.24);
+  box-shadow: 0 14px 36px color-mix(in srgb, var(--tier-accent, #70ffe2) 28%, transparent);
 }
 
 .catalog-checkout-button:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.7;
 }
 
@@ -229,7 +265,7 @@
   }
 
   .catalog-card {
-    min-height: 300px;
+    min-height: 320px;
     padding: 20px;
   }
 }
