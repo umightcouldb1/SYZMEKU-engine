@@ -4,14 +4,62 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import './Catalog.css';
 
+const FINALIZED_TIERS = [
+  {
+    key: 'harmonic',
+    matcher: /harmonic/i,
+    displayName: 'BIG SYZ Harmonic System Access (111)',
+    design: 'gold-amber',
+    themeLabel: 'Gold / Amber Technical Theme',
+    fallbackPrice: 1111,
+    signal: '111',
+  },
+  {
+    key: 'cosmic',
+    matcher: /cosmic/i,
+    displayName: 'BIG SYZ Cosmic System Access (222)',
+    design: 'silver-platinum',
+    themeLabel: 'Silver / Platinum Geometric Theme',
+    fallbackPrice: 2222,
+    signal: '222',
+  },
+  {
+    key: 'guardian',
+    matcher: /guardian/i,
+    displayName: 'BIG SYZ Guardian Vector Access (444)',
+    design: 'cobalt-crystalline',
+    themeLabel: 'Deep Cobalt Blue Crystalline Theme',
+    fallbackPrice: 4444,
+    signal: '444',
+  },
+];
+
 const currencyFormatter = (currency = 'usd') => new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: String(currency || 'usd').toUpperCase(),
 });
 
 const formatPrice = (product) => {
-  const amount = Number(product?.price || 0);
+  const amount = Number(product?.price || product?.fallbackPrice || 0);
   return currencyFormatter(product?.currency).format(amount);
+};
+
+const mergeFinalizedTier = (tier, products) => {
+  const liveProduct = products.find((product) => tier.matcher.test(product.name || ''));
+  return {
+    ...tier,
+    ...(liveProduct || {}),
+    id: liveProduct?.id || tier.key,
+    name: tier.displayName,
+    description: liveProduct?.description || `${tier.themeLabel}. Direct access tier for the SYZMEKU engine.`,
+    price: liveProduct?.price || tier.fallbackPrice,
+    currency: liveProduct?.currency || 'usd',
+    priceId: liveProduct?.priceId || '',
+    interval: liveProduct?.interval || null,
+    design: tier.design,
+    signal: tier.signal,
+    themeLabel: tier.themeLabel,
+  };
 };
 
 export default function Catalog() {
@@ -23,11 +71,7 @@ export default function Catalog() {
   const [error, setError] = useState('');
   const [checkoutPriceId, setCheckoutPriceId] = useState('');
 
-  const sortedProducts = useMemo(() => [...products].sort((a, b) => {
-    const left = Number(a.price || 0);
-    const right = Number(b.price || 0);
-    return left - right;
-  }), [products]);
+  const finalizedProducts = useMemo(() => FINALIZED_TIERS.map((tier) => mergeFinalizedTier(tier, products)), [products]);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,11 +158,11 @@ export default function Catalog() {
     <main className="catalog-shell" aria-label="SYZMEKU public catalog">
       <div className="catalog-prism-field" />
       <section className="catalog-hero">
-        <p className="catalog-eyebrow">SYZMEKU Public Catalog</p>
+        <p className="catalog-eyebrow">T.O.I. Souljah Academy Catalog</p>
         <h1>Choose Your Engine Layer</h1>
         <p>
-          Public access stays visible. Checkout opens only after identity verification,
-          keeping the purchase flow clean while the private system remains sealed.
+          Three finalized access vectors are embedded directly into the academy front-end,
+          with live Stripe checkout staying synchronized behind the glass.
         </p>
       </section>
 
@@ -131,14 +175,15 @@ export default function Catalog() {
         </section>
       ) : (
         <section className="catalog-grid" aria-label="Available SYZMEKU products">
-          {sortedProducts.length > 0 ? sortedProducts.map((product) => (
-            <article className="catalog-card" key={product.id}>
+          {finalizedProducts.map((product) => (
+            <article className={`catalog-card catalog-card-${product.design}`} key={product.key}>
               <div className="catalog-card-shine" />
               <div className="catalog-card-header">
                 <h2>{product.name}</h2>
-                {product.interval && <span>{product.interval}</span>}
+                <span>{product.signal}</span>
               </div>
-              <p className="catalog-description">{product.description || 'SYZMEKU access module'}</p>
+              <p className="catalog-theme-label">{product.themeLabel}</p>
+              <p className="catalog-description">{product.description}</p>
               <div className="catalog-price-row">
                 <strong>{formatPrice(product)}</strong>
                 <small>{String(product.currency || 'usd').toUpperCase()}</small>
@@ -146,18 +191,13 @@ export default function Catalog() {
               <button
                 type="button"
                 onClick={() => handleCheckout(product.priceId)}
-                disabled={checkoutPriceId === product.priceId}
+                disabled={!product.priceId || checkoutPriceId === product.priceId}
                 className="catalog-checkout-button"
               >
-                {checkoutPriceId === product.priceId ? 'Opening Stripe...' : 'Commit'}
+                {checkoutPriceId === product.priceId ? 'Opening Stripe...' : product.priceId ? 'Commit' : 'Awaiting Stripe Link'}
               </button>
             </article>
-          )) : (
-            <div className="catalog-empty">
-              <h2>No active products found</h2>
-              <p>Once active Stripe products with default prices exist, they will appear here automatically.</p>
-            </div>
-          )}
+          ))}
         </section>
       )}
     </main>
