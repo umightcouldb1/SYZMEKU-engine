@@ -8,6 +8,7 @@ import OnboardingFlow from './OnboardingFlow';
 import OnboardingVoiceBridge from './OnboardingVoiceBridge';
 import WelcomeScreen from './WelcomeScreen';
 import Catalog from './components/Catalog';
+import Profile from './components/Profile';
 import RequireAuth from './components/RequireAuth';
 import { BiometricProvider } from './context/BiometricContext';
 import PrivateLayout from './layouts/PrivateLayout';
@@ -216,6 +217,8 @@ function App() {
           }
         >
           <Route path={APP_HOME_ROUTE} element={onboardingCompleted ? <Dashboard user={user} /> : <Navigate to="/onboarding" replace />} />
+          <Route path="/app/profile" element={onboardingCompleted ? <Profile /> : <Navigate to="/onboarding" replace />} />
+          <Route path="/profile" element={onboardingCompleted ? <Profile /> : <Navigate to="/onboarding" replace />} />
           <Route path="/dashboard" element={<Navigate to={APP_HOME_ROUTE} replace />} />
         </Route>
         <Route
