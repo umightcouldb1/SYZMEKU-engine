@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const asyncHandler = require('express-async-handler');
 const User = require('../../models/User');
-const { registerUser, loginUser, googleLoginUser, logoutUser } = require('../../controllers/auth controller');
+const { registerUser, loginUser, googleLoginUser, refreshSession, logoutUser } = require('../../controllers/auth controller');
 const { protect } = require('../../middleware/authMiddleware');
 
 // @route POST /api/auth/signup
@@ -14,6 +14,9 @@ router.post('/login', asyncHandler(loginUser));
 
 // @route POST /api/auth/google
 router.post('/google', asyncHandler(googleLoginUser));
+
+// @route POST /api/auth/refresh
+router.post('/refresh', asyncHandler(refreshSession));
 
 // @route POST /api/auth/logout
 router.post('/logout', protect, asyncHandler(logoutUser));
