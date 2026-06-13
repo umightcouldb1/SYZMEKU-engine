@@ -7,6 +7,7 @@ import Dashboard from './sovereign-shield/Dashboard';
 import OnboardingFlow from './OnboardingFlow';
 import OnboardingVoiceBridge from './OnboardingVoiceBridge';
 import WelcomeScreen from './WelcomeScreen';
+import Catalog from './components/Catalog';
 import RequireAuth from './components/RequireAuth';
 import { BiometricProvider } from './context/BiometricContext';
 import PrivateLayout from './layouts/PrivateLayout';
@@ -188,6 +189,8 @@ function App() {
     <BiometricProvider>
       <Routes>
         <Route path="/welcome" element={<WelcomeScreen />} />
+        <Route path="/catalog" element={<Catalog />} />
+        <Route path="/products" element={<Navigate to="/catalog" replace />} />
         <Route path="/login" element={isAuthenticated ? <Navigate to={onboardingCompleted ? APP_HOME_ROUTE : '/onboarding'} replace /> : <AuthPage mode="login" />} />
         <Route path="/signup" element={isAuthenticated ? <Navigate to={onboardingCompleted ? APP_HOME_ROUTE : '/onboarding'} replace /> : <AuthPage mode="signup" />} />
         <Route
