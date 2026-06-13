@@ -89,8 +89,14 @@ const createCheckoutSession = asyncHandler(async (req, res) => {
     customer_email: req.user?.email || undefined,
     metadata: {
       userId,
+      user_id: userId,
       productId: product?.id || '',
+      product_id: product?.id || '',
       productName: product?.name || '',
+      product_name: product?.name || '',
+      priceId,
+      price_id: priceId,
+      tier: product?.metadata?.tier || '',
       source: 'syzmeku_public_catalog',
     },
   });
