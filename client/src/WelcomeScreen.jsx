@@ -147,11 +147,11 @@ const WelcomeScreen = () => {
     <main className="entry-shell">
       <section className="welcome-panel">
         <p className="auth-eyebrow">Public gateway: toisouljahacademy.com</p>
-        <h1>T.O.T. Soulyah Academy</h1>
+        <h1>T.O.I. Souljah Academy</h1>
         <p className="welcome-powered">Ancestral Intelligence Mentor Platform</p>
         <p className="welcome-copy">
           Reconstruct trauma, reclaim sovereign identity, and activate inner mastery through breath, bodywork,
-          sacred coaching, and AI-guided flame mentorship.
+          sacred coaching, and guided ancestral mentorship.
         </p>
 
         <div className="welcome-portal-map" aria-label="Portal architecture">
