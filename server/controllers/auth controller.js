@@ -38,6 +38,22 @@ const setSessionCookie = (res, token) => {
     });
 };
 
+const getCookieToken = (cookieHeader = '') => {
+    const sessionCookie = cookieHeader
+        .split(';')
+        .map((part) => part.trim())
+        .find((part) => part.startsWith('session='));
+
+    if (!sessionCookie) return null;
+    return decodeURIComponent(sessionCookie.replace('session=', ''));
+};
+
+const getRequestToken = (req) => {
+    const authHeader = req.headers.authorization || '';
+    if (authHeader.startsWith('Bearer ')) return authHeader.split(' ')[1];
+    return getCookieToken(req.headers.cookie || '');
+};
+
 const createPersistentSession = async (user, req) => {
     const sessionId = randomUUID();
     const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
@@ -51,6 +67,23 @@ const createPersistentSession = async (user, req) => {
     });
 
     return { sessionId, expiresAt };
+};
+
+const extendPersistentSession = async (sessionId, req) => {
+    const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+    return AuthSession.findOneAndUpdate(
+        {
+            sessionId,
+            revokedAt: null,
+            expiresAt: { $gt: new Date() },
+        },
+        {
+            expiresAt,
+            ip: req?.ip || '',
+            userAgent: req?.headers?.['user-agent'] || '',
+        },
+        { new: true }
+    );
 };
 
 const buildAuthResponse = (user, token) => ({
@@ -336,16 +369,75 @@ const googleLoginUser = async (req, res) => {
     }
 };
 
+// @desc    Refresh active operative session
+// @route   POST /api/auth/refresh
+const refreshSession = async (req, res) => {
+    const token = getRequestToken(req) || String(req.body?.refreshToken || req.body?.token || '').trim();
+
+    if (!token) {
+        return res.status(401).json({ message: 'No active session token.' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, getJwtSecret(), { ignoreExpiration: true });
+        if (!decoded?.id || !decoded?.sid) {
+            return res.status(401).json({ message: 'Invalid session token.' });
+        }
+
+        const existingSession = await AuthSession.findOne({
+            sessionId: decoded.sid,
+            userId: decoded.id,
+            revokedAt: null,
+            expiresAt: { $gt: new Date() },
+        });
+
+        if (!existingSession) {
+            return res.status(401).json({ message: 'Session expired or revoked.' });
+        }
+
+        const user = await User.findById(decoded.id).select('-password');
+        if (!user) {
+            return res.status(401).json({ message: 'User not found.' });
+        }
+
+        const refreshedSession = await extendPersistentSession(decoded.sid, req);
+        if (!refreshedSession) {
+            return res.status(401).json({ message: 'Session expired or revoked.' });
+        }
+
+        const refreshedToken = createAuthToken(user, decoded.sid);
+        setSessionCookie(res, refreshedToken);
+
+        await logAuditEvent({
+            category: 'auth',
+            event: 'session_refresh_success',
+            req,
+            userId: user._id,
+            role: user.role || User.ROLES.USER,
+            success: true,
+        });
+
+        return res.json({
+            ...buildAuthResponse(user, refreshedToken),
+            expiresAt: refreshedSession.expiresAt,
+        });
+    } catch (error) {
+        await logAuditEvent({
+            category: 'auth',
+            event: 'session_refresh_failed',
+            req,
+            success: false,
+            details: { message: error?.message || 'Refresh failed' },
+        }).catch(() => {});
+
+        return res.status(401).json({ message: 'Session refresh failed.' });
+    }
+};
+
 // @desc    Logout operative
 // @route   POST /api/auth/logout
 const logoutUser = async (req, res) => {
-    const authHeader = req.headers.authorization || '';
-    const bearer = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-    const cookieToken = (req.headers.cookie || '')
-        .split(';')
-        .map((part) => part.trim())
-        .find((part) => part.startsWith('session='));
-    const token = bearer || (cookieToken ? decodeURIComponent(cookieToken.replace('session=', '')) : null);
+    const token = getRequestToken(req);
 
     if (token) {
         try {
@@ -377,4 +469,4 @@ const logoutUser = async (req, res) => {
     res.status(200).json({ message: 'Logout successful.' });
 };
 
-module.exports = { registerUser, loginUser, googleLoginUser, logoutUser };
+module.exports = { registerUser, loginUser, googleLoginUser, refreshSession, logoutUser };
