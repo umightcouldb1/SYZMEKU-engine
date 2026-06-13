@@ -53,6 +53,15 @@ const AuthPage = ({ mode = 'login' }) => {
   });
   const [error, setError] = useState(location.state?.message || '');
 
+  const getPostAuthRoute = useCallback((fallbackRoute) => {
+    const from = location.state?.from;
+    if (from?.pathname) {
+      return `${from.pathname}${from.search || ''}`;
+    }
+
+    return fallbackRoute;
+  }, [location.state]);
+
   const onChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -74,8 +83,8 @@ const AuthPage = ({ mode = 'login' }) => {
     }
 
     const completed = Boolean(result.payload?.onboarding?.completed);
-    navigate(completed ? '/app' : '/onboarding', { replace: true });
-  }, [dispatch, navigate]);
+    navigate(completed ? getPostAuthRoute('/app') : '/onboarding', { replace: true });
+  }, [dispatch, getPostAuthRoute, navigate]);
 
   useEffect(() => {
     if (!hasGoogleClientId) return undefined;
@@ -157,7 +166,7 @@ const AuthPage = ({ mode = 'login' }) => {
       return;
     }
 
-    navigate(isSignup ? '/onboarding' : '/app', { replace: true });
+    navigate(isSignup ? '/onboarding' : getPostAuthRoute('/app'), { replace: true });
   };
 
   return (
