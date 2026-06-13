@@ -6,15 +6,18 @@ const router = express.Router();
 
 let stripeClient;
 
+const getStripeSecretKey = () => process.env.STRIPE_SECRET_KEY || process.env.Stripe_Secret_Key;
+const getStripeWebhookSecret = () => process.env.STRIPE_WEBHOOK_SECRET || process.env.Stripe_Webhook_Secret;
+
 const getStripe = () => {
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!getStripeSecretKey()) {
     const error = new Error('STRIPE_SECRET_KEY is not configured.');
     error.statusCode = 503;
     throw error;
   }
 
   if (!stripeClient) {
-    stripeClient = Stripe(process.env.STRIPE_SECRET_KEY);
+    stripeClient = Stripe(getStripeSecretKey());
   }
 
   return stripeClient;
@@ -111,14 +114,15 @@ const fulfillCheckoutSession = async (session) => {
 
 router.post('/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
   const signature = req.headers['stripe-signature'];
+  const webhookSecret = getStripeWebhookSecret();
 
-  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+  if (!webhookSecret) {
     return res.status(503).json({ error: 'STRIPE_WEBHOOK_SECRET is not configured.' });
   }
 
   let event;
   try {
-    event = getStripe().webhooks.constructEvent(req.body, signature, process.env.STRIPE_WEBHOOK_SECRET);
+    event = getStripe().webhooks.constructEvent(req.body, signature, webhookSecret);
   } catch (error) {
     return res.status(400).send(`Webhook Error: ${error.message}`);
   }
