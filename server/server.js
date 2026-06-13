@@ -76,7 +76,9 @@ app.use(helmet({
 app.use(cors(corsOptions));
 
 // Stripe signature verification requires the untouched raw request body.
-app.use('/api/webhooks', require(path.resolve(__dirname, 'routes/webhook')));
+const stripeWebhookRoutes = require(path.resolve(__dirname, 'routes/webhook'));
+app.use('/api/webhooks', stripeWebhookRoutes);
+app.use('/webhook', stripeWebhookRoutes);
 
 app.use(express.json({ limit: '1mb' }));
 
