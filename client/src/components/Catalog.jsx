@@ -1,21 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 import './Catalog.css';
 
 const currencyFormatter = (currency = 'usd') => new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: String(currency || 'usd').toUpperCase(),
 });
-
-const getStoredToken = () => {
-  try {
-    const storedUser = JSON.parse(localStorage.getItem('user'));
-    return storedUser?.token || localStorage.getItem('token') || '';
-  } catch (_error) {
-    return localStorage.getItem('token') || '';
-  }
-};
 
 const formatPrice = (product) => {
   const amount = Number(product?.price || 0);
@@ -25,6 +17,7 @@ const formatPrice = (product) => {
 export default function Catalog() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { ensureValidSession } = useAuth();
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -67,30 +60,33 @@ export default function Catalog() {
     };
   }, []);
 
+  const redirectToLogin = (message) => {
+    localStorage.setItem('syz_checkout_intent', JSON.stringify({
+      pathname: location.pathname,
+      search: location.search,
+      createdAt: new Date().toISOString(),
+    }));
+    navigate('/login', {
+      state: {
+        from: { pathname: location.pathname, search: location.search },
+        message,
+      },
+    });
+  };
+
   const handleCheckout = async (priceId) => {
     if (!priceId || checkoutPriceId) return;
-
-    const token = getStoredToken();
-    if (!token) {
-      localStorage.setItem('syz_checkout_intent', JSON.stringify({
-        pathname: location.pathname,
-        search: location.search,
-        priceId,
-        createdAt: new Date().toISOString(),
-      }));
-      navigate('/login', {
-        state: {
-          from: { pathname: location.pathname, search: location.search },
-          message: 'Sign in to complete checkout.',
-        },
-      });
-      return;
-    }
 
     setCheckoutPriceId(priceId);
     setError('');
 
     try {
+      const token = await ensureValidSession();
+      if (!token) {
+        redirectToLogin('Sign in to complete checkout.');
+        return;
+      }
+
       const response = await axios.post('/api/checkout/session', { priceId }, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -104,12 +100,7 @@ export default function Catalog() {
     } catch (checkoutError) {
       const status = checkoutError?.response?.status;
       if (status === 401) {
-        navigate('/login', {
-          state: {
-            from: { pathname: location.pathname, search: location.search },
-            message: 'Your session expired. Sign in to complete checkout.',
-          },
-        });
+        redirectToLogin('Your session expired. Sign in to complete checkout.');
         return;
       }
 
