@@ -31,7 +31,7 @@ const automationLogSchema = new mongoose.Schema(
     },
     command: {
       type: String,
-      enum: ['partnership_deck_draft', 'partnership_outreach_draft'],
+      enum: ['workspace_smoke_test', 'partnership_deck_draft', 'partnership_outreach_draft'],
       required: true,
       index: true,
     },
