@@ -32,6 +32,12 @@ services:
         sync: false
       - key: GOOGLE_WORKSPACE_IMPERSONATED_USER
         sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_REFRESH_TOKEN
+        sync: false
       - key: OLLAMA_BASE_URL
         sync: false
       - key: OLLAMA_MODEL
