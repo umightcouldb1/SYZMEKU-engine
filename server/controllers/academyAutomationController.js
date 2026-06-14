@@ -2,6 +2,11 @@ const asyncHandler = require('express-async-handler');
 const { google } = require('googleapis');
 
 const PARTNERSHIP_CONTEXT = `T.O.I. Souljah Academy and the SYZMEKU engine are preparing a polished Samsung corporate partnership presentation. Keep language strategic, grounded, and review-ready.`;
+const WORKSPACE_SCOPES = [
+  'https://www.googleapis.com/auth/presentations',
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/gmail.compose',
+];
 
 let genAiClientPromise;
 
@@ -37,27 +42,49 @@ const generateWithGemini = async (prompt) => {
   return extractText(response);
 };
 
+const getWorkspaceAuthMode = () => {
+  if (process.env.GOOGLE_WORKSPACE_CLIENT_EMAIL && process.env.GOOGLE_WORKSPACE_PRIVATE_KEY) {
+    return 'service_account';
+  }
+
+  if (
+    (process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_CLIENT_ID)
+    && process.env.GOOGLE_OAUTH_CLIENT_SECRET
+    && process.env.GOOGLE_OAUTH_REFRESH_TOKEN
+  ) {
+    return 'oauth_refresh_token';
+  }
+
+  return 'missing';
+};
+
 const getWorkspaceAuth = () => {
   const clientEmail = process.env.GOOGLE_WORKSPACE_CLIENT_EMAIL;
   const privateKey = process.env.GOOGLE_WORKSPACE_PRIVATE_KEY;
   const subject = process.env.GOOGLE_WORKSPACE_IMPERSONATED_USER;
 
-  if (!clientEmail || !privateKey) {
-    const error = new Error('Google Workspace service account credentials are not configured.');
-    error.statusCode = 503;
-    throw error;
+  if (clientEmail && privateKey) {
+    return new google.auth.JWT({
+      email: clientEmail,
+      key: privateKey.replace(/\\n/g, '\n'),
+      scopes: WORKSPACE_SCOPES,
+      subject: subject || undefined,
+    });
   }
 
-  return new google.auth.JWT({
-    email: clientEmail,
-    key: privateKey.replace(/\\n/g, '\n'),
-    scopes: [
-      'https://www.googleapis.com/auth/presentations',
-      'https://www.googleapis.com/auth/drive.file',
-      'https://www.googleapis.com/auth/gmail.compose',
-    ],
-    subject: subject || undefined,
-  });
+  const oauthClientId = process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+  const oauthClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const oauthRefreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
+
+  if (oauthClientId && oauthClientSecret && oauthRefreshToken) {
+    const oauthClient = new google.auth.OAuth2(oauthClientId, oauthClientSecret);
+    oauthClient.setCredentials({ refresh_token: oauthRefreshToken });
+    return oauthClient;
+  }
+
+  const error = new Error('Google Workspace credentials are not configured. Provide service-account credentials or GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, and GOOGLE_OAUTH_REFRESH_TOKEN.');
+  error.statusCode = 503;
+  throw error;
 };
 
 const encodeBase64Url = (value) => Buffer.from(value)
@@ -72,15 +99,17 @@ const createSlidesDraft = async ({ title, outline }) => {
   const drive = google.drive({ version: 'v3', auth });
   const presentation = await slides.presentations.create({ requestBody: { title } });
 
-  await drive.permissions.create({
-    fileId: presentation.data.presentationId,
-    requestBody: {
-      type: 'user',
-      role: 'writer',
-      emailAddress: process.env.GOOGLE_WORKSPACE_IMPERSONATED_USER,
-    },
-    sendNotificationEmail: false,
-  }).catch(() => undefined);
+  if (process.env.GOOGLE_WORKSPACE_IMPERSONATED_USER) {
+    await drive.permissions.create({
+      fileId: presentation.data.presentationId,
+      requestBody: {
+        type: 'user',
+        role: 'writer',
+        emailAddress: process.env.GOOGLE_WORKSPACE_IMPERSONATED_USER,
+      },
+      sendNotificationEmail: false,
+    }).catch(() => undefined);
+  }
 
   return {
     presentationId: presentation.data.presentationId,
@@ -113,9 +142,18 @@ const createGmailDraft = async ({ to, subject, body }) => {
 };
 
 const getAutomationStatus = asyncHandler(async (_req, res) => {
+  const workspaceAuthMode = getWorkspaceAuthMode();
+
   return res.json({
     geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
-    workspaceConfigured: Boolean(process.env.GOOGLE_WORKSPACE_CLIENT_EMAIL && process.env.GOOGLE_WORKSPACE_PRIVATE_KEY),
+    workspaceConfigured: workspaceAuthMode !== 'missing',
+    workspaceAuthMode,
+    serviceAccountConfigured: Boolean(process.env.GOOGLE_WORKSPACE_CLIENT_EMAIL && process.env.GOOGLE_WORKSPACE_PRIVATE_KEY),
+    oauthRefreshConfigured: Boolean(
+      (process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_CLIENT_ID)
+      && process.env.GOOGLE_OAUTH_CLIENT_SECRET
+      && process.env.GOOGLE_OAUTH_REFRESH_TOKEN
+    ),
     impersonatedUserConfigured: Boolean(process.env.GOOGLE_WORKSPACE_IMPERSONATED_USER),
     supportedActions: ['deck_draft', 'gmail_draft'],
     sendMode: 'draft_only',
