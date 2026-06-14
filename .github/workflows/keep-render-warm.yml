@@ -1,0 +1,22 @@
+name: Keep Render API Warm
+
+on:
+  schedule:
+    - cron: '*/14 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping-render-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping product catalog
+        run: |
+          set -euo pipefail
+          url="https://syzmeku-api.onrender.com/api/products"
+          status=$(curl -L --retry 2 --retry-delay 5 --max-time 45 -s -o /tmp/syzmeku-products.json -w "%{http_code}" "$url")
+          echo "Render API status: $status"
+          test "$status" = "200"
