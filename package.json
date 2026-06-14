@@ -8,6 +8,7 @@
     "prepare-client-env": "node scripts/prepare-client-env.cjs",
     "client-build": "npm run prepare-client-env && npm run build --prefix client",
     "server-check": "node --check server.js && node --check server/server.js",
+    "backfill:workspace-smoke-test": "node scripts/backfill-workspace-smoke-test.cjs",
     "render-build": "npm run setup && npm run test",
     "start": "node server.js",
     "test": "npm run server-check && npm run client-build"
