@@ -17,6 +17,7 @@ router.use('/onboarding', require('./onboardingRoutes'));
 router.use('/admin', require('./adminRoutes'));
 router.use('/vision', require('./visionRoutes'));
 router.use('/memory', require('./memoryRoutes'));
+router.use('/sentiment-analysis', require('./sentimentAnalysisRoutes'));
 router.use('/monetization', require('./billingRoutes'));
 router.use('/ai', require('./aiGatewayRoutes'));
 router.use('/', require('./stripeRoutes'));

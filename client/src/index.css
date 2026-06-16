@@ -2,13 +2,18 @@
 
 :root {
   /* Font remains monospace for the interface feel, but colors are updated */
-  font-family: monospace, sans-serif; 
+  font-family: Inter, monospace, sans-serif; 
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
   color: #C0C0C0; /* Default Silver text */
   background-color: #000000; /* Pure black background */
   font-size: 16px;
+
+  /* Ethereal-Sovereign Big Sis theme constraints */
+  --bg-primary: #05070a;
+  --accent-nebula: #6b4c9a;
+  --grid-quantum: #1e2a38;
   
   /* Requested Color Scheme Variables */
   --emerald-green: #00A040; /* Emerald Forest Green */
@@ -19,13 +24,19 @@
   --red-warning: #FF0000; /* Standard Red for security risks */
 }
 
+.module-interaction {
+    border: 1px solid var(--grid-quantum);
+    font-family: Inter, sans-serif;
+    transition: opacity 0.3s ease-in-out;
+}
+
 body {
   margin: 0;
   display: flex;
   place-items: center;
   min-width: 100vw;
   min-height: 100vh;
-  background-color: #000000; 
+  background-color: var(--bg-primary); 
   color: var(--silver); /* Global text color is Silver */
   overflow-x: hidden;
   padding: 20px;
