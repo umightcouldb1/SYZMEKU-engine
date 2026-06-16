@@ -8,7 +8,7 @@ const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || process.env.MODEL_TARGE
 const DEFAULT_OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
 const DEFAULT_OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS || 45000);
-const GEMINI_TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS || 45000);
+let genAiClientPromise;
 
 const sanitizePrompt = (value) => String(value || '').trim();
 
@@ -23,37 +23,34 @@ const getGeminiApiKey = () => {
   return process.env.GEMINI_API_KEY;
 };
 
-const extractGeminiText = (data) => {
-  const parts = data?.candidates?.[0]?.content?.parts;
-  if (Array.isArray(parts)) {
-    return parts.map((part) => part?.text || '').filter(Boolean).join('\n').trim();
+const getGeminiClient = async () => {
+  const apiKey = getGeminiApiKey();
+
+  if (!genAiClientPromise) {
+    genAiClientPromise = import('@google/genai').then(({ GoogleGenAI }) => new GoogleGenAI({ apiKey }));
   }
-  return '';
+
+  return genAiClientPromise;
+};
+
+const extractGeminiText = (response) => {
+  if (!response) return '';
+  if (typeof response.text === 'function') return response.text();
+  if (typeof response.text === 'string') return response.text;
+  return JSON.stringify(response);
 };
 
 const processWithGemini = async (prompt) => {
-  const apiKey = getGeminiApiKey();
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(DEFAULT_GEMINI_MODEL)}:generateContent`;
-  const { data } = await axios.post(
-    url,
-    {
-      contents: [
-        {
-          parts: [{ text: prompt }],
-        },
-      ],
-    },
-    {
-      params: { key: apiKey },
-      timeout: GEMINI_TIMEOUT_MS,
-      headers: { 'Content-Type': 'application/json' },
-    },
-  );
+  const ai = await getGeminiClient();
+  const response = await ai.models.generateContent({
+    model: DEFAULT_GEMINI_MODEL,
+    contents: prompt,
+  });
 
   return {
     provider: 'gemini',
     model: DEFAULT_GEMINI_MODEL,
-    response: extractGeminiText(data),
+    response: extractGeminiText(response),
   };
 };
 
@@ -119,6 +116,8 @@ const processIntelligencePrompt = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     const provider = isCommander ? 'ollama' : 'gemini';
+    console.error(`[AI_GATEWAY_ERR] ${provider}: ${error.message}`);
+
     await auditGatewayEvent({
       req,
       provider,
