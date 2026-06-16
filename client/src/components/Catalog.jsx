@@ -6,6 +6,17 @@ import './Catalog.css';
 
 const FINALIZED_TIERS = [
   {
+    key: 'ketsuron',
+    matcher: /ketsuron|flash sale|syzmeku os/i,
+    displayName: 'SYZMEKU OS - Ketsuron Flash Sale',
+    design: 'emerald-lunar',
+    themeLabel: 'Monthly Subscription Access',
+    fallbackPrice: 9.88,
+    fallbackPriceId: 'price_1Thcnu6K9xPHaof1xOEVeJss',
+    checkoutMode: 'subscription',
+    signal: '988',
+  },
+  {
     key: 'harmonic',
     matcher: /harmonic/i,
     displayName: 'BIG SYZ Harmonic System Access (111)',
@@ -41,7 +52,8 @@ const currencyFormatter = (currency = 'usd') => new Intl.NumberFormat('en-US', {
 
 const formatPrice = (product) => {
   const amount = Number(product?.price || product?.fallbackPrice || 0);
-  return currencyFormatter(product?.currency).format(amount);
+  const formatted = currencyFormatter(product?.currency).format(amount);
+  return product?.interval ? `${formatted}/${product.interval}` : formatted;
 };
 
 const mergeFinalizedTier = (tier, products) => {
@@ -56,6 +68,7 @@ const mergeFinalizedTier = (tier, products) => {
     currency: liveProduct?.currency || 'usd',
     priceId: liveProduct?.priceId || '',
     interval: liveProduct?.interval || null,
+    checkoutMode: liveProduct?.interval ? 'subscription' : tier.checkoutMode || 'payment',
     design: tier.design,
     signal: tier.signal,
     themeLabel: tier.themeLabel,
@@ -118,7 +131,10 @@ export default function Catalog() {
     });
   };
 
-  const handleCheckout = async (priceId) => {
+  const handleCheckout = async (product) => {
+    const priceId = product?.priceId || product?.fallbackPriceId;
+    const mode = product?.checkoutMode || (product?.interval ? 'subscription' : 'payment');
+
     if (!priceId || checkoutPriceId) return;
 
     setCheckoutPriceId(priceId);
@@ -131,7 +147,7 @@ export default function Catalog() {
         return;
       }
 
-      const response = await axios.post('/api/checkout/session', { priceId }, {
+      const response = await axios.post('/api/checkout/session', { priceId, mode }, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -190,11 +206,11 @@ export default function Catalog() {
               </div>
               <button
                 type="button"
-                onClick={() => handleCheckout(product.priceId)}
-                disabled={!product.priceId || checkoutPriceId === product.priceId}
+                onClick={() => handleCheckout(product)}
+                disabled={!(product.priceId || product.fallbackPriceId) || checkoutPriceId === (product.priceId || product.fallbackPriceId)}
                 className="catalog-checkout-button"
               >
-                {checkoutPriceId === product.priceId ? 'Opening Stripe...' : product.priceId ? 'Commit' : 'Awaiting Stripe Link'}
+                {checkoutPriceId === (product.priceId || product.fallbackPriceId) ? 'Opening Stripe...' : (product.priceId || product.fallbackPriceId) ? 'Subscribe' : 'Awaiting Stripe Link'}
               </button>
             </article>
           ))}

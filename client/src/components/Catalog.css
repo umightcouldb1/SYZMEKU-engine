@@ -143,6 +143,15 @@
     rgba(3, 8, 22, 0.86);
 }
 
+.catalog-card-emerald-lunar {
+  --tier-accent: #7effb6;
+  --tier-secondary: #af6cff;
+  background:
+    linear-gradient(155deg, rgba(126, 255, 182, 0.22), rgba(255, 255, 255, 0.05)),
+    linear-gradient(45deg, rgba(175, 108, 255, 0.18), transparent 62%),
+    rgba(4, 14, 12, 0.86);
+}
+
 .catalog-card-shine {
   position: absolute;
   inset: -45% auto auto -20%;
