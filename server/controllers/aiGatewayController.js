@@ -14,6 +14,14 @@ const sanitizePrompt = (value) => String(value || '').trim();
 
 const getPromptFromRequest = (req) => sanitizePrompt(req.body?.prompt || req.body?.message || req.body?.input);
 
+const getErrorStatus = (error) => error?.statusCode || error?.status || error?.response?.status || 503;
+
+const getSafeGatewayError = (error) => ({
+  message: error?.message || 'Upstream provider request failed.',
+  code: error?.code || error?.cause?.code || '',
+  status: getErrorStatus(error),
+});
+
 const getGeminiApiKey = () => {
   if (!process.env.GEMINI_API_KEY) {
     const error = new Error('GEMINI_API_KEY is not configured.');
@@ -116,24 +124,31 @@ const processIntelligencePrompt = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     const provider = isCommander ? 'ollama' : 'gemini';
-    console.error(`[AI_GATEWAY_ERR] ${provider}: ${error.message}`);
+    const diagnostics = getSafeGatewayError(error);
+    console.error(`[AI_GATEWAY_ERR] ${provider}: ${JSON.stringify(diagnostics)}`);
 
     await auditGatewayEvent({
       req,
       provider,
       success: false,
-      details: { message: error.message },
+      details: diagnostics,
     });
 
     const message = isCommander
       ? 'Local commander model is unavailable. Start Ollama locally or configure OLLAMA_BASE_URL to a private reachable endpoint.'
       : 'Cloud intelligence model is unavailable.';
 
-    return res.status(error.statusCode || 503).json({
+    const payload = {
       success: false,
       provider,
       message,
-    });
+    };
+
+    if (process.env.AI_GATEWAY_DIAGNOSTICS === 'true') {
+      payload.diagnostics = diagnostics;
+    }
+
+    return res.status(diagnostics.status).json(payload);
   }
 });
 
