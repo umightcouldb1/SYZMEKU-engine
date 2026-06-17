@@ -26,6 +26,13 @@ const QUICK_PROMPTS = {
   off: 'I feel off today',
 };
 
+const TRAUMA_AWARE_STACK = {
+  priority: 'Trauma-Aware Safety',
+  gentleResetMode: 'ENABLED',
+  narrativePriority: 'Griot_Narrative_First',
+  stressThreshold: 8,
+};
+
 const PATH_STAGES = [
   { name: 'Initiate', detail: 'Mentor chat, simple insights, and daily check-ins.' },
   { name: 'Alignment', detail: 'Pattern-building with stronger recommendations.' },
@@ -51,6 +58,16 @@ const getMentorResponseText = (response) =>
 
 const buildRecentConversationCommands = (chatMemory = []) =>
   chatMemory.slice(-8).map((entry) => `${entry.label}: ${entry.text}`);
+
+const shouldUseGentleReset = ({ signals = {}, coherenceVector = {} }) => {
+  const stress = Number(signals.stress ?? coherenceVector.contextual?.stressLevel ?? 0);
+  const labels = [
+    coherenceVector.coherenceLabel,
+    coherenceVector.contextual?.label,
+  ].filter(Boolean);
+
+  return stress >= TRAUMA_AWARE_STACK.stressThreshold || labels.some((label) => ['Support Needed', 'Strained'].includes(label));
+};
 
 const mapPersistentHistoryToChatMemory = (history = []) =>
   history.map((turn, index) => ({
@@ -171,7 +188,17 @@ const Dashboard = ({ user }) => {
     () => [...chatMemory].reverse().find((entry) => entry.speaker === 'syz')?.text || '',
     [chatMemory],
   );
+  const gentleResetActive = useMemo(
+    () => shouldUseGentleReset({ signals, coherenceVector }),
+    [signals, coherenceVector],
+  );
   const mentorContext = useMemo(() => ({
+    traumaAwareStack: {
+      ...TRAUMA_AWARE_STACK,
+      active: true,
+      gentleResetActive,
+      activeMentorshipSession: true,
+    },
     onboardingProfile,
     sovereignMatrixNote: sovereignContext?.sovereignMatrixNote || matrixNote,
     onboardingReflection: sovereignContext?.onboardingReflection || onboardingProfile.onboardingReflection || '',
@@ -180,9 +207,14 @@ const Dashboard = ({ user }) => {
     supportAreas: onboardingProfile.supportAreas || [],
     mentorStyle: onboardingProfile.mentorStyle || '',
     goals: onboardingProfile.goals || [],
+    telemetryPolicy: {
+      rawAlertPriority: gentleResetActive ? 'softened' : 'contextual',
+      narrativePriority: 'primary',
+      activeFeeds: telemetrySync?.sensorFusion?.feeds || {},
+    },
     recentCommands: buildRecentConversationCommands(chatMemory),
     conversationHistory: chatMemory.map(({ speaker, text }) => ({ role: speaker === 'syz' ? 'model' : 'user', text })),
-  }), [chatMemory, matrixNote, onboardingProfile, sovereignContext, user]);
+  }), [chatMemory, gentleResetActive, matrixNote, onboardingProfile, sovereignContext, telemetrySync, user]);
 
   const canAccessOperatorMode = Boolean(operatorVisibility?.canAccessOperatorMode || ['founder', 'admin'].includes(String(user?.role || '').toLowerCase()));
   const adminSignatureVerified = Boolean(canAccessOperatorMode);
@@ -293,10 +325,14 @@ const Dashboard = ({ user }) => {
       updateContextualMetrics(signals);
       await axios.post('/api/core/signals', signals);
       const biometricMetadata = getLatestCoherencePayload();
+      const traumaAwareMetadata = {
+        ...biometricMetadata,
+        traumaAwareStack: mentorContext.traumaAwareStack,
+      };
       const analysis = await axios.post('/api/core/analyze', {
         text: `sleep=${signals.sleep} stress=${signals.stress} symptoms=${signals.symptoms}`,
         context: mentorContext,
-        biometricMetadata,
+        biometricMetadata: traumaAwareMetadata,
       });
       setLatestInsight(analysis.data);
       await refreshMentorData();
@@ -340,6 +376,10 @@ const Dashboard = ({ user }) => {
         ].slice(-10),
       };
       const biometricMetadata = getLatestCoherencePayload();
+      const traumaAwareMetadata = {
+        ...biometricMetadata,
+        traumaAwareStack: mentorContext.traumaAwareStack,
+      };
       const internalCommand = `analyze ${question || 'visual attachment'}`;
       setChatMemory((prev) => [...prev, userEntry].slice(-12));
 
@@ -348,12 +388,12 @@ const Dashboard = ({ user }) => {
             text: question,
             media: mediaAttachment,
             context: contextWithCurrentTurn,
-            biometricMetadata,
+            biometricMetadata: traumaAwareMetadata,
           })
         : await axios.post('/api/core/analyze', {
             text: internalCommand.replace(/^analyze\s+/i, ''),
             context: contextWithCurrentTurn,
-            biometricMetadata,
+            biometricMetadata: traumaAwareMetadata,
           });
       const mentorEntry = {
         id: `mentor-${Date.now()}`,
@@ -465,6 +505,7 @@ const Dashboard = ({ user }) => {
             <span className="mentor-pill success">{lineageStatus}</span>
             <span className="mentor-pill">{chatMemory.length} persistent turns held</span>
             <span className="mentor-pill">Coherence: {coherenceVector.coherenceLabel}</span>
+            {gentleResetActive && <span className="mentor-pill success">Gentle Reset active</span>}
             <button type="button" className="mentor-link" onClick={clearLineageMemory} disabled={loading || chatMemory.length === 0}>
               Clear lineage memory
             </button>
@@ -582,6 +623,10 @@ const Dashboard = ({ user }) => {
                 Sensor fusion: {telemetrySync?.sensorFusion?.status || 'PENDING'}.
                 S.A.M.: {telemetrySync?.emotiveLayer?.status || 'PENDING'}.
                 Griot: {telemetrySync?.memoryStream?.status || 'PENDING'}.
+              </p>
+              <p className="mentor-muted">
+                Trauma-aware stack: {telemetrySync?.traumaAwareness?.status || 'PENDING'}.
+                Narrative priority: {telemetrySync?.traumaAwareness?.griotPriority?.enabled ? 'Griot first' : 'Pending'}.
               </p>
               <div className="mentor-operator-meta">
                 {Object.entries(telemetrySync?.sensorFusion?.feeds || {}).map(([feed, status]) => (

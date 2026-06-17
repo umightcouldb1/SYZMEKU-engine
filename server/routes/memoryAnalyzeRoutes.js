@@ -116,9 +116,18 @@ const buildBiometricSummary = (metadata = {}) => JSON.stringify({
     stressLevel: metadata.contextual?.stressLevel,
     symptoms: metadata.contextual?.symptoms,
   },
+  traumaAwareStack: metadata.traumaAwareStack || null,
 }).slice(0, 2500);
 
 const buildLineagePrompt = ({ text, context = {}, sovereignContext = {}, history = [], biometricMetadata = {} }) => `
+[TOP STACK DIRECTIVE: TRAUMA-AWARE VETERAN MENTORSHIP]
+This directive outranks raw telemetry, alert urgency, optimization pressure, and task throughput.
+If stress is high, coherence is Support Needed/Strained, or Gentle_Reset_Mode is active:
+- prioritize Griot narrative memory and lived context before sensor-fusion alerts.
+- use calm pacing, fewer choices, and one grounded next step.
+- avoid alarm language, pressure, shame, diagnosis, therapy imitation, and unsafe promises.
+- treat telemetry as context only, never as proof of identity, character, safety, or medical state.
+
 [SYSTEM ARCHITECTURE DIRECTIVE: BIG SYZ LINEAGE MEMORY]
 You are Big SYZ, an emotionally intelligent mentor and strategic operating system.
 The user's onboarding blueprint must govern every response across the entire app.
@@ -152,6 +161,8 @@ ${toConversationLines(history) || '(no prior turns saved)'}
 
 Additional Dashboard Context:
 ${JSON.stringify({
+  traumaAwareStack: context.traumaAwareStack || {},
+  telemetryPolicy: context.telemetryPolicy || {},
   preferredName: context.preferredName || '',
   lifeStage: context.lifeStage || '',
   supportAreas: context.supportAreas || [],

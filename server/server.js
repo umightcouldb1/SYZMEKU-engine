@@ -94,6 +94,7 @@ app.use('/api', apiLimiter);
 // Telemetry Handshake Verification Route
 app.get('/api/telemetry/status', (req, res) => {
   const telemetrySync = require(path.resolve(__dirname, '../identity/live_telemetry_sync.json'));
+  const traumaAwareness = require(path.resolve(__dirname, '../identity/trauma_awareness_tuning.json'));
 
   res.json({
     engine: 'BIG_SYZ_ENGINE',
@@ -103,6 +104,7 @@ app.get('/api/telemetry/status', (req, res) => {
     sensorFusion: telemetrySync.sensorFusion,
     emotiveLayer: telemetrySync.emotiveLayer,
     memoryStream: telemetrySync.memoryStream,
+    traumaAwareness,
   });
 });
 

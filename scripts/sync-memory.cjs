@@ -2,8 +2,10 @@ const fs = require('fs');
 const path = require('path');
 
 const syncPath = path.resolve(__dirname, '..', 'identity', 'live_telemetry_sync.json');
+const tuningPath = path.resolve(__dirname, '..', 'identity', 'trauma_awareness_tuning.json');
 const raw = fs.readFileSync(syncPath, 'utf8');
 const sync = JSON.parse(raw);
+const tuning = JSON.parse(fs.readFileSync(tuningPath, 'utf8'));
 
 const requiredFeeds = ['NOAA', 'USGS', 'Satellite', 'Surveillance', 'Seismic'];
 const inactiveFeeds = requiredFeeds.filter((feed) => sync.sensorFusion?.feeds?.[feed] !== 'ACTIVE');
@@ -28,6 +30,12 @@ if (sync.memoryStream?.status !== 'SYNCED' || sync.memoryStream?.protocol !== 'G
   process.exit(1);
 }
 
+if (tuning.status !== 'TRAUMA_AWARE_TOP_STACK' || !tuning.gentleResetMode?.enabled) {
+  console.error('TRAUMA_AWARE stack not active');
+  process.exit(1);
+}
+
 console.log('SENSOR_FUSION: Active (NOAA/USGS/Satellite/Surveillance/Seismic)');
 console.log('EMOTIVE_LAYER: S.A.M. interface responding to telemetry inputs');
 console.log('MEMORY_STREAM: Griot-protocol synced to dashboard');
+console.log('TRAUMA_AWARE_STACK: top priority with Gentle_Reset_Mode enabled');

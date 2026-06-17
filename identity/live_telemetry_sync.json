@@ -16,12 +16,15 @@
     "status": "LIVE",
     "protocol": "S.A.M.",
     "inputBinding": "telemetry",
-    "responseMode": "empathic-interface"
+    "responseMode": "empathic-interface",
+    "traumaAwareTuning": "Griot_Narrative_First",
+    "gentleResetMode": "ENABLED"
   },
   "memoryStream": {
     "status": "SYNCED",
     "protocol": "Griot",
-    "dashboardBinding": "Big SYZ Home"
+    "dashboardBinding": "Big SYZ Home",
+    "priority": "PRIMARY_DURING_MENTORSHIP"
   },
   "integrity": {
     "externalSensorServicesInstantiated": false,

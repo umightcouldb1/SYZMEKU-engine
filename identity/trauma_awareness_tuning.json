@@ -1,0 +1,35 @@
+{
+  "taskId": "B-SIS_TRAUMA_AWARENESS_TUNING",
+  "status": "TRAUMA_AWARE_TOP_STACK",
+  "missionAlignment": "VETERAN_MENTORSHIP_PRIORITY",
+  "priorityOrder": [
+    "Trauma-Aware Safety",
+    "Griot Narrative Memory",
+    "S.A.M. Empathic Interface",
+    "Sensor-Fusion Telemetry"
+  ],
+  "gentleResetMode": {
+    "enabled": true,
+    "triggerStressAtOrAbove": 8,
+    "triggerCoherenceLabels": [
+      "Support Needed",
+      "Strained"
+    ],
+    "responseRules": [
+      "Reduce complexity before recommending action.",
+      "Use one grounded next step.",
+      "Avoid alarm language from raw telemetry.",
+      "Do not diagnose, imitate therapy, or make safety promises."
+    ]
+  },
+  "griotPriority": {
+    "enabled": true,
+    "activeDuringMentorship": true,
+    "rule": "Narrative memory streams outrank raw telemetry alerts during active mentor sessions."
+  },
+  "samInterface": {
+    "status": "TUNED",
+    "mode": "Griot_Narrative_First",
+    "telemetryHandling": "gentle-reset-filtered"
+  }
+}

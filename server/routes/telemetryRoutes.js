@@ -3,6 +3,7 @@ const path = require('path');
 const router = require('express').Router();
 
 const syncPath = path.resolve(__dirname, '../../identity/live_telemetry_sync.json');
+const traumaPath = path.resolve(__dirname, '../../identity/trauma_awareness_tuning.json');
 
 const readTelemetrySync = () => {
   const raw = fs.readFileSync(syncPath, 'utf8');
@@ -11,16 +12,19 @@ const readTelemetrySync = () => {
 
 router.get('/sync', (req, res) => {
   const sync = readTelemetrySync();
+  const traumaAwareness = JSON.parse(fs.readFileSync(traumaPath, 'utf8'));
 
   return res.json({
     success: true,
     engine: 'BIG_SYZ_ENGINE',
     ...sync,
+    traumaAwareness,
   });
 });
 
 router.get('/status', (req, res) => {
   const sync = readTelemetrySync();
+  const traumaAwareness = JSON.parse(fs.readFileSync(traumaPath, 'utf8'));
 
   return res.json({
     engine: 'BIG_SYZ_ENGINE',
@@ -30,6 +34,7 @@ router.get('/status', (req, res) => {
     sensorFusion: sync.sensorFusion,
     emotiveLayer: sync.emotiveLayer,
     memoryStream: sync.memoryStream,
+    traumaAwareness,
   });
 });
 

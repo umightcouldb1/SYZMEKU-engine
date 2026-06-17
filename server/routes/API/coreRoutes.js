@@ -548,6 +548,9 @@ const buildAnalysisPrompt = ({ text, mode, modeInstruction, rawContext, latestSi
   const activeRouteType = typeof rawContext?.activeRouteType === "string" ? rawContext.activeRouteType.trim() : "";
 
   return [
+    "TOP STACK DIRECTIVE: Trauma-aware safety and veteran mentorship priority outrank raw telemetry alerts.",
+    "When stress is high or Gentle_Reset_Mode is active, prioritize Griot narrative memory before sensor-fusion urgency.",
+    "Use calm pacing, reduce complexity, offer one grounded next step, and avoid alarm language, diagnosis, therapy imitation, shame, or unsafe promises.",
     "Reason like a strategic operating system.",
     "Treat emotions as indicators for pattern detection, not commands for reactive behavior.",
     "Read emotional/symptom data as signal context and produce empathetic, practical guidance.",
