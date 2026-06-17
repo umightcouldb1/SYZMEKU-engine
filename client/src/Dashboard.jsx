@@ -147,6 +147,7 @@ const Dashboard = ({ user }) => {
   const [chatInput, setChatInput] = useState('');
   const [chatMemory, setChatMemory] = useState([]);
   const [lineageStatus, setLineageStatus] = useState('Lineage Sync Pending');
+  const [telemetrySync, setTelemetrySync] = useState(null);
   const [sovereignContext, setSovereignContext] = useState(null);
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState('');
@@ -188,19 +189,21 @@ const Dashboard = ({ user }) => {
   const displayName = adminSignatureVerified ? 'Commander Toi' : onboardingProfile.preferredName || user?.name || 'there';
 
   const refreshMentorData = async () => {
-    const [summaryRes, tasksRes, alertsRes, signalsRes, operatorRes, memoryRes] = await Promise.all([
+    const [summaryRes, tasksRes, alertsRes, signalsRes, operatorRes, memoryRes, telemetryRes] = await Promise.all([
       axios.get('/api/core/summary').catch(() => ({ data: null })),
       axios.get('/api/core/tasks').catch(() => ({ data: { tasks: [] } })),
       axios.get('/api/core/alerts').catch(() => ({ data: { alerts: [] } })),
       axios.get('/api/core/signals').catch(() => ({ data: { entries: [] } })),
       axios.get('/api/core/operator/visibility').catch(() => ({ data: null })),
       axios.get('/api/memory').catch(() => ({ data: null })),
+      axios.get('/api/telemetry/sync').catch(() => ({ data: null })),
     ]);
 
     setSummary(summaryRes.data || null);
     setTasks(tasksRes.data?.tasks || []);
     setAlerts(alertsRes.data?.alerts || []);
     setOperatorVisibility(operatorRes.data || null);
+    setTelemetrySync(telemetryRes.data || null);
 
     if (memoryRes.data?.success) {
       setChatMemory(mapPersistentHistoryToChatMemory(memoryRes.data.conversationHistory || []));
@@ -569,6 +572,21 @@ const Dashboard = ({ user }) => {
               <div className="mentor-inline-actions">
                 <button type="button" className="mentor-button" onClick={submitCheckIn} disabled={loading}>Analyze my state</button>
                 <button type="button" className="mentor-button secondary" onClick={() => axios.post('/api/core/health-sync/connect')}>Connect health data</button>
+              </div>
+            </section>
+
+            <section className="mentor-card">
+              <p className="mentor-section-label">Live Telemetry Sync</p>
+              <h2>{telemetrySync?.status || 'Telemetry pending'}</h2>
+              <p className="mentor-muted">
+                Sensor fusion: {telemetrySync?.sensorFusion?.status || 'PENDING'}.
+                S.A.M.: {telemetrySync?.emotiveLayer?.status || 'PENDING'}.
+                Griot: {telemetrySync?.memoryStream?.status || 'PENDING'}.
+              </p>
+              <div className="mentor-operator-meta">
+                {Object.entries(telemetrySync?.sensorFusion?.feeds || {}).map(([feed, status]) => (
+                  <span key={feed} className={`mentor-pill${status === 'ACTIVE' ? ' success' : ''}`}>{feed}: {status}</span>
+                ))}
               </div>
             </section>
 

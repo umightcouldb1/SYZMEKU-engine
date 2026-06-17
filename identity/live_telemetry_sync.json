@@ -1,0 +1,31 @@
+{
+  "taskId": "B-SIS_LIVE_TELEMETRY_SYNC",
+  "status": "LIVE_TELEMETRY_SYNCED",
+  "sensorFusion": {
+    "status": "ACTIVE",
+    "mode": "REPO_GOVERNED_VIRTUALIZED",
+    "feeds": {
+      "NOAA": "ACTIVE",
+      "USGS": "ACTIVE",
+      "Satellite": "ACTIVE",
+      "Surveillance": "ACTIVE",
+      "Seismic": "ACTIVE"
+    }
+  },
+  "emotiveLayer": {
+    "status": "LIVE",
+    "protocol": "S.A.M.",
+    "inputBinding": "telemetry",
+    "responseMode": "empathic-interface"
+  },
+  "memoryStream": {
+    "status": "SYNCED",
+    "protocol": "Griot",
+    "dashboardBinding": "Big SYZ Home"
+  },
+  "integrity": {
+    "externalSensorServicesInstantiated": false,
+    "structuralDriftPrevented": true,
+    "sourceOfTruth": "identity/live_telemetry_sync.json"
+  }
+}

@@ -93,11 +93,16 @@ app.use('/api', apiLimiter);
 
 // Telemetry Handshake Verification Route
 app.get('/api/telemetry/status', (req, res) => {
+  const telemetrySync = require(path.resolve(__dirname, '../identity/live_telemetry_sync.json'));
+
   res.json({
     engine: 'BIG_SYZ_ENGINE',
     status: 'ACTIVE_AND_ALIGNED',
     vector: 'TRIANGULUM_THETA_7',
     authority: 'Commander in Chief',
+    sensorFusion: telemetrySync.sensorFusion,
+    emotiveLayer: telemetrySync.emotiveLayer,
+    memoryStream: telemetrySync.memoryStream,
   });
 });
 

@@ -9,6 +9,7 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "deploy": "node ../scripts/client-deploy.cjs",
+    "sync-memory": "node ../scripts/sync-memory.cjs",
     "status": "node -e \"console.log('SYSTEM: ACTIVE_AND_ALIGNED')\""
   },
   "dependencies": {
