@@ -14,6 +14,7 @@ import './adaptiveInterface.css';
 import App from './App.jsx';
 import { AuthProvider } from './hooks/useAuth.jsx';
 import { InteractionProvider } from './context/InteractionContext.jsx';
+import { getGoogleClientId } from './config/googleOAuth';
 
 function FallbackUI({ error }) {
   const message = error?.message ?? 'Unknown error';
@@ -21,7 +22,8 @@ function FallbackUI({ error }) {
 }
 
 const rootElement = document.getElementById('root');
-const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+const googleClientId = getGoogleClientId();
+const hasGoogleClientId = Boolean(googleClientId);
 const apiOrigin = (import.meta.env.VITE_API_URL || 'https://syzmeku-api.onrender.com').replace(/\/+$/, '');
 
 axios.defaults.baseURL = apiOrigin;
@@ -41,7 +43,7 @@ const AppShell = () => {
   if (!hasGoogleClientId) return shell;
 
   return (
-    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+    <GoogleOAuthProvider clientId={googleClientId}>
       {shell}
     </GoogleOAuthProvider>
   );

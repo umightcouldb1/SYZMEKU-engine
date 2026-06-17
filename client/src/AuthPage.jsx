@@ -2,12 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { googleLogin, login, register, reset } from './features/auth/authSlice';
+import { getGoogleClientId } from './config/googleOAuth';
 import './authTypography.css';
 
 const GOOGLE_SCRIPT_ID = 'google-identity-services-sdk';
 let googleSdkPromise = null;
-
-const getGoogleClientId = () => import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 const ensureGoogleIdentityScript = () => {
   if (window.google?.accounts?.id) return Promise.resolve(window.google);
