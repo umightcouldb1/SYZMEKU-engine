@@ -20,6 +20,7 @@ router.use('/memory', require('./memoryRoutes'));
 router.use('/sentiment-analysis', require('./sentimentAnalysisRoutes'));
 router.use('/telemetry', require('./telemetryRoutes'));
 router.use('/monetization', require('./billingRoutes'));
+router.use('/capital', require('./capitalLedgerRoutes'));
 router.use('/ai', require('./aiGatewayRoutes'));
 router.use('/', require('./stripeRoutes'));
 
