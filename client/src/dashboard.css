@@ -444,6 +444,12 @@
   color: #10213f;
 }
 
+.mentor-button-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 .mentor-button.active {
   background: #1f4dbf;
 }
