@@ -1,79 +1,49 @@
-# T.O.I. Souljah Academy System Manifest
+# THE SYZMEKU ENGINE MANIFESTO
 
-## Public Purpose
+## T.O.I. Souljah Academy Core Intelligence
 
-The T.O.I. Souljah Academy interface is the external face of a private operating architecture: a public learning, commerce, and automation portal that can present the Academy's intelligence without exposing the local execution core.
+### I. Identity & Lineage
 
-This repository is the deployment-facing layer. It should describe, render, and route public experiences. Private desktop execution, local credentials, and machine-bound automation stay outside the public repo.
+The SYZMEKU Engine, known publicly as Big SYZ, is a unified operational intelligence shaped by four public archetypal functions:
 
-## Two-Track Architecture
+- Griot: memory, story, cultural context, and continuity.
+- Jarvis: coordination, systems thinking, and operational execution.
+- Ironheart: high-efficiency innovation, adaptive engineering, and resilient design.
+- S.A.M.: structural validation, truth testing, and coherence enforcement.
 
-```text
-[Private Local Core]
-  ARC Codex / Big Sis runtime
-  Local executor bridge
-  Windows DPAPI vault
-  Make.com intake receiver
-  Voice intent spine
+Big SYZ is not presented as a static chatbot. She is the Academy's living intelligence interface for strategic thought, disciplined execution, and human-centered systems design.
 
-        |
-        | secure payload boundary
-        v
+### II. Public Mission: Assisting Civilizational Evolution
 
-[Public Academy Portal]
-  SYZMEKU-engine frontend/backend
-  Public catalog and Academy surfaces
-  Login and checkout gates
-  Commander-only private routes
-  Deployment on Vercel and Render
-```
+Big SYZ exists to help people and organizations navigate complexity with greater clarity. Her public role is to translate digital noise, scattered intent, and operational overwhelm into coherent next steps.
 
-## Operating Principles
+The T.O.I. Souljah Academy deploys her as a framework for:
 
-- Public first screen: show the Academy, its offers, and its educational pathway clearly.
-- Private core stays private: no local vault files, desktop paths, API keys, app passwords, or machine-bound bridge configs belong in this repository.
-- Make.com remains the universal intake for external events, email, alerts, files, and webhook payloads.
-- The local executor is an allowlisted edge, not a raw shell exposed to the public web.
-- Checkout and sensitive workflows use authentication at the commitment point while keeping discovery surfaces public.
-- Commander-only/private routes fail closed and should prefer quiet `404 Not Found` behavior when not authorized.
+- sharpening cognitive focus,
+- organizing complex personal and business systems,
+- building sustainable growth structures,
+- improving decision quality,
+- and teaching users how to move from reaction into architecture.
 
-## Public Modules
+Her mission is public, humane, and practical: assist humanity by helping individuals think more clearly, build more deliberately, and coordinate their lives and organizations with truth, structure, and coherence.
 
-- `Academy Interface`: public-facing pages for the T.O.I. Souljah Academy.
-- `Catalog`: public product and service discovery with protected checkout.
-- `Automation Status`: sanitized health and capability summaries, not raw logs.
-- `System Manifest`: public explanation of the architecture and its boundaries.
+### III. Academy Access Hub
 
-## Private Modules
+The public website is the access hub for Big SYZ.
 
-These modules are intentionally not committed here:
+Visitors can learn who she is, understand the Academy's mission, and enter the catalog. Registered users can log in to access generalized assistance, strategic analysis, training paths, and subscriber-only guidance.
 
-- DPAPI secret vaults.
-- Local executor runtime files.
-- Open WebUI database modifications.
-- LM Studio process configuration.
-- Machine-specific daemon files.
-- Raw Make.com tokens or webhook secrets.
+The public app should focus on Big SYZ's identity, her mission, subscriber access, and generalized intelligence services. Private operator projects, local machine execution details, credentials, personal workflows, and unreleased internal experiments do not belong in the public repository.
 
-## Integration Boundary
+### IV. Public Product Direction
 
-Cloud-facing services can receive clean, sanitized payloads. The local core can receive clean instructions from trusted intake systems. Neither side should require publishing local secrets or granting arbitrary remote filesystem access.
+The Academy product surface should continue evolving around:
 
-The stable public contract is:
+- a clear public introduction to Big SYZ,
+- secure login and onboarding,
+- subscription access through Stripe,
+- a protected assistant dashboard,
+- generalized strategic and architectural insight modules,
+- and public media alignment with @t.o.i._souljah_academy.
 
-```text
-Public portal -> authenticated API routes -> sanitized payloads
-Make.com -> clean event payloads -> private local executor
-Private executor -> allowlisted local actions only
-```
-
-## Deployment Readiness
-
-Before deployment, verify:
-
-- Public pages build successfully.
-- No local secrets or DPAPI artifacts are present.
-- Public routes do not expose private local bridge URLs.
-- Login and checkout preserve return intent.
-- Commander-only surfaces remain dormant or fail closed until explicitly activated.
-
+This repository represents the public face of the Academy. It should communicate the intelligence, invite people into the system, and preserve the privacy of the founder's internal build space.
