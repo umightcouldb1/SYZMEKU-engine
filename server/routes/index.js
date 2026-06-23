@@ -22,7 +22,6 @@ router.use('/telemetry', require('./telemetryRoutes'));
 router.use('/monetization', require('./billingRoutes'));
 router.use('/capital', require('./capitalLedgerRoutes'));
 router.use('/ai', require('./aiGatewayRoutes'));
-router.use('/modules', require('./academyModulesRoutes'));
 router.use('/', require('./stripeRoutes'));
 
 // Keep the lineage-aware analyzer ahead of the legacy core router.

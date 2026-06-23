@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
 import OperatorConsole from './OperatorConsole';
 import { useBiometric } from './context/BiometricContext';
 import './dashboard.css';
@@ -633,16 +632,6 @@ const Dashboard = ({ user }) => {
                 {Object.entries(telemetrySync?.sensorFusion?.feeds || {}).map(([feed, status]) => (
                   <span key={feed} className={`mentor-pill${status === 'ACTIVE' ? ' success' : ''}`}>{feed}: {status}</span>
                 ))}
-              </div>
-            </section>
-
-            <section className="mentor-card">
-              <p className="mentor-section-label">Academy Systems</p>
-              <h2>Use specialized modules</h2>
-              <p>Open the electroculture and closed-loop agriculture workbench for protected, module-specific planning.</p>
-              <div className="mentor-inline-actions">
-                <Link className="mentor-button mentor-button-link" to="/app/modules">Open module hub</Link>
-                <Link className="mentor-button secondary mentor-button-link" to="/catalog">Subscription catalog</Link>
               </div>
             </section>
 
