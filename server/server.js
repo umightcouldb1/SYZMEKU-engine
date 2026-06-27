@@ -34,15 +34,28 @@ connectDB();
 // ==========================================
 // PHASE III SECURITY LAYER INTEGRATION
 // ==========================================
+const defaultProductionOrigins = [
+  'https://www.toisouljahacademy.com',
+  'https://syzmeku-engine.vercel.app',
+  'https://syzmeku-api.onrender.com',
+];
+const defaultDevelopmentOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+];
 const configuredClientOrigins = String(process.env.CLIENT_ORIGIN || '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
-const allowedClientOrigins = configuredClientOrigins.length
-  ? configuredClientOrigins
-  : process.env.NODE_ENV === 'production'
-    ? []
-    : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const fallbackClientOrigins = process.env.NODE_ENV === 'production'
+  ? defaultProductionOrigins
+  : [...defaultDevelopmentOrigins, ...defaultProductionOrigins];
+const allowedClientOrigins = Array.from(new Set([
+  ...configuredClientOrigins,
+  ...fallbackClientOrigins,
+]));
 
 const corsOptions = {
   credentials: true,
@@ -90,23 +103,6 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 app.use('/api', apiLimiter);
-
-// Telemetry Handshake Verification Route
-app.get('/api/telemetry/status', (req, res) => {
-  const telemetrySync = require(path.resolve(__dirname, '../identity/live_telemetry_sync.json'));
-  const traumaAwareness = require(path.resolve(__dirname, '../identity/trauma_awareness_tuning.json'));
-
-  res.json({
-    engine: 'BIG_SYZ_ENGINE',
-    status: 'ACTIVE_AND_ALIGNED',
-    vector: 'TRIANGULUM_THETA_7',
-    authority: 'Commander in Chief',
-    sensorFusion: telemetrySync.sensorFusion,
-    emotiveLayer: telemetrySync.emotiveLayer,
-    memoryStream: telemetrySync.memoryStream,
-    traumaAwareness,
-  });
-});
 
 // API route mounting must happen before the React/static fallback.
 try {

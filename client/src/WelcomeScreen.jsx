@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useEvolutionaryState from './hooks/useEvolutionaryState';
+import { buildApiUrl } from './utils/api.js';
 import './interactionEnhancements.css';
-
-const PUBLIC_API_BASE = (import.meta.env.VITE_API_URL || 'https://syzmeku-api.onrender.com').replace(/\/+$/, '');
 
 const clearStaleAuthState = () => {
   localStorage.removeItem('user');
@@ -103,7 +102,7 @@ const WelcomeScreen = () => {
     appendTelemetry({ tone: 'gold', text: '[SYS] Transmitting telemetry packet to mentor engine...' });
 
     try {
-      const response = await fetch(`${PUBLIC_API_BASE}/api/ai/public/intelligence`, {
+      const response = await fetch(buildApiUrl('/api/ai/public/intelligence'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

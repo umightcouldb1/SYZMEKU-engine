@@ -15,6 +15,7 @@ import App from './App.jsx';
 import { AuthProvider } from './hooks/useAuth.jsx';
 import { InteractionProvider } from './context/InteractionContext.jsx';
 import { getGoogleClientId } from './config/googleOAuth';
+import { getApiBaseUrl } from './config/apiConfig.js';
 
 function FallbackUI({ error }) {
   const message = error?.message ?? 'Unknown error';
@@ -24,7 +25,7 @@ function FallbackUI({ error }) {
 const rootElement = document.getElementById('root');
 const googleClientId = getGoogleClientId();
 const hasGoogleClientId = Boolean(googleClientId);
-const apiOrigin = (import.meta.env.VITE_API_URL || 'https://syzmeku-api.onrender.com').replace(/\/+$/, '');
+const apiOrigin = getApiBaseUrl();
 
 axios.defaults.baseURL = apiOrigin;
 axios.defaults.withCredentials = true;

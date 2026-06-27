@@ -29,11 +29,22 @@ const buildTokenPayload = (user, sessionId) => ({
 const createAuthToken = (user, sessionId) =>
     jwt.sign(buildTokenPayload(user, sessionId), getJwtSecret(), { expiresIn: `${SESSION_TTL_DAYS}d` });
 
-const setSessionCookie = (res, token) => {
-    res.cookie('session', token, {
+const isProduction = () => process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+
+const getCookieOptions = (req, overrides = {}) => {
+    const secure = isProduction();
+    return {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure,
+        sameSite: secure ? 'none' : 'lax',
+        path: '/',
+        ...overrides,
+    };
+};
+
+const setSessionCookie = (req, res, token) => {
+    res.cookie('session', token, {
+        ...getCookieOptions(req),
         maxAge: SESSION_TTL_MS,
     });
 };
@@ -175,7 +186,7 @@ const registerUser = async (req, res) => {
         user = await ensureAdminRoleForUser(user);
         const { sessionId } = await createPersistentSession(user, req);
         const token = createAuthToken(user, sessionId);
-        setSessionCookie(res, token);
+        setSessionCookie(req, res, token);
 
         await logAuditEvent({
             category: 'auth',
@@ -254,7 +265,7 @@ const loginUser = async (req, res) => {
     user = await ensureAdminRoleForUser(user);
     const { sessionId } = await createPersistentSession(user, req);
     const token = createAuthToken(user, sessionId);
-    setSessionCookie(res, token);
+    setSessionCookie(req, res, token);
 
     await logAuditEvent({
         category: 'auth',
@@ -337,7 +348,7 @@ const googleLoginUser = async (req, res) => {
 
         const { sessionId } = await createPersistentSession(user, req);
         const token = createAuthToken(user, sessionId);
-        setSessionCookie(res, token);
+        setSessionCookie(req, res, token);
 
         await logAuditEvent({
             category: 'auth',
@@ -406,7 +417,7 @@ const refreshSession = async (req, res) => {
         }
 
         const refreshedToken = createAuthToken(user, decoded.sid);
-        setSessionCookie(res, refreshedToken);
+        setSessionCookie(req, res, refreshedToken);
 
         await logAuditEvent({
             category: 'auth',
@@ -451,9 +462,7 @@ const logoutUser = async (req, res) => {
     }
 
     res.cookie('session', '', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        ...getCookieOptions(req),
         expires: new Date(0),
     });
 

@@ -1,9 +1,8 @@
 import React, { useCallback, useContext, createContext, useEffect, useMemo, useState } from 'react';
+import { getApiBaseUrl } from '../config/apiConfig.js';
 
 const AuthContext = createContext(null);
 const TOKEN_REFRESH_WINDOW_MS = 5 * 60 * 1000;
-
-const getApiBaseUrl = () => (import.meta.env.VITE_API_URL || 'https://syzmeku-api.onrender.com').replace(/\/+$/, '');
 
 const parseJwtPayload = (token) => {
   if (!token || typeof token !== 'string') return null;

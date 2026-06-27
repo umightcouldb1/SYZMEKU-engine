@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import { fetchTelemetryStatus } from '../utils/api.js';
 import './CatEyeFocus.css';
 
 const fallbackStatus = {
@@ -19,9 +19,15 @@ export default function SovereignShieldPanel() {
   useEffect(() => {
     let cancelled = false;
 
-    axios.get('/api/starburst-core/status')
-      .then((response) => {
-        if (!cancelled) setStatus({ ...fallbackStatus, ...(response.data || {}) });
+    fetchTelemetryStatus()
+      .then((telemetry) => {
+        if (!cancelled) {
+          setStatus({
+            ...fallbackStatus,
+            systemStatus: telemetry.status || fallbackStatus.systemStatus,
+            conductionVelocity: telemetry.sensorFusion?.status || telemetry.sensorFusion?.conductionVelocity || fallbackStatus.conductionVelocity,
+          });
+        }
       })
       .catch(() => {
         if (!cancelled) setStatus(fallbackStatus);

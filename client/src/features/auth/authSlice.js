@@ -1,6 +1,7 @@
 // --- FILE: client/src/features/auth/authSlice.js ---
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../config/apiConfig.js';
 
 axios.defaults.withCredentials = true;
 
@@ -55,7 +56,7 @@ const initialState = {
     message: '',
 };
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://syzmeku-api.onrender.com').replace(/\/+$/, '');
+const API_BASE_URL = getApiBaseUrl();
 const API_URL = `${API_BASE_URL}/api/auth/`; // Base URL for Auth API routes
 
 // --- AUTH SERVICE (API Interaction) ---

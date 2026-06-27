@@ -12,6 +12,20 @@ export default defineConfig({
   plugins: [react()],
   // Ensure the base URL is correct for deployment
   base: '/',
+  server: {
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/webhook': {
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
   resolve: {
     alias: {
       // Setup an alias for the source directory for absolute imports
