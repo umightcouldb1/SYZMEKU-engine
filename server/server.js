@@ -35,6 +35,7 @@ connectDB();
 // PHASE III SECURITY LAYER INTEGRATION
 // ==========================================
 const defaultProductionOrigins = [
+  'https://toisouljahacademy.com',
   'https://www.toisouljahacademy.com',
   'https://syzmeku-engine.vercel.app',
   'https://syzmeku-api.onrender.com',
