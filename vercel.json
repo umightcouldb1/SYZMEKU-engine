@@ -3,6 +3,19 @@
   "installCommand": "npm install --prefix client",
   "buildCommand": "npm run prepare-client-env && npm run build --prefix client",
   "outputDirectory": "client/dist",
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "toisouljahacademy.com"
+        }
+      ],
+      "destination": "https://www.toisouljahacademy.com/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",

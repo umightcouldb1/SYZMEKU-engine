@@ -17,6 +17,16 @@ import { InteractionProvider } from './context/InteractionContext.jsx';
 import { getGoogleClientId } from './config/googleOAuth';
 import { getApiBaseUrl } from './config/apiConfig.js';
 
+const shouldRedirectToCanonicalHost = () =>
+  typeof window !== 'undefined' &&
+  window.location.hostname === 'toisouljahacademy.com';
+
+if (shouldRedirectToCanonicalHost()) {
+  window.location.replace(
+    `https://www.toisouljahacademy.com${window.location.pathname}${window.location.search}${window.location.hash}`,
+  );
+}
+
 function FallbackUI({ error }) {
   const message = error?.message ?? 'Unknown error';
   return <div style={{ color: 'red' }}>Engine Dissonance: {message}</div>;
@@ -50,7 +60,9 @@ const AppShell = () => {
   );
 };
 
-if (!rootElement) {
+if (shouldRedirectToCanonicalHost()) {
+  // Navigation is already in progress; do not initialize Google OAuth from the apex origin.
+} else if (!rootElement) {
   console.error('CRITICAL: Root element not found. The Engine has no anchor.');
 } else {
   ReactDOM.createRoot(rootElement).render(
