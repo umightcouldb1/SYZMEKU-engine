@@ -20,7 +20,6 @@ class MetaProvider extends SocialProviderAdapter {
       'pages_manage_posts',
       'instagram_basic',
       'instagram_content_publish',
-      'instagram_manage_insights',
     ];
   }
 
@@ -38,7 +37,7 @@ class MetaProvider extends SocialProviderAdapter {
         publishImage: true,
         publishVideo: true,
         schedulePost: false,
-        analytics: true,
+        analytics: false,
         note: 'Instagram publishing requires a Professional account linked to a Facebook Page. Stories and some media types depend on account eligibility.',
       },
     };
