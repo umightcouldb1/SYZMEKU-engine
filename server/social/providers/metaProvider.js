@@ -18,6 +18,7 @@ class MetaProvider extends SocialProviderAdapter {
       'pages_show_list',
       'pages_read_engagement',
       'pages_manage_posts',
+      'business_management',
       'instagram_basic',
       'instagram_content_publish',
     ];
@@ -62,6 +63,7 @@ class MetaProvider extends SocialProviderAdapter {
     url.searchParams.set('redirect_uri', redirectUri);
     url.searchParams.set('state', state);
     url.searchParams.set('response_type', 'code');
+    url.searchParams.set('auth_type', 'rerequest');
     url.searchParams.set('scope', this.scopes.join(','));
     return url.toString();
   }
@@ -83,39 +85,98 @@ class MetaProvider extends SocialProviderAdapter {
     return requestJson(longUrl.toString());
   }
 
-  async getConnectedAccounts({ accessToken }) {
-    const url = new URL(`${GRAPH_BASE}/me/accounts`);
-    url.searchParams.set('fields', 'id,name,access_token,category,instagram_business_account{id,username,name}');
-    url.searchParams.set('access_token', accessToken);
-    const pages = await requestJson(url.toString());
-    const accounts = [];
+  mapPageConnection(page, accessToken, metadata = {}) {
+    const connections = [{
+      providerAccountId: page.id,
+      accountName: page.name,
+      accountType: 'facebook_page',
+      accessToken: page.access_token || accessToken,
+      refreshToken: '',
+      scopes: this.scopes,
+      metadata: {
+        category: page.category || '',
+        tasks: page.tasks || [],
+        ...metadata,
+      },
+    }];
 
-    for (const page of pages.data || []) {
-      accounts.push({
-        providerAccountId: page.id,
-        accountName: page.name,
-        accountType: 'facebook_page',
+    if (page.instagram_business_account?.id || page.connected_instagram_account?.id) {
+      const instagram = page.instagram_business_account || page.connected_instagram_account;
+      connections.push({
+        providerAccountId: instagram.id,
+        accountName: instagram.username || instagram.name || page.name,
+        accountType: 'instagram_professional',
         accessToken: page.access_token || accessToken,
         refreshToken: '',
         scopes: this.scopes,
-        metadata: { category: page.category || '' },
+        metadata: {
+          linkedPageId: page.id,
+          linkedPageName: page.name,
+          username: instagram.username || '',
+          ...metadata,
+        },
       });
+    }
 
-      if (page.instagram_business_account?.id) {
-        accounts.push({
-          providerAccountId: page.instagram_business_account.id,
-          accountName: page.instagram_business_account.username || page.instagram_business_account.name || page.name,
-          accountType: 'instagram_professional',
-          accessToken: page.access_token || accessToken,
-          refreshToken: '',
-          scopes: this.scopes,
-          metadata: {
-            linkedPageId: page.id,
-            linkedPageName: page.name,
-            username: page.instagram_business_account.username || '',
-          },
-        });
+    return connections;
+  }
+
+  async getBusinessManagedPages({ accessToken }) {
+    const businessUrl = new URL(`${GRAPH_BASE}/me/businesses`);
+    businessUrl.searchParams.set(
+      'fields',
+      [
+        'id',
+        'name',
+        'owned_pages.limit(100){id,name,access_token,category,tasks,instagram_business_account{id,username,name},connected_instagram_account{id,username,name}}',
+        'client_pages.limit(100){id,name,access_token,category,tasks,instagram_business_account{id,username,name},connected_instagram_account{id,username,name}}',
+      ].join(',')
+    );
+    businessUrl.searchParams.set('access_token', accessToken);
+
+    const businesses = await requestJson(businessUrl.toString()).catch(() => ({ data: [] }));
+    const pages = [];
+    for (const business of businesses.data || []) {
+      for (const source of ['owned_pages', 'client_pages']) {
+        for (const page of business[source]?.data || []) {
+          pages.push({
+            ...page,
+            metadata: {
+              businessId: business.id,
+              businessName: business.name,
+              businessPageSource: source,
+            },
+          });
+        }
       }
+    }
+    return pages;
+  }
+
+  async getConnectedAccounts({ accessToken }) {
+    const url = new URL(`${GRAPH_BASE}/me/accounts`);
+    url.searchParams.set('fields', 'id,name,access_token,category,tasks,instagram_business_account{id,username,name},connected_instagram_account{id,username,name}');
+    url.searchParams.set('access_token', accessToken);
+    const pages = await requestJson(url.toString());
+    const accounts = [];
+    const seen = new Set();
+
+    const addPage = (page, metadata = {}) => {
+      for (const account of this.mapPageConnection(page, accessToken, metadata)) {
+        const key = `${account.accountType}:${account.providerAccountId}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          accounts.push(account);
+        }
+      }
+    };
+
+    for (const page of pages.data || []) {
+      addPage(page);
+    }
+
+    for (const page of await this.getBusinessManagedPages({ accessToken })) {
+      addPage(page, page.metadata || {});
     }
 
     return accounts;
