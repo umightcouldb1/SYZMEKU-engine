@@ -38,6 +38,15 @@ The Freedom Audit reuses the existing SYZMEKU Stripe stack:
 
 Create one Stripe product named `The Freedom Audit` with a one-time USD price of `3700` cents. Set the backend environment variable `FREEDOM_AUDIT_STRIPE_PRICE_ID` to that exact Stripe price id. Freedom Audit entitlement is tied to this configured price id, not to product name matching.
 
+Production Stripe configuration:
+
+```text
+Product ID: prod_V60FCCIsi8quB5
+Product name: The Freedom Audit
+Price ID: price_1U5oFA6K9xPHaof1VTFTo7eo
+Price: $37 USD one-time
+```
+
 Recommended Stripe metadata:
 
 ```text
@@ -109,7 +118,7 @@ SYZMEKU API deployment:
 ```text
 STRIPE_SECRET_KEY=sk_live_or_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-FREEDOM_AUDIT_STRIPE_PRICE_ID=price_...
+FREEDOM_AUDIT_STRIPE_PRICE_ID=price_1U5oFA6K9xPHaof1VTFTo7eo
 FREEDOM_AUDIT_APP_URL=https://your-freedom-audit-project.vercel.app
 CLIENT_ORIGIN=https://your-existing-client-origin,https://your-freedom-audit-project.vercel.app
 MONGO_URI=mongodb+srv://...
