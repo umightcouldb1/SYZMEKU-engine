@@ -24,7 +24,7 @@ const sections = {
       },
       {
         heading: 'Social Publishing',
-        body: 'Social Command connects only through official provider APIs when you authorize it. You remain responsible for the content you approve, publish, schedule, or submit to third-party platforms and for complying with each platform’s rules.',
+        body: 'Social Command connects only through official provider APIs when you authorize it. You remain responsible for the content you approve, publish, schedule, or submit to third-party platforms and for complying with each platform\'s rules.',
       },
       {
         heading: 'Account Access',
@@ -44,7 +44,7 @@ const sections = {
       },
       {
         heading: 'Contact',
-        body: 'Questions about these Terms can be sent through the public contact channels on toisouljahacademy.com.',
+        body: 'Questions about these Terms can be sent through the public contact channels listed on toisouljahacademy.com or through the account/support channel used to access the service.',
       },
     ],
   },
@@ -63,11 +63,11 @@ const sections = {
       },
       {
         heading: 'Social Platform Connections',
-        body: 'If you connect Meta, YouTube, TikTok, or another provider, we store only the tokens and account metadata required to perform actions you request. Tokens are encrypted on the server and are not exposed in the browser.',
+        body: 'If you connect Meta, YouTube, TikTok, or another provider, we store only the OAuth tokens, scopes, expiry data, and account metadata required to perform actions you request. Tokens are encrypted on the server and are not exposed in the browser.',
       },
       {
         heading: 'How We Use Information',
-        body: 'Information is used to authenticate users, provide purchased products, personalize coaching experiences, generate and save audit results, draft and publish approved social content, measure performance, prevent abuse, and improve platform reliability.',
+        body: 'Information is used to authenticate users, provide purchased products, personalize coaching experiences, generate and save audit results, draft and publish approved social content, refresh provider analytics when authorized, prevent abuse, and improve platform reliability.',
       },
       {
         heading: 'Sharing',
@@ -75,7 +75,11 @@ const sections = {
       },
       {
         heading: 'Your Choices',
-        body: 'You can choose not to connect social accounts, disconnect connected accounts, avoid submitting optional profile data, or request account support through public contact channels on toisouljahacademy.com.',
+        body: 'You can choose not to connect social accounts, disconnect connected accounts, revoke access through the third-party provider, avoid submitting optional profile data, or request account support through public contact channels on toisouljahacademy.com.',
+      },
+      {
+        heading: 'Retention',
+        body: 'We keep account, purchase, assessment, campaign, connection, audit, and analytics records for as long as needed to operate the service, resolve disputes, maintain security, comply with legal obligations, and support user-requested access. Disconnected social accounts are marked inactive and are not used for new publishing actions.',
       },
       {
         heading: 'Security',

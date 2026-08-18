@@ -14,6 +14,25 @@ const { validateMediaAsset } = require('../social/mediaAssetService');
 const sanitizeText = (value = '', max = 4000) => String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').trim().slice(0, max);
 const userIdOf = (req) => req.user?._id;
 
+const firstConfiguredOrigin = () => String(process.env.CLIENT_ORIGIN || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)[0];
+
+const socialCommandReturnUrl = (params = {}) => {
+  const base = process.env.SOCIAL_COMMAND_APP_URL
+    || (process.env.DOMAIN ? `${process.env.DOMAIN.replace(/\/$/, '')}/app/social-command` : '')
+    || (firstConfiguredOrigin() ? `${firstConfiguredOrigin().replace(/\/$/, '')}/app/social-command` : '')
+    || 'http://localhost:5173/app/social-command';
+  const url = new URL(base);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value));
+  });
+  return url.toString();
+};
+
+const redirectSocialCallback = (res, params) => res.redirect(302, socialCommandReturnUrl(params));
+
 const audit = (req, event, details = {}, success = true) => logAuditEvent({
   category: 'social-command',
   event,
@@ -80,6 +99,21 @@ const beginAuthorization = asyncHandler(async (req, res) => {
 
 const handleOAuthCallback = asyncHandler(async (req, res) => {
   const provider = getProvider(req.params.provider);
+  if (req.query.error) {
+    return redirectSocialCallback(res, {
+      social_provider: provider.id,
+      social_status: 'error',
+      social_error: sanitizeText(req.query.error_description || req.query.error, 160),
+    });
+  }
+  if (!req.query.code || !req.query.state) {
+    return redirectSocialCallback(res, {
+      social_provider: provider.id,
+      social_status: 'error',
+      social_error: 'missing_oauth_code_or_state',
+    });
+  }
+
   const stateRecord = await consumeOAuthState({ provider: provider.id, state: req.query.state });
   const tokenSet = await provider.handleCallback({
     code: String(req.query.code || ''),
@@ -118,10 +152,11 @@ const handleOAuthCallback = asyncHandler(async (req, res) => {
 
   await audit({ ...req, user: { _id: stateRecord.userId, role: '' } }, 'account_connected', { provider: provider.id, accounts: saved.length });
 
-  res.json({
-    success: true,
+  return redirectSocialCallback(res, {
     provider: provider.id,
-    connections: saved.map(serializeConnection),
+    social_provider: provider.id,
+    social_status: saved.length ? 'connected' : 'no_accounts',
+    social_accounts: saved.length,
   });
 });
 

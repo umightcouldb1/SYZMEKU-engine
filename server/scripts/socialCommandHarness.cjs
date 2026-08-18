@@ -9,6 +9,7 @@ const { generateCampaignDraft, withUtm } = require('../social/campaignGeneration
 const { normalizeProviderAnalytics, summarizeCampaign } = require('../social/analyticsService');
 const { listProviders } = require('../social/providers');
 const { buildIdempotencyKey } = require('../social/publishingService');
+const { assertAllowedHttpsUrl } = require('../social/mediaAssetService');
 const SocialConnection = require('../models/SocialConnection');
 const SocialCampaign = require('../models/SocialCampaign');
 
@@ -49,6 +50,20 @@ const run = async () => {
   const idempotencyC = buildIdempotencyKey({ campaignId: 'campaign', postId: 'different' });
   assert.strictEqual(idempotencyA, idempotencyB, 'publish idempotency key should be stable per campaign/post');
   assert.notStrictEqual(idempotencyA, idempotencyC, 'publish idempotency key should vary by post');
+
+  assert.doesNotThrow(() => assertAllowedHttpsUrl('https://cdn.example.com/a.mp4'), 'public HTTPS media URLs should be allowed');
+  assert.throws(() => assertAllowedHttpsUrl('http://cdn.example.com/a.mp4'), /HTTPS/, 'media URL validation should reject HTTP');
+  assert.throws(() => assertAllowedHttpsUrl('https://localhost/a.mp4'), /public hostname/, 'media URL validation should reject localhost');
+  assert.throws(() => assertAllowedHttpsUrl('https://127.0.0.1/a.mp4'), /private or reserved/, 'media URL validation should reject loopback IPs');
+  const previousAllowedHosts = process.env.SOCIAL_MEDIA_ALLOWED_ASSET_HOSTS;
+  process.env.SOCIAL_MEDIA_ALLOWED_ASSET_HOSTS = 'assets.example.com';
+  assert.doesNotThrow(() => assertAllowedHttpsUrl('https://cdn.assets.example.com/a.mp4'), 'media allowlist should include subdomains');
+  assert.throws(() => assertAllowedHttpsUrl('https://evil.example.com/a.mp4'), /allowlist/, 'media allowlist should reject unlisted hosts');
+  if (previousAllowedHosts === undefined) {
+    delete process.env.SOCIAL_MEDIA_ALLOWED_ASSET_HOSTS;
+  } else {
+    process.env.SOCIAL_MEDIA_ALLOWED_ASSET_HOSTS = previousAllowedHosts;
+  }
 
   const invalidConnection = new SocialConnection({
     provider: 'meta',

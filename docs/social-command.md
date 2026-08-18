@@ -39,6 +39,8 @@ YOUTUBE_REDIRECT_URI=https://syzmeku-api.onrender.com/api/social-command/oauth/y
 TIKTOK_CLIENT_KEY=<tiktok-client-key>
 TIKTOK_CLIENT_SECRET=<tiktok-client-secret>
 TIKTOK_REDIRECT_URI=https://syzmeku-api.onrender.com/api/social-command/oauth/tiktok/callback
+SOCIAL_COMMAND_APP_URL=https://www.toisouljahacademy.com/app/social-command
+SOCIAL_MEDIA_ALLOWED_ASSET_HOSTS=<optional-comma-separated-public-media-hosts>
 ```
 
 Local callback URLs:
@@ -184,11 +186,20 @@ The scheduler endpoint is restricted to authenticated `founder` or `admin` roles
 
 - All Social Command routes require normal SYZMEKU authentication except OAuth callbacks.
 - OAuth callbacks validate the server-created state record and consume it once. Provider redirects cannot carry a bearer token, so callback authorization is state-based.
+- OAuth callbacks redirect only to the server-configured Social Command URL. The callback handler does not accept arbitrary return URLs from provider query parameters.
 - OAuth state is stored hashed and expires after 15 minutes.
 - PKCE is used for YouTube and TikTok.
 - Provider access and refresh tokens are encrypted with AES-256-GCM before database storage and never returned to the client.
+- Media asset URLs are validated before storage. They must be public HTTPS URLs, cannot target localhost or private/reserved IP ranges, and can be constrained further with `SOCIAL_MEDIA_ALLOWED_ASSET_HOSTS`.
 - Campaigns, connections, analytics snapshots, and publishing operations are scoped by `userId`.
 - Audit log category `social-command` records account connection, disconnect, token refresh, campaign creation, approval, scheduling, publish success, and publish/schedule failure.
+
+## Production Readiness Notes
+
+- The public legal routes required for provider review are `/terms` and `/privacy`.
+- The current TikTok app configuration should remain truthful during review: Login Kit and Content Posting API can be configured before approval, but public publishing depends on TikTok approval and valid production credentials.
+- Do not submit a TikTok demo that claims approved publishing behavior until the deployed Social Command flow can connect the real app, start OAuth, return to `/app/social-command`, and show the post approval workflow.
+- TikTok, Meta, and YouTube client secrets must be configured only in the backend environment. They must not be committed, printed, or bundled into the frontend.
 
 ## Testing
 

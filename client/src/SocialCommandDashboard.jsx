@@ -68,6 +68,21 @@ export default function SocialCommandDashboard() {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const socialStatus = params.get('social_status');
+    const socialProvider = params.get('social_provider');
+    const socialError = params.get('social_error');
+    if (socialStatus === 'connected') {
+      setMessage(`${providerLabels[socialProvider] || socialProvider || 'Provider'} account connected.`);
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (socialStatus === 'no_accounts') {
+      setError(`${providerLabels[socialProvider] || socialProvider || 'Provider'} authorization completed, but no eligible account was returned.`);
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (socialStatus === 'error') {
+      setError(socialError ? `Social connection failed: ${socialError}` : 'Social connection failed.');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
     loadAll().catch((loadError) => setError(loadError?.response?.data?.error || 'Social Command failed to load.'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
