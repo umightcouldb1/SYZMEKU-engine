@@ -8,8 +8,10 @@ import OnboardingFlow from './OnboardingFlow';
 import OnboardingVoiceBridge from './OnboardingVoiceBridge';
 import WelcomeScreen from './WelcomeScreen';
 import Catalog from './components/Catalog';
+import LegalPage from './components/LegalPage';
 import Profile from './components/Profile';
 import RequireAuth from './components/RequireAuth';
+import SocialCommandDashboard from './SocialCommandDashboard';
 import { BiometricProvider } from './context/BiometricContext';
 import PrivateLayout from './layouts/PrivateLayout';
 import './entryFlow.css';
@@ -190,6 +192,8 @@ function App() {
     <BiometricProvider>
       <Routes>
         <Route path="/welcome" element={<WelcomeScreen />} />
+        <Route path="/terms" element={<LegalPage type="terms" />} />
+        <Route path="/privacy" element={<LegalPage type="privacy" />} />
         <Route path="/catalog" element={<Catalog />} />
         <Route path="/products" element={<Navigate to="/catalog" replace />} />
         <Route path="/login" element={isAuthenticated ? <Navigate to={onboardingCompleted ? APP_HOME_ROUTE : '/onboarding'} replace /> : <AuthPage mode="login" />} />
@@ -217,6 +221,7 @@ function App() {
           }
         >
           <Route path={APP_HOME_ROUTE} element={onboardingCompleted ? <Dashboard user={user} /> : <Navigate to="/onboarding" replace />} />
+          <Route path="/app/social-command" element={onboardingCompleted ? <SocialCommandDashboard /> : <Navigate to="/onboarding" replace />} />
           <Route path="/app/profile" element={onboardingCompleted ? <Profile /> : <Navigate to="/onboarding" replace />} />
           <Route path="/profile" element={onboardingCompleted ? <Profile /> : <Navigate to="/onboarding" replace />} />
           <Route path="/dashboard" element={<Navigate to={APP_HOME_ROUTE} replace />} />

@@ -1,0 +1,190 @@
+.social-command {
+  width: min(1440px, 100%);
+  color: #f7fbff;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.social-command__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  padding: 24px;
+  border: 1px solid rgba(126, 231, 255, 0.22);
+  background: rgba(5, 12, 20, 0.78);
+}
+
+.social-command__eyebrow {
+  margin: 0 0 8px;
+  color: #72e7ff;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  font-size: 0.78rem;
+}
+
+.social-command h1,
+.social-command h2,
+.social-command h3,
+.social-command p {
+  margin-top: 0;
+}
+
+.social-command h1 {
+  font-size: clamp(2rem, 5vw, 4.2rem);
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.social-command button {
+  border: 1px solid rgba(126, 231, 255, 0.35);
+  background: #72e7ff;
+  color: #041014;
+  min-height: 44px;
+  padding: 0 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.social-command button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.social-command__notice {
+  padding: 12px 16px;
+  background: rgba(68, 255, 186, 0.12);
+  border: 1px solid rgba(68, 255, 186, 0.35);
+}
+
+.social-command__notice.is-error {
+  background: rgba(255, 91, 128, 0.12);
+  border-color: rgba(255, 91, 128, 0.35);
+}
+
+.social-command__grid {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 260px;
+  gap: 18px;
+  align-items: start;
+}
+
+.social-command__panel,
+.social-command__post {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(5, 12, 20, 0.76);
+  padding: 18px;
+}
+
+.social-command__panel-heading,
+.social-command__post-head,
+.social-command__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.social-command__panel-heading span,
+.social-command__post-head em {
+  color: #ffd479;
+  font-style: normal;
+}
+
+.social-command__provider-list,
+.social-command__connections,
+.social-command__posts,
+.social-command__campaign-list {
+  display: grid;
+  gap: 12px;
+}
+
+.social-command__provider {
+  display: grid;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 12px;
+}
+
+.social-command__provider p,
+.social-command__muted {
+  color: rgba(247, 251, 255, 0.68);
+  font-size: 0.92rem;
+}
+
+.social-command__connection {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.social-command__summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.social-command__summary div {
+  background: rgba(255, 255, 255, 0.07);
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.social-command__summary strong {
+  font-size: 1.4rem;
+}
+
+.social-command__field,
+.social-command__post label {
+  display: grid;
+  gap: 6px;
+  color: rgba(247, 251, 255, 0.78);
+  font-size: 0.86rem;
+  margin-bottom: 12px;
+}
+
+.social-command input,
+.social-command textarea,
+.social-command select {
+  width: 100%;
+  border: 1px solid rgba(126, 231, 255, 0.22);
+  background: rgba(0, 0, 0, 0.28);
+  color: #f7fbff;
+  padding: 10px;
+  font: inherit;
+}
+
+.social-command textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.social-command__post-head {
+  margin-bottom: 14px;
+}
+
+.social-command__campaign-list button {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f7fbff;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  min-height: 0;
+  padding: 12px;
+}
+
+.social-command__actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1080px) {
+  .social-command__grid,
+  .social-command__header {
+    grid-template-columns: 1fr;
+  }
+}

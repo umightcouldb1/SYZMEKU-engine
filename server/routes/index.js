@@ -23,6 +23,7 @@ router.use('/monetization', require('./billingRoutes'));
 router.use('/capital', require('./capitalLedgerRoutes'));
 router.use('/ai', require('./aiGatewayRoutes'));
 router.use('/freedom-audit', require('./freedomAuditRoutes'));
+router.use('/social-command', require('./socialCommandRoutes'));
 router.use('/', require('./stripeRoutes'));
 
 // Keep the lineage-aware analyzer ahead of the legacy core router.
