@@ -75,6 +75,10 @@ const normalizeLineItem = (session, lineItem) => {
 };
 
 const fulfillCheckoutSession = async (session) => {
+  if (session.mode !== 'payment' || session.status !== 'complete' || session.payment_status !== 'paid') {
+    throw new Error(`Checkout session ${session.id} is not a completed paid payment session.`);
+  }
+
   const userId = session.client_reference_id || session.metadata?.userId || session.metadata?.user_id;
   if (!userId) {
     throw new Error(`Checkout session ${session.id} is missing user identity metadata.`);
