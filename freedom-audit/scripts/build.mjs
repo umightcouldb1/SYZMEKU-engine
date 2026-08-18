@@ -7,7 +7,7 @@ const dist = join(root, 'dist');
 mkdirSync(dist, { recursive: true });
 
 const apiBase = process.env.FREEDOM_AUDIT_API_BASE_URL || process.env.VITE_API_BASE_URL || 'https://syzmeku-api.onrender.com/api';
-const bigSyzUrl = process.env.FREEDOM_AUDIT_BIG_SYZ_URL || process.env.VITE_BIG_SYZ_URL || 'https://syzmeku-api.onrender.com';
+const bigSyzUrl = process.env.FREEDOM_AUDIT_BIG_SYZ_URL || process.env.VITE_BIG_SYZ_URL || 'https://www.toisouljahacademy.com';
 
 const template = readFileSync(join(root, 'index.html'), 'utf8');
 const rendered = template

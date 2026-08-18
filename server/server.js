@@ -46,28 +46,36 @@ const defaultDevelopmentOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ];
-const configuredClientOrigins = String(process.env.CLIENT_ORIGIN || '')
+const normalizeOrigin = (origin = '') => {
+  const trimmed = String(origin || '').trim().replace(/\/+$/, '');
+  if (!trimmed) return '';
+
+  try {
+    return new URL(trimmed).origin;
+  } catch (_error) {
+    return trimmed;
+  }
+};
+const parseAllowedOrigins = (value = '') => String(value || '')
   .split(',')
-  .map((origin) => origin.trim())
+  .map(normalizeOrigin)
   .filter(Boolean);
-const configuredFreedomAuditOrigins = String(process.env.FREEDOM_AUDIT_APP_URL || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const configuredClientOrigins = parseAllowedOrigins(process.env.CLIENT_ORIGIN);
+const configuredFreedomAuditOrigins = parseAllowedOrigins(process.env.FREEDOM_AUDIT_APP_URL);
 const fallbackClientOrigins = process.env.NODE_ENV === 'production'
   ? defaultProductionOrigins
   : [...defaultDevelopmentOrigins, ...defaultProductionOrigins];
 const allowedClientOrigins = Array.from(new Set([
   ...configuredClientOrigins,
   ...configuredFreedomAuditOrigins,
-  ...fallbackClientOrigins,
+  ...fallbackClientOrigins.map(normalizeOrigin),
 ]));
 
 const corsOptions = {
   credentials: true,
   origin(origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedClientOrigins.includes(origin)) return callback(null, true);
+    if (allowedClientOrigins.includes(normalizeOrigin(origin))) return callback(null, true);
     return callback(new Error('CORS origin not allowed.'));
   },
 };

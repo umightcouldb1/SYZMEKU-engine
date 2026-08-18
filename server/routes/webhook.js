@@ -8,6 +8,7 @@ let stripeClient;
 
 const getStripeSecretKey = () => process.env.STRIPE_SECRET_KEY || process.env.Stripe_Secret_Key;
 const getStripeWebhookSecret = () => process.env.STRIPE_WEBHOOK_SECRET || process.env.Stripe_Webhook_Secret;
+const getFreedomAuditPriceId = () => process.env.FREEDOM_AUDIT_STRIPE_PRICE_ID || '';
 
 const getStripe = () => {
   if (!getStripeSecretKey()) {
@@ -23,9 +24,9 @@ const getStripe = () => {
   return stripeClient;
 };
 
-const deriveTier = (name = '', metadataTier = '') => {
+const deriveTier = (name = '', metadataTier = '', priceId = '') => {
+  if (getFreedomAuditPriceId() && priceId === getFreedomAuditPriceId()) return 'freedom_audit';
   const source = `${metadataTier} ${name}`.toLowerCase();
-  if (source.includes('freedom_audit') || source.includes('freedom audit')) return 'freedom_audit';
   if (source.includes('genesis')) return 'genesis';
   if (source.includes('guardian')) return 'guardian';
   if (source.includes('cosmic')) return 'cosmic';
@@ -58,7 +59,7 @@ const normalizeLineItem = (session, lineItem) => {
   const price = lineItem.price || {};
   const product = price.product && typeof price.product === 'object' ? price.product : null;
   const productName = product?.name || lineItem.description || session.metadata?.productName || '';
-  const tier = deriveTier(productName, product?.metadata?.tier || session.metadata?.tier);
+  const tier = deriveTier(productName, product?.metadata?.tier || session.metadata?.tier, price.id || session.metadata?.priceId || '');
 
   return {
     productId: product?.id || session.metadata?.productId || '',

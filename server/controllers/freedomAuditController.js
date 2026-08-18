@@ -5,6 +5,8 @@ const UserProfile = require('../models/UserProfile');
 const FREEDOM_AUDIT_PRODUCT_SLUG = 'freedom-audit';
 const FREEDOM_AUDIT_TIER = 'freedom_audit';
 const DOMAIN_KEYS = ['time', 'money', 'obligations', 'assets', 'desires'];
+const MAX_RESULT_HISTORY = 10;
+const MAX_TEXT_LENGTH = 1000;
 
 let stripeClient;
 
@@ -68,20 +70,8 @@ const getOrCreateProfile = async (userId) => {
 const normalize = (value = '') => String(value || '').trim().toLowerCase();
 
 const isFreedomAuditPurchase = (product = {}) => {
-  const fields = [
-    product.productId,
-    product.priceId,
-    product.name,
-    product.tier,
-    product.metadata?.productSlug,
-    product.metadata?.tier,
-  ].map(normalize);
-
-  return fields.some((field) =>
-    field === FREEDOM_AUDIT_TIER ||
-    field === FREEDOM_AUDIT_PRODUCT_SLUG ||
-    field.includes('freedom audit')
-  );
+  const configuredPriceId = getFreedomAuditPriceId();
+  return normalize(product.priceId) === normalize(configuredPriceId);
 };
 
 const hasFreedomAuditEntitlement = (profile) =>
@@ -134,7 +124,6 @@ const recordFreedomAuditPurchaseFromSession = async (session, userId) => {
     profile.purchasedProducts.push(purchase);
   }
 
-  if (profile.tier === 'public') profile.tier = 'active';
   await profile.save();
   return profile;
 };
@@ -184,7 +173,15 @@ const verifyFreedomAuditSession = asyncHandler(async (req, res) => {
   }
 
   const stripe = getStripe();
-  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  let session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch (error) {
+    if (error?.type === 'StripeInvalidRequestError') {
+      return res.status(400).json({ error: 'Checkout session is invalid or expired.' });
+    }
+    throw error;
+  }
   const userId = String(req.user._id);
   const sessionUserId = String(session.client_reference_id || session.metadata?.userId || session.metadata?.user_id || '');
 
@@ -192,12 +189,16 @@ const verifyFreedomAuditSession = asyncHandler(async (req, res) => {
     return res.status(403).json({ error: 'This checkout session does not belong to the signed-in user.' });
   }
 
-  if (session.payment_status !== 'paid') {
+  if (session.mode !== 'payment' || session.status !== 'complete' || session.payment_status !== 'paid') {
     return res.status(402).json({ error: 'Payment is not complete for this checkout session.' });
   }
 
   const profile = await recordFreedomAuditPurchaseFromSession(session, req.user._id);
-  return res.json(buildEntitlementResponse(profile || await getOrCreateProfile(req.user._id)));
+  if (!profile || !hasFreedomAuditEntitlement(profile)) {
+    return res.status(403).json({ error: 'This checkout session does not contain the configured Freedom Audit price.' });
+  }
+
+  return res.json(buildEntitlementResponse(profile));
 });
 
 const guidance = {
@@ -273,7 +274,12 @@ const guidance = {
   },
 };
 
-const sanitizeText = (value, fallback) => String(value || fallback).trim().slice(0, 1000);
+const sanitizeText = (value, fallback) =>
+  String(value || fallback)
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_TEXT_LENGTH);
 
 const validateRatings = (ratings = {}) => {
   const cleanRatings = {};
@@ -368,7 +374,7 @@ const scoreFreedomAudit = asyncHandler(async (req, res) => {
 
   profile.freedomAudit = profile.freedomAudit || {};
   profile.freedomAudit.latestResult = result;
-  profile.freedomAudit.results = [...(profile.freedomAudit.results || []), result].slice(-10);
+  profile.freedomAudit.results = [...(profile.freedomAudit.results || []), result].slice(-MAX_RESULT_HISTORY);
   await profile.save();
 
   return res.status(201).json({ result });
