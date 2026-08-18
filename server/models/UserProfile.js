@@ -38,6 +38,43 @@ const profilePreferenceSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const freedomAuditResultSchema = new mongoose.Schema(
+  {
+    score: { type: Number, min: 0, max: 100, required: true },
+    stage: {
+      type: String,
+      enum: ['Survive', 'Stabilize', 'Liberate', 'Expand'],
+      required: true,
+    },
+    weakestDomain: { type: String, required: true },
+    highestLeveragePriority: { type: String, required: true },
+    domainScores: {
+      time: { type: Number, min: 0, max: 100, required: true },
+      money: { type: Number, min: 0, max: 100, required: true },
+      obligations: { type: Number, min: 0, max: 100, required: true },
+      assets: { type: Number, min: 0, max: 100, required: true },
+      desires: { type: Number, min: 0, max: 100, required: true },
+    },
+    leverageMoves: { type: [String], default: [] },
+    compression: {
+      delete: { type: String, default: '' },
+      automate: { type: String, default: '' },
+      delegate: { type: String, default: '' },
+      execute: { type: String, default: '' },
+    },
+    liberationPlan: { type: [String], default: [] },
+    bigSyzPrompt: { type: String, default: '' },
+    inputs: {
+      ratings: { type: mongoose.Schema.Types.Mixed, default: {} },
+      win: { type: String, default: '' },
+      drag: { type: String, default: '' },
+      asset: { type: String, default: '' },
+    },
+    completedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const userProfileSchema = new mongoose.Schema(
   {
     userId: {
@@ -50,6 +87,10 @@ const userProfileSchema = new mongoose.Schema(
     tier: { type: String, default: 'public', index: true },
     purchasedProducts: { type: [purchasedProductSchema], default: [] },
     preferences: { type: profilePreferenceSchema, default: () => ({}) },
+    freedomAudit: {
+      latestResult: { type: freedomAuditResultSchema, default: null },
+      results: { type: [freedomAuditResultSchema], default: [] },
+    },
   },
   { timestamps: true }
 );

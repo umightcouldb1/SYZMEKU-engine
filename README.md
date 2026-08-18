@@ -12,3 +12,9 @@
 
 ## ⚖️ License
 Licensed under the **Sovereign Engine License (SEL)**. Unauthorized reckless use or coercion is strictly prohibited.
+
+## Freedom Audit
+
+The Freedom Audit paid product app lives in `freedom-audit/` and is intended to deploy as a separate Vercel project with Root Directory `freedom-audit`.
+
+Freedom Audit setup, Stripe configuration, Vercel build settings, and purchase-flow testing are documented in `freedom-audit/README.md`.

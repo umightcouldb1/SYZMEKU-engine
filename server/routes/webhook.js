@@ -25,6 +25,7 @@ const getStripe = () => {
 
 const deriveTier = (name = '', metadataTier = '') => {
   const source = `${metadataTier} ${name}`.toLowerCase();
+  if (source.includes('freedom_audit') || source.includes('freedom audit')) return 'freedom_audit';
   if (source.includes('genesis')) return 'genesis';
   if (source.includes('guardian')) return 'guardian';
   if (source.includes('cosmic')) return 'cosmic';

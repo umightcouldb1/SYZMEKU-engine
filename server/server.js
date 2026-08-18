@@ -50,11 +50,16 @@ const configuredClientOrigins = String(process.env.CLIENT_ORIGIN || '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
+const configuredFreedomAuditOrigins = String(process.env.FREEDOM_AUDIT_APP_URL || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const fallbackClientOrigins = process.env.NODE_ENV === 'production'
   ? defaultProductionOrigins
   : [...defaultDevelopmentOrigins, ...defaultProductionOrigins];
 const allowedClientOrigins = Array.from(new Set([
   ...configuredClientOrigins,
+  ...configuredFreedomAuditOrigins,
   ...fallbackClientOrigins,
 ]));
 
