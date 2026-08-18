@@ -10,6 +10,7 @@ import WelcomeScreen from './WelcomeScreen';
 import Catalog from './components/Catalog';
 import Profile from './components/Profile';
 import RequireAuth from './components/RequireAuth';
+import SocialCommandDashboard from './SocialCommandDashboard';
 import { BiometricProvider } from './context/BiometricContext';
 import PrivateLayout from './layouts/PrivateLayout';
 import './entryFlow.css';
@@ -217,6 +218,7 @@ function App() {
           }
         >
           <Route path={APP_HOME_ROUTE} element={onboardingCompleted ? <Dashboard user={user} /> : <Navigate to="/onboarding" replace />} />
+          <Route path="/app/social-command" element={onboardingCompleted ? <SocialCommandDashboard /> : <Navigate to="/onboarding" replace />} />
           <Route path="/app/profile" element={onboardingCompleted ? <Profile /> : <Navigate to="/onboarding" replace />} />
           <Route path="/profile" element={onboardingCompleted ? <Profile /> : <Navigate to="/onboarding" replace />} />
           <Route path="/dashboard" element={<Navigate to={APP_HOME_ROUTE} replace />} />

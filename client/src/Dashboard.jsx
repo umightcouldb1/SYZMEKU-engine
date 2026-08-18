@@ -463,6 +463,9 @@ const Dashboard = ({ user }) => {
               <button type="button" className="mentor-button" onClick={() => setAdvancedMode(true)}>
                 Enter Operator Mode
               </button>
+              <button type="button" className="mentor-button secondary" onClick={() => window.location.assign('/app/social-command')}>
+                Open Social Command
+              </button>
             </>
           ) : (
             <>
