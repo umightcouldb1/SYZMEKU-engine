@@ -137,7 +137,6 @@ const createFreedomAuditCheckout = asyncHandler(async (req, res) => {
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
-    payment_method_types: ['card'],
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${appUrl}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${appUrl}/?checkout=canceled`,
