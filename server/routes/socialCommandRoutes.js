@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const User = require('../models/User');
 const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 const {
   listSocialProviders,
@@ -37,6 +38,6 @@ router.post('/campaigns/:campaignId/publish', publishNow);
 router.post('/campaigns/:campaignId/posts/:postId/publish', publishNow);
 router.post('/campaigns/:campaignId/schedule', scheduleCampaign);
 router.post('/campaigns/:campaignId/analytics/refresh', refreshAnalytics);
-router.post('/scheduler/run-due', authorizeRoles('founder', 'admin'), processSchedule);
+router.post('/scheduler/run-due', authorizeRoles(User.ROLES.COMMANDER_IN_CHIEF, 'founder', 'admin'), processSchedule);
 
 module.exports = router;
