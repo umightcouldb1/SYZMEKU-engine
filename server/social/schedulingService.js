@@ -34,7 +34,8 @@ const activatePlannedSchedule = (campaign) => {
 
   for (const post of campaign.posts || []) {
     if (!post.scheduledTime || !post.connectedAccountId) continue;
-    if (['published', 'publishing', 'failed', 'skipped'].includes(post.publishStatus)) continue;
+    if (['published', 'publishing', 'skipped'].includes(post.publishStatus)) continue;
+    if (post.publishStatus === 'failed' && Number(post.publishAttempts || 0) > 0) continue;
 
     const scheduledAt = new Date(post.scheduledTime);
     if (Number.isNaN(scheduledAt.getTime())) continue;
@@ -55,16 +56,28 @@ const activatePlannedSchedule = (campaign) => {
 };
 
 const processDuePosts = async ({ limit = 10 } = {}) => {
+  const retryFailedPosts = process.env.SOCIAL_COMMAND_RETRY_FAILED_POSTS !== 'false';
+  const maxAttempts = Math.max(1, Number(process.env.SOCIAL_COMMAND_MAX_PUBLISH_ATTEMPTS || 3));
+  const dueStatuses = retryFailedPosts ? ['scheduled', 'failed'] : ['scheduled'];
+  const now = new Date();
   const campaigns = await SocialCampaign.find({
     status: { $in: ['scheduled', 'publishing'] },
-    'posts.publishStatus': 'scheduled',
-    'posts.scheduledTime': { $lte: new Date() },
+    'posts.publishStatus': { $in: dueStatuses },
+    'posts.scheduledTime': { $lte: now },
   }).limit(limit);
 
   const results = [];
   for (const campaign of campaigns) {
     for (const post of campaign.posts) {
-      if (post.publishStatus === 'scheduled' && post.scheduledTime && post.scheduledTime <= new Date()) {
+      const scheduledTime = post.scheduledTime ? new Date(post.scheduledTime) : null;
+      const nextAttempt = post.nextPublishAttemptAt ? new Date(post.nextPublishAttemptAt) : null;
+      const retryableFailure = retryFailedPosts
+        && post.publishStatus === 'failed'
+        && !post.providerPostId
+        && Number(post.publishAttempts || 0) < maxAttempts
+        && (!nextAttempt || nextAttempt <= now);
+      const dueScheduledPost = post.publishStatus === 'scheduled';
+      if ((dueScheduledPost || retryableFailure) && scheduledTime && scheduledTime <= now) {
         results.push(await publishPost({ userId: campaign.userId, campaignId: campaign._id, postId: post._id }).catch((error) => {
           const result = {
             error: error.message,

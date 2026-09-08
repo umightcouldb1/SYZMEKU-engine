@@ -45,6 +45,7 @@ const postSchema = new mongoose.Schema(
     hashtags: { type: [String], default: [] },
     link: { type: String, default: '' },
     mediaAssets: { type: [mediaAssetSchema], default: [] },
+    metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
     scheduledTime: { type: Date, default: null },
     publishStatus: {
       type: String,
@@ -59,6 +60,8 @@ const postSchema = new mongoose.Schema(
       code: { type: String, default: '' },
       at: { type: Date, default: null },
     },
+    publishAttempts: { type: Number, default: 0 },
+    nextPublishAttemptAt: { type: Date, default: null },
     analytics: { type: analyticsSchema, default: () => ({}) },
     idempotencyKey: { type: String, default: '', index: true },
     publishedAt: { type: Date, default: null },

@@ -272,6 +272,7 @@ const updateCampaign = asyncHandler(async (req, res) => {
       hashtags: Array.isArray(post.hashtags) ? post.hashtags.map((tag) => sanitizeText(tag, 80).replace(/^#/, '')).filter(Boolean) : [],
       link: sanitizeText(post.link, 500),
       mediaAssets: Array.isArray(post.mediaAssets) ? post.mediaAssets.map(validateMediaAsset).filter(Boolean) : [],
+      metadata: post.metadata && typeof post.metadata === 'object' ? post.metadata : {},
       scheduledTime: post.scheduledTime || null,
       publishStatus: post.publishStatus || 'draft',
     }));

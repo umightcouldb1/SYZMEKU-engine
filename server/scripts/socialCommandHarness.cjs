@@ -108,18 +108,30 @@ const run = async () => {
     userId,
     name: 'Scheduled Harness Campaign',
     status: 'approved',
-    posts: [{
-      provider: 'meta',
-      format: 'text',
-      caption: 'scheduled copy',
-      connectedAccountId: new mongoose.Types.ObjectId(),
-      scheduledTime: new Date(Date.now() + 15 * 60 * 1000),
-      publishStatus: 'approved',
-    }],
+    posts: [
+      {
+        provider: 'meta',
+        format: 'text',
+        caption: 'scheduled copy',
+        connectedAccountId: new mongoose.Types.ObjectId(),
+        scheduledTime: new Date(Date.now() + 15 * 60 * 1000),
+        publishStatus: 'approved',
+      },
+      {
+        provider: 'youtube',
+        format: 'short',
+        caption: 'previously failed copy',
+        connectedAccountId: new mongoose.Types.ObjectId(),
+        scheduledTime: new Date(Date.now() + 15 * 60 * 1000),
+        publishStatus: 'failed',
+        publishAttempts: 1,
+      },
+    ],
   });
   assert.strictEqual(activatePlannedSchedule(scheduledCampaign), 1, 'planned connected posts should be activated for scheduling');
   assert.strictEqual(scheduledCampaign.status, 'scheduled', 'activating planned posts should schedule the campaign');
   assert.strictEqual(scheduledCampaign.posts[0].publishStatus, 'scheduled', 'planned post should become scheduled');
+  assert.strictEqual(scheduledCampaign.posts[1].publishStatus, 'failed', 'previously attempted failures should stay failed until the retry worker handles them');
 
   await mongoose.disconnect();
   console.log('social-command harness passed');

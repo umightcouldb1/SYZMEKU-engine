@@ -51,6 +51,8 @@ const publishPost = async ({ userId, campaignId, postId }) => {
 
   post.idempotencyKey = post.idempotencyKey || buildIdempotencyKey({ campaignId: campaign._id, postId: post._id });
   post.publishStatus = 'publishing';
+  post.publishAttempts = Number(post.publishAttempts || 0) + 1;
+  post.nextPublishAttemptAt = null;
   await campaign.save();
 
   try {
@@ -67,6 +69,7 @@ const publishPost = async ({ userId, campaignId, postId }) => {
     post.providerUrl = result.permalink_url || result.url || '';
     post.publishedAt = new Date();
     post.error = { message: '', code: '', at: null };
+    post.nextPublishAttemptAt = null;
     await campaign.save();
     return { post, result };
   } catch (error) {
@@ -76,6 +79,8 @@ const publishPost = async ({ userId, campaignId, postId }) => {
       code: String(error.statusCode || error.code || ''),
       at: new Date(),
     };
+    const retryDelayMinutes = Math.max(5, Number(process.env.SOCIAL_COMMAND_RETRY_DELAY_MINUTES || 15));
+    post.nextPublishAttemptAt = new Date(Date.now() + retryDelayMinutes * 60 * 1000);
     await campaign.save();
     throw error;
   }
