@@ -24,7 +24,7 @@ class TikTokProvider extends SocialProviderAdapter {
         schedulePost: false,
         analytics: false,
         approvalRequired: true,
-        note: 'Direct publishing requires TikTok Content Posting API access, approved video.publish scope, verified media URL prefixes, and app audit for public visibility.',
+        note: 'Direct publishing requires TikTok Content Posting API access, approved video.publish scope, verified media URL prefixes, and app audit for owner-operated production posting.',
       },
     };
   }

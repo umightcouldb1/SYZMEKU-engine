@@ -87,7 +87,7 @@ Requirements:
 - A Meta developer app with the production redirect URI added.
 - Facebook Pages connected to the authenticating account.
 - Instagram Professional accounts linked to a Facebook Page for Instagram publishing.
-- Meta App Review and business verification as required for public production use and non-developer accounts.
+- Meta App Review and business verification as required by Meta for owner-operated production publishing to T.O.I. Souljah Academy business assets.
 
 Implemented capabilities:
 
@@ -146,7 +146,7 @@ Requirements:
 - A TikTok developer app with Login Kit and Content Posting API configured.
 - Direct Post configuration and approval for `video.publish`.
 - Verified media URL prefixes/domains for pull-from-URL publishing.
-- App audit/approval for public visibility. Unaudited clients can be restricted to private posting.
+- App audit/approval for owner-operated production posting to the authenticated T.O.I. Souljah Academy TikTok account. This app is not offered as a public social media management service for outside users.
 
 Implemented capabilities:
 
@@ -199,7 +199,7 @@ The scheduler endpoint is restricted to the authenticated `COMMANDER_IN_CHIEF` r
 ## Production Readiness Notes
 
 - The public legal routes required for provider review are `/terms` and `/privacy`.
-- The current TikTok app configuration should remain truthful during review: Login Kit and Content Posting API can be configured before approval, but public publishing depends on TikTok approval and valid production credentials.
+- The current TikTok app configuration should remain truthful during review: Social Command is a private, owner-operated publishing workflow for T.O.I. Souljah Academy accounts only. Login Kit and Content Posting API can be configured before approval, but production posting depends on TikTok approval and valid production credentials.
 - Do not submit a TikTok demo that claims approved publishing behavior until the deployed Social Command flow can connect the real app, start OAuth, return to `/app/social-command`, and show the post approval workflow.
 - TikTok, Meta, and YouTube client secrets must be configured only in the backend environment. They must not be committed, printed, or bundled into the frontend.
 
