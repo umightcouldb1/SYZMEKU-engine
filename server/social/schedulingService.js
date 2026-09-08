@@ -65,7 +65,17 @@ const processDuePosts = async ({ limit = 10 } = {}) => {
   for (const campaign of campaigns) {
     for (const post of campaign.posts) {
       if (post.publishStatus === 'scheduled' && post.scheduledTime && post.scheduledTime <= new Date()) {
-        results.push(await publishPost({ userId: campaign.userId, campaignId: campaign._id, postId: post._id }).catch((error) => ({ error: error.message, postId: post._id })));
+        results.push(await publishPost({ userId: campaign.userId, campaignId: campaign._id, postId: post._id }).catch((error) => {
+          const result = {
+            error: error.message,
+            campaignId: String(campaign._id),
+            postId: String(post._id),
+            provider: post.provider,
+            format: post.format,
+          };
+          console.error(`[SYS_ERR] Social Command post failed: ${JSON.stringify(result)}`);
+          return result;
+        }));
       }
     }
   }

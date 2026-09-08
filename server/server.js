@@ -146,12 +146,18 @@ const schedulerEnabled = process.env.SOCIAL_COMMAND_SCHEDULER_ENABLED !== 'false
 const schedulerIntervalMs = Math.max(60_000, Number(process.env.SOCIAL_COMMAND_SCHEDULER_INTERVAL_MS || 300_000));
 
 if (schedulerEnabled) {
-  setInterval(async () => {
+  const runSocialCommandScheduler = async () => {
     if (mongoose.connection.readyState !== 1) return;
     try {
-      await processDuePosts({ limit: Number(process.env.SOCIAL_COMMAND_SCHEDULER_LIMIT || 10) });
+      const results = await processDuePosts({ limit: Number(process.env.SOCIAL_COMMAND_SCHEDULER_LIMIT || 10) });
+      if (results.length) {
+        console.log(`[SYS_LOG] Social Command scheduler processed ${results.length} due post(s).`);
+      }
     } catch (error) {
       console.error(`[SYS_ERR] Social Command scheduler failed: ${error.message}`);
     }
-  }, schedulerIntervalMs).unref();
+  };
+
+  setTimeout(runSocialCommandScheduler, Math.min(30_000, schedulerIntervalMs)).unref();
+  setInterval(runSocialCommandScheduler, schedulerIntervalMs).unref();
 }
