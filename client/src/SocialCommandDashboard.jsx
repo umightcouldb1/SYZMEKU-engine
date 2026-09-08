@@ -53,6 +53,8 @@ const fromDatetimeLocalValue = (value) => {
   return date.toISOString();
 };
 
+const hasPlannedSchedule = (campaign) => (campaign?.posts || []).some((post) => post.scheduledTime && post.connectedAccountId);
+
 export default function SocialCommandDashboard() {
   const navigate = useNavigate();
   const [providers, setProviders] = useState([]);
@@ -172,6 +174,25 @@ export default function SocialCommandDashboard() {
     }
   };
 
+  const activateSchedule = async () => {
+    if (!activeCampaign?.campaign?._id) return;
+    setLoading(true);
+    setError('');
+    try {
+      const postSchedules = (activeCampaign.campaign.posts || [])
+        .filter((post) => post._id && post.scheduledTime && post.connectedAccountId)
+        .map((post) => ({ postId: post._id, scheduledTime: post.scheduledTime }));
+      const data = await api('post', `/api/social-command/campaigns/${activeCampaign.campaign._id}/schedule`, { postSchedules });
+      setActiveCampaign(data);
+      await loadAll();
+      setMessage('Campaign schedule activated. Due posts will publish through connected official APIs.');
+    } catch (scheduleError) {
+      setError(scheduleError?.response?.data?.error || 'Could not activate campaign schedule.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const approveCampaign = async () => {
     if (!activeCampaign?.campaign?._id) return;
     setLoading(true);
@@ -180,7 +201,9 @@ export default function SocialCommandDashboard() {
       const data = await api('post', `/api/social-command/campaigns/${activeCampaign.campaign._id}/approve`, {});
       setActiveCampaign(data);
       await loadAll();
-      setMessage('Campaign approved. Publishing is now available for connected accounts.');
+      setMessage(data.campaign?.status === 'scheduled'
+        ? 'Campaign approved and schedule activated.'
+        : 'Campaign approved. Publishing is now available for connected accounts.');
     } catch (approveError) {
       setError(approveError?.response?.data?.error || 'Could not approve campaign.');
     } finally {
@@ -213,6 +236,10 @@ export default function SocialCommandDashboard() {
   };
 
   const campaign = activeCampaign?.campaign || null;
+  const plannedScheduleAvailable = hasPlannedSchedule(campaign);
+  const approvalActionLabel = campaign?.status === 'approved' && plannedScheduleAvailable ? 'Activate Schedule' : 'Approve Campaign';
+  const approvalAction = campaign?.status === 'approved' && plannedScheduleAvailable ? activateSchedule : approveCampaign;
+  const approvalActionDisabled = loading || campaign?.status === 'scheduled' || campaign?.status === 'published';
 
   return (
     <main className="social-command" aria-label="SYZMEKU Social Command">
@@ -333,9 +360,9 @@ export default function SocialCommandDashboard() {
 
               <div className="social-command__actions">
                 <button type="button" onClick={saveCampaign} disabled={loading}>Save Drafts</button>
-                <button type="button" onClick={approveCampaign} disabled={loading || campaign.status === 'approved'}>Approve Campaign</button>
+                <button type="button" onClick={approvalAction} disabled={approvalActionDisabled}>{approvalActionLabel}</button>
                 <button type="button" onClick={refreshAnalytics} disabled={loading}>Refresh Analytics</button>
-                <p>Planned launch times are saved with drafts. Approval remains the human gate before any publishing workflow can run.</p>
+                <p>Planned launch times are saved with drafts. Approval activates the schedule before any publishing workflow can run.</p>
               </div>
             </>
           )}

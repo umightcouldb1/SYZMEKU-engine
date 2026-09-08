@@ -28,6 +28,32 @@ const scheduleCampaignPosts = async ({ userId, campaignId, postSchedules = [] })
   return campaign;
 };
 
+const activatePlannedSchedule = (campaign) => {
+  let scheduledCount = 0;
+  const now = Date.now();
+
+  for (const post of campaign.posts || []) {
+    if (!post.scheduledTime || !post.connectedAccountId) continue;
+    if (['published', 'publishing', 'failed', 'skipped'].includes(post.publishStatus)) continue;
+
+    const scheduledAt = new Date(post.scheduledTime);
+    if (Number.isNaN(scheduledAt.getTime())) continue;
+
+    post.publishStatus = 'scheduled';
+    if (scheduledAt.getTime() <= now) {
+      post.scheduledTime = new Date(now + 60 * 1000);
+    }
+    scheduledCount += 1;
+  }
+
+  if (scheduledCount > 0) {
+    campaign.status = 'scheduled';
+    campaign.scheduledAt = new Date();
+  }
+
+  return scheduledCount;
+};
+
 const processDuePosts = async ({ limit = 10 } = {}) => {
   const campaigns = await SocialCampaign.find({
     status: { $in: ['scheduled', 'publishing'] },
@@ -46,4 +72,4 @@ const processDuePosts = async ({ limit = 10 } = {}) => {
   return results;
 };
 
-module.exports = { scheduleCampaignPosts, processDuePosts };
+module.exports = { scheduleCampaignPosts, activatePlannedSchedule, processDuePosts };

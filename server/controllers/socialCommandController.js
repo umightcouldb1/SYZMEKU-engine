@@ -7,7 +7,7 @@ const { createOAuthState, consumeOAuthState } = require('../social/oauthState');
 const { getProvider, listProviders } = require('../social/providers');
 const { generateCampaignDraft } = require('../social/campaignGenerationService');
 const { publishCampaign, publishPost } = require('../social/publishingService');
-const { scheduleCampaignPosts, processDuePosts } = require('../social/schedulingService');
+const { scheduleCampaignPosts, activatePlannedSchedule, processDuePosts } = require('../social/schedulingService');
 const { refreshCampaignAnalytics, summarizeCampaign } = require('../social/analyticsService');
 const { validateMediaAsset } = require('../social/mediaAssetService');
 
@@ -279,8 +279,9 @@ const approveCampaign = asyncHandler(async (req, res) => {
   campaign.posts.forEach((post) => {
     if (post.publishStatus === 'draft') post.publishStatus = 'approved';
   });
+  const scheduledCount = activatePlannedSchedule(campaign);
   await campaign.save();
-  await audit(req, 'campaign_approved', { campaignId: campaign._id });
+  await audit(req, 'campaign_approved', { campaignId: campaign._id, scheduledCount });
   res.json({ campaign, summary: summarizeCampaign(campaign) });
 });
 

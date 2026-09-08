@@ -8,6 +8,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { loadArchitectBaseTone } = require('./logic/architectLayer');
 const { initializeAdminSystem } = require('./utils/adminIdentity');
+const { processDuePosts } = require('./social/schedulingService');
 
 const app = express();
 global.toneMatrix = loadArchitectBaseTone();
@@ -140,3 +141,17 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`[SYS_LOG] Big SYZ Engine running on port ${PORT}`);
 });
+
+const schedulerEnabled = process.env.SOCIAL_COMMAND_SCHEDULER_ENABLED !== 'false';
+const schedulerIntervalMs = Math.max(60_000, Number(process.env.SOCIAL_COMMAND_SCHEDULER_INTERVAL_MS || 300_000));
+
+if (schedulerEnabled) {
+  setInterval(async () => {
+    if (mongoose.connection.readyState !== 1) return;
+    try {
+      await processDuePosts({ limit: Number(process.env.SOCIAL_COMMAND_SCHEDULER_LIMIT || 10) });
+    } catch (error) {
+      console.error(`[SYS_ERR] Social Command scheduler failed: ${error.message}`);
+    }
+  }, schedulerIntervalMs).unref();
+}

@@ -9,6 +9,7 @@ const { generateCampaignDraft, withUtm } = require('../social/campaignGeneration
 const { normalizeProviderAnalytics, summarizeCampaign } = require('../social/analyticsService');
 const { listProviders } = require('../social/providers');
 const { buildIdempotencyKey } = require('../social/publishingService');
+const { activatePlannedSchedule } = require('../social/schedulingService');
 const { assertAllowedHttpsUrl } = require('../social/mediaAssetService');
 const SocialConnection = require('../models/SocialConnection');
 const SocialCampaign = require('../models/SocialCampaign');
@@ -82,6 +83,23 @@ const run = async () => {
   });
   assert.doesNotThrow(() => validCampaign.validateSync(), 'campaign model should validate a minimal owned campaign');
   assert.strictEqual(summarizeCampaign(validCampaign).impressions, 4);
+
+  const scheduledCampaign = new SocialCampaign({
+    userId,
+    name: 'Scheduled Harness Campaign',
+    status: 'approved',
+    posts: [{
+      provider: 'meta',
+      format: 'text',
+      caption: 'scheduled copy',
+      connectedAccountId: new mongoose.Types.ObjectId(),
+      scheduledTime: new Date(Date.now() + 15 * 60 * 1000),
+      publishStatus: 'approved',
+    }],
+  });
+  assert.strictEqual(activatePlannedSchedule(scheduledCampaign), 1, 'planned connected posts should be activated for scheduling');
+  assert.strictEqual(scheduledCampaign.status, 'scheduled', 'activating planned posts should schedule the campaign');
+  assert.strictEqual(scheduledCampaign.posts[0].publishStatus, 'scheduled', 'planned post should become scheduled');
 
   await mongoose.disconnect();
   console.log('social-command harness passed');
