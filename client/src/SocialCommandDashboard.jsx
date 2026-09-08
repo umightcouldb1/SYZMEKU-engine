@@ -55,6 +55,14 @@ const fromDatetimeLocalValue = (value) => {
 
 const hasPlannedSchedule = (campaign) => (campaign?.posts || []).some((post) => post.scheduledTime && post.connectedAccountId);
 
+const firstMediaUrl = (post) => (post.mediaAssets || []).find((asset) => asset.url)?.url || '';
+
+const mediaTypeForPost = (post) => (
+  ['video', 'short', 'reel'].includes(post.format) ? 'video'
+    : post.format === 'image' ? 'image'
+      : 'link'
+);
+
 export default function SocialCommandDashboard() {
   const navigate = useNavigate();
   const [providers, setProviders] = useState([]);
@@ -235,6 +243,25 @@ export default function SocialCommandDashboard() {
     });
   };
 
+  const updatePostMediaUrl = (postIndex, url) => {
+    setActiveCampaign((current) => {
+      const campaign = { ...(current?.campaign || {}) };
+      campaign.posts = [...(campaign.posts || [])];
+      const post = { ...campaign.posts[postIndex] };
+      const trimmedUrl = url.trim();
+      post.mediaAssets = trimmedUrl
+        ? [{
+          ...(post.mediaAssets?.[0] || {}),
+          url: trimmedUrl,
+          type: mediaTypeForPost(post),
+          mimeType: mediaTypeForPost(post) === 'video' ? 'video/mp4' : '',
+        }]
+        : [];
+      campaign.posts[postIndex] = post;
+      return { ...(current || {}), campaign };
+    });
+  };
+
   const campaign = activeCampaign?.campaign || null;
   const plannedScheduleAvailable = hasPlannedSchedule(campaign);
   const approvalActionLabel = campaign?.status === 'approved' && plannedScheduleAvailable ? 'Activate Schedule' : 'Approve Campaign';
@@ -337,6 +364,16 @@ export default function SocialCommandDashboard() {
                       Link
                       <input value={post.link || ''} onChange={(event) => updatePost(index, { link: event.target.value })} />
                     </label>
+                    {post.format !== 'text' && (
+                      <label>
+                        Hosted media URL
+                        <input
+                          value={firstMediaUrl(post)}
+                          placeholder="https://..."
+                          onChange={(event) => updatePostMediaUrl(index, event.target.value)}
+                        />
+                      </label>
+                    )}
                     <label>
                       Planned launch time
                       <input
@@ -354,6 +391,12 @@ export default function SocialCommandDashboard() {
                         ))}
                       </select>
                     </label>
+                    {post.providerUrl && (
+                      <a className="social-command__published-link" href={post.providerUrl} target="_blank" rel="noreferrer">Open published post</a>
+                    )}
+                    {post.error?.message && (
+                      <p className="social-command__post-error">{post.error.message}</p>
+                    )}
                   </article>
                 ))}
               </div>

@@ -1,5 +1,8 @@
 const SocialProviderAdapter = require('./baseProvider');
 const { requestJson } = require('./http');
+const { google } = require('googleapis');
+const { fetchMediaBuffer } = require('../mediaFetchService');
+const { findPostMediaAsset } = require('../mediaAssetService');
 
 class YouTubeProvider extends SocialProviderAdapter {
   get id() {
@@ -108,15 +111,44 @@ class YouTubeProvider extends SocialProviderAdapter {
   }
 
   async publishVideo({ accessToken, post }) {
-    const videoAsset = post.mediaAssets?.find((asset) => asset.type === 'video' && asset.url);
+    const videoAsset = findPostMediaAsset(post, 'video');
     if (!videoAsset) {
-      throw new Error('YouTube publishing requires a hosted video URL. Download/upload streaming is not enabled in this first module slice.');
+      throw new Error('YouTube publishing requires a hosted video URL.');
     }
 
-    const error = new Error('YouTube direct video upload requires server-side media streaming from configured storage. The adapter is ready for OAuth and metadata but needs media storage before upload is enabled.');
-    error.statusCode = 501;
-    error.details = { requiredScope: 'https://www.googleapis.com/auth/youtube.upload' };
-    throw error;
+    const { stream, mimeType } = await fetchMediaBuffer(videoAsset, {
+      maxBytes: Number(process.env.YOUTUBE_MAX_UPLOAD_BYTES || 75 * 1024 * 1024),
+    });
+    const auth = new google.auth.OAuth2();
+    auth.setCredentials({ access_token: accessToken });
+    const youtube = google.youtube({ version: 'v3', auth });
+    const description = [post.description || post.caption, post.link].filter(Boolean).join('\n\n');
+    const tags = Array.isArray(post.hashtags)
+      ? post.hashtags.map((tag) => String(tag || '').replace(/^#/, '')).filter(Boolean)
+      : [];
+
+    const response = await youtube.videos.insert({
+      part: ['snippet', 'status'],
+      requestBody: {
+        snippet: {
+          title: post.title || 'SYZMEKU Social Command',
+          description,
+          tags,
+          categoryId: post.metadata?.categoryId || '27',
+        },
+        status: {
+          privacyStatus: post.metadata?.privacyStatus || process.env.YOUTUBE_DEFAULT_PRIVACY_STATUS || 'public',
+          selfDeclaredMadeForKids: false,
+        },
+      },
+      media: { mimeType, body: stream },
+    });
+
+    return {
+      id: response.data?.id || '',
+      url: response.data?.id ? `https://www.youtube.com/watch?v=${response.data.id}` : '',
+      data: response.data,
+    };
   }
 
   async getAnalytics() {

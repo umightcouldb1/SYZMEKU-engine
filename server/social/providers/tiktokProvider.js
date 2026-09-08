@@ -1,5 +1,6 @@
 const SocialProviderAdapter = require('./baseProvider');
 const { requestJson } = require('./http');
+const { findPostMediaAsset } = require('../mediaAssetService');
 
 class TikTokProvider extends SocialProviderAdapter {
   get id() {
@@ -102,7 +103,7 @@ class TikTokProvider extends SocialProviderAdapter {
   }
 
   async publishVideo({ accessToken, post }) {
-    const videoAsset = post.mediaAssets?.find((asset) => asset.type === 'video' && asset.url);
+    const videoAsset = findPostMediaAsset(post, 'video');
     if (!videoAsset) throw new Error('TikTok direct post requires a hosted video URL from a verified domain or URL prefix.');
     return requestJson('https://open.tiktokapis.com/v2/post/publish/video/init/', {
       method: 'POST',
@@ -113,7 +114,7 @@ class TikTokProvider extends SocialProviderAdapter {
       body: JSON.stringify({
         post_info: {
           title: [post.title || post.caption, post.hashtags?.join(' ')].filter(Boolean).join(' ').slice(0, 2200),
-          privacy_level: post.metadata?.privacyLevel || 'SELF_ONLY',
+          privacy_level: post.metadata?.privacyLevel || process.env.TIKTOK_DEFAULT_PRIVACY_LEVEL || 'PUBLIC_TO_EVERYONE',
           disable_duet: Boolean(post.metadata?.disableDuet),
           disable_comment: Boolean(post.metadata?.disableComment),
           disable_stitch: Boolean(post.metadata?.disableStitch),

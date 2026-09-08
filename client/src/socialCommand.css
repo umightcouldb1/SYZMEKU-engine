@@ -163,6 +163,19 @@
   resize: vertical;
 }
 
+.social-command__published-link {
+  color: #7ee8ff;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.social-command__post-error {
+  color: #ff9a9a;
+  font-size: 0.86rem;
+  margin: 0;
+}
+
 .social-command__post-head {
   margin-bottom: 14px;
 }

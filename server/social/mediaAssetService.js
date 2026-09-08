@@ -68,4 +68,22 @@ const validateMediaAsset = (asset = {}) => {
   };
 };
 
-module.exports = { validateMediaAsset, assertAllowedHttpsUrl };
+const fallbackMediaAsset = (type) => {
+  const url = process.env.SOCIAL_COMMAND_DEFAULT_VIDEO_URL || '';
+  if (!url || type !== 'video') return null;
+  assertAllowedHttpsUrl(url);
+  return {
+    assetId: 'default-freedom-audit-video',
+    url,
+    type: 'video',
+    mimeType: 'video/mp4',
+    altText: 'Freedom Audit launch campaign video',
+    metadata: { source: 'SOCIAL_COMMAND_DEFAULT_VIDEO_URL' },
+  };
+};
+
+const findPostMediaAsset = (post, type) => (
+  post.mediaAssets?.find((asset) => asset.type === type && asset.url) || fallbackMediaAsset(type)
+);
+
+module.exports = { validateMediaAsset, assertAllowedHttpsUrl, findPostMediaAsset };

@@ -1,5 +1,6 @@
 const SocialProviderAdapter = require('./baseProvider');
 const { requestJson } = require('./http');
+const { findPostMediaAsset } = require('../mediaAssetService');
 
 const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v24.0';
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
@@ -216,6 +217,57 @@ class MetaProvider extends SocialProviderAdapter {
           access_token: accessToken,
         }),
       });
+      return requestJson(`${GRAPH_BASE}/${connection.providerAccountId}/media_publish`, {
+        method: 'POST',
+        body: new URLSearchParams({ creation_id: container.id, access_token: accessToken }),
+      });
+    }
+
+    throw new Error('Unsupported Meta account type.');
+  }
+
+  async publishVideo({ connection, accessToken, post }) {
+    const videoAsset = findPostMediaAsset(post, 'video');
+    const videoUrl = videoAsset?.url;
+    if (!videoUrl) throw new Error('Meta video publishing requires a hosted video URL.');
+
+    if (connection.accountType === 'facebook_page') {
+      const body = new URLSearchParams({
+        file_url: videoUrl,
+        description: [post.caption, post.link].filter(Boolean).join('\n\n'),
+        access_token: accessToken,
+      });
+      return requestJson(`${GRAPH_BASE}/${connection.providerAccountId}/videos`, { method: 'POST', body });
+    }
+
+    if (connection.accountType === 'instagram_professional') {
+      const container = await requestJson(`${GRAPH_BASE}/${connection.providerAccountId}/media`, {
+        method: 'POST',
+        body: new URLSearchParams({
+          media_type: 'REELS',
+          video_url: videoUrl,
+          caption: [post.caption, post.hashtags?.join(' ')].filter(Boolean).join('\n\n'),
+          share_to_feed: String(post.metadata?.shareToFeed ?? true),
+          access_token: accessToken,
+        }),
+      });
+
+      let processingFinished = false;
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        const status = await requestJson(`${GRAPH_BASE}/${container.id}?fields=status_code,status&access_token=${encodeURIComponent(accessToken)}`);
+        if (status.status_code === 'FINISHED') {
+          processingFinished = true;
+          break;
+        }
+        if (['ERROR', 'EXPIRED'].includes(status.status_code)) {
+          throw new Error(status.status || `Instagram reel processing failed with ${status.status_code}.`);
+        }
+      }
+      if (!processingFinished) {
+        throw new Error('Instagram reel processing did not finish before the publish timeout.');
+      }
+
       return requestJson(`${GRAPH_BASE}/${connection.providerAccountId}/media_publish`, {
         method: 'POST',
         body: new URLSearchParams({ creation_id: container.id, access_token: accessToken }),

@@ -66,6 +66,26 @@ const run = async () => {
     process.env.SOCIAL_MEDIA_ALLOWED_ASSET_HOSTS = previousAllowedHosts;
   }
 
+  const { fetchMediaBuffer } = require('../social/mediaFetchService');
+  const { findPostMediaAsset } = require('../social/mediaAssetService');
+  await assert.rejects(
+    () => fetchMediaBuffer({ url: 'http://cdn.example.com/a.mp4' }),
+    /HTTPS/,
+    'media fetch should reuse hosted URL safety checks'
+  );
+  const previousDefaultVideoUrl = process.env.SOCIAL_COMMAND_DEFAULT_VIDEO_URL;
+  process.env.SOCIAL_COMMAND_DEFAULT_VIDEO_URL = 'https://assets.example.com/freedom-audit.mp4';
+  assert.strictEqual(
+    findPostMediaAsset({ mediaAssets: [] }, 'video').url,
+    'https://assets.example.com/freedom-audit.mp4',
+    'video posts can use a configured default hosted campaign asset'
+  );
+  if (previousDefaultVideoUrl === undefined) {
+    delete process.env.SOCIAL_COMMAND_DEFAULT_VIDEO_URL;
+  } else {
+    process.env.SOCIAL_COMMAND_DEFAULT_VIDEO_URL = previousDefaultVideoUrl;
+  }
+
   const invalidConnection = new SocialConnection({
     provider: 'meta',
     providerAccountId: 'page-1',
