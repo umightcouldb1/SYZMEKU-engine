@@ -33,8 +33,24 @@ const clearStoredAuth = () => {
 const postStatusLabel = (post) => {
   if (post.publishStatus === 'published') return 'Published';
   if (post.publishStatus === 'scheduled') return 'Scheduled';
+  if (post.scheduledTime) return 'Planned';
   if (post.connectedAccountId) return 'Ready';
   return 'Needs account';
+};
+
+const toDatetimeLocalValue = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+};
+
+const fromDatetimeLocalValue = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
 };
 
 export default function SocialCommandDashboard() {
@@ -295,6 +311,14 @@ export default function SocialCommandDashboard() {
                       <input value={post.link || ''} onChange={(event) => updatePost(index, { link: event.target.value })} />
                     </label>
                     <label>
+                      Planned launch time
+                      <input
+                        type="datetime-local"
+                        value={toDatetimeLocalValue(post.scheduledTime)}
+                        onChange={(event) => updatePost(index, { scheduledTime: fromDatetimeLocalValue(event.target.value) })}
+                      />
+                    </label>
+                    <label>
                       Account
                       <select value={post.connectedAccountId || ''} onChange={(event) => updatePost(index, { connectedAccountId: event.target.value })}>
                         <option value="">Choose connected account later</option>
@@ -311,6 +335,7 @@ export default function SocialCommandDashboard() {
                 <button type="button" onClick={saveCampaign} disabled={loading}>Save Drafts</button>
                 <button type="button" onClick={approveCampaign} disabled={loading || campaign.status === 'approved'}>Approve Campaign</button>
                 <button type="button" onClick={refreshAnalytics} disabled={loading}>Refresh Analytics</button>
+                <p>Planned launch times are saved with drafts. Approval remains the human gate before any publishing workflow can run.</p>
               </div>
             </>
           )}

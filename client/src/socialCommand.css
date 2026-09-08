@@ -182,6 +182,17 @@
   flex-wrap: wrap;
 }
 
+.social-command__actions p {
+  flex-basis: 100%;
+  margin: 0;
+  color: rgba(247, 251, 255, 0.68);
+  font-size: 0.86rem;
+}
+
+.social-command input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
 @media (max-width: 1080px) {
   .social-command__grid,
   .social-command__header {
