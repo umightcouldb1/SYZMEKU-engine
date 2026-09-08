@@ -18,6 +18,7 @@ import './entryFlow.css';
 
 const ONBOARDING_STORAGE_KEY = 'syz_onboarding_complete';
 const APP_HOME_ROUTE = '/app';
+const ONBOARDING_SYNC_TIMEOUT_MS = 8000;
 
 const getStoredUser = () => {
   try {
@@ -100,14 +101,17 @@ function App() {
     const localState = getLocalOnboardingComplete();
     if (localState) {
       setOnboardingCompleted(true);
+      setOnboardingReady(true);
     }
 
-    if (!silent) {
+    if (!silent && !localState) {
       setOnboardingReady(false);
     }
 
     try {
-      const adminSignatureResponse = await axios.get('/api/admin/signature').catch(() => ({ data: null }));
+      const adminSignatureResponse = await axios.get('/api/admin/signature', {
+        timeout: ONBOARDING_SYNC_TIMEOUT_MS,
+      }).catch(() => ({ data: null }));
       if (adminSignatureResponse.data?.success) {
         const adminOnboarding = buildAdminOnboardingState(
           adminSignatureResponse.data,
@@ -125,7 +129,9 @@ function App() {
         return { completed: true, source: 'admin-signature', data: adminSignatureResponse.data };
       }
 
-      const response = await axios.get('/api/core/onboarding/status');
+      const response = await axios.get('/api/core/onboarding/status', {
+        timeout: ONBOARDING_SYNC_TIMEOUT_MS,
+      });
       const completed = Boolean(response.data?.completed || localState);
       console.info('[onboarding] status sync success', {
         completed,
