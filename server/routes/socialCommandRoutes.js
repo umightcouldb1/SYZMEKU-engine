@@ -22,7 +22,7 @@ const {
 
 router.get('/oauth/:provider/callback', handleOAuthCallback);
 
-router.use(protect);
+router.use(protect, authorizeRoles(User.ROLES.COMMANDER_IN_CHIEF));
 router.get('/providers', listSocialProviders);
 router.post('/connections/:provider/authorize', beginAuthorization);
 router.get('/connections', listConnections);
@@ -38,6 +38,6 @@ router.post('/campaigns/:campaignId/publish', publishNow);
 router.post('/campaigns/:campaignId/posts/:postId/publish', publishNow);
 router.post('/campaigns/:campaignId/schedule', scheduleCampaign);
 router.post('/campaigns/:campaignId/analytics/refresh', refreshAnalytics);
-router.post('/scheduler/run-due', authorizeRoles(User.ROLES.COMMANDER_IN_CHIEF, 'founder', 'admin'), processSchedule);
+router.post('/scheduler/run-due', processSchedule);
 
 module.exports = router;

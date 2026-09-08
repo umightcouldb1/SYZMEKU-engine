@@ -1,6 +1,8 @@
 # SYZMEKU Social Command
 
-SYZMEKU Social Command is an authenticated Big SYZ module for preparing, approving, scheduling, publishing, and reviewing social campaigns through official provider APIs. It is mounted at `/app/social-command` in the client and `/api/social-command` in the server.
+SYZMEKU Social Command is a private Big SYZ operator module for preparing, approving, scheduling, publishing, and reviewing social campaigns through official provider APIs. It is mounted at `/app/social-command` in the client and `/api/social-command` in the server.
+
+Social Command is not a public customer product. It is restricted to the founder/operator account with the `COMMANDER_IN_CHIEF` role. Public users and ordinary authenticated accounts must not be able to load the dashboard, connect accounts, create campaigns, approve posts, schedule posts, publish posts, or run the scheduler.
 
 The module does not scrape, automate browsers, store provider tokens in the frontend, or replace the existing SYZMEKU/Freedom Audit production applications.
 
@@ -21,7 +23,7 @@ npm install --prefix client
 npm run dev
 ```
 
-4. Open the authenticated client at `http://localhost:5173/app/social-command`.
+4. Open the authenticated client at `http://localhost:5173/app/social-command` while signed in as the configured founder/operator account.
 
 ## Backend Environment Variables
 
@@ -167,7 +169,7 @@ The server generates campaigns from `server/social/campaignGenerationService.js`
 
 Each draft includes UTM-tagged links to `https://freedom.toisouljahacademy.com` with `utm_medium=social` and `utm_campaign=freedom_audit_launch`.
 
-Users must approve a campaign before publishing. Publishing requires a connected account owned by the authenticated user. Publishing uses an idempotency key per campaign/post and skips posts already marked as published with a provider post ID.
+The founder/operator must approve a campaign before publishing. Publishing requires a connected account owned by that authenticated operator account. Publishing uses an idempotency key per campaign/post and skips posts already marked as published with a provider post ID.
 
 ## Scheduling
 
@@ -175,16 +177,16 @@ Schedules are stored in MongoDB on the campaign post records. Run due scheduled 
 
 ```http
 POST /api/social-command/scheduler/run-due
-Authorization: Bearer <user-token>
+Authorization: Bearer <commander-token>
 ```
 
 For production, call this endpoint from a trusted Render Cron job or an existing internal scheduler. The first implementation slice does not add an always-on worker process.
 
-The scheduler endpoint is restricted to authenticated `founder` or `admin` roles because it can process due posts across stored campaigns.
+The scheduler endpoint is restricted to the authenticated `COMMANDER_IN_CHIEF` role because it can process due posts across stored campaigns.
 
 ## Security Model
 
-- All Social Command routes require normal SYZMEKU authentication except OAuth callbacks.
+- All Social Command routes require the `COMMANDER_IN_CHIEF` role except OAuth callbacks.
 - OAuth callbacks validate the server-created state record and consume it once. Provider redirects cannot carry a bearer token, so callback authorization is state-based.
 - OAuth callbacks redirect only to the server-configured Social Command URL. The callback handler does not accept arbitrary return URLs from provider query parameters.
 - OAuth state is stored hashed and expires after 15 minutes.

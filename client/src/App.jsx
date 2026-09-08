@@ -19,6 +19,7 @@ import './entryFlow.css';
 const ONBOARDING_STORAGE_KEY = 'syz_onboarding_complete';
 const APP_HOME_ROUTE = '/app';
 const ONBOARDING_SYNC_TIMEOUT_MS = 8000;
+const COMMANDER_ROLE = 'COMMANDER_IN_CHIEF';
 
 const getStoredUser = () => {
   try {
@@ -227,7 +228,14 @@ function App() {
           }
         >
           <Route path={APP_HOME_ROUTE} element={onboardingCompleted ? <Dashboard user={user} /> : <Navigate to="/onboarding" replace />} />
-          <Route path="/app/social-command" element={onboardingCompleted ? <SocialCommandDashboard /> : <Navigate to="/onboarding" replace />} />
+          <Route
+            path="/app/social-command"
+            element={
+              <RequireAuth allowedRoles={[COMMANDER_ROLE]}>
+                {onboardingCompleted ? <SocialCommandDashboard /> : <Navigate to="/onboarding" replace />}
+              </RequireAuth>
+            }
+          />
           <Route path="/app/profile" element={onboardingCompleted ? <Profile /> : <Navigate to="/onboarding" replace />} />
           <Route path="/profile" element={onboardingCompleted ? <Profile /> : <Navigate to="/onboarding" replace />} />
           <Route path="/dashboard" element={<Navigate to={APP_HOME_ROUTE} replace />} />
