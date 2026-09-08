@@ -57,6 +57,13 @@ const serializeConnection = (connection) => ({
   metadata: connection.metadata,
 });
 
+const activateApprovedScheduleIfReady = async (campaign) => {
+  if (!campaign || campaign.status !== 'approved') return 0;
+  const scheduledCount = activatePlannedSchedule(campaign);
+  if (scheduledCount > 0) await campaign.save();
+  return scheduledCount;
+};
+
 const normalizeCampaignInput = (body = {}) => ({
   name: sanitizeText(body.name, 160),
   objective: sanitizeText(body.objective, 1000),
@@ -237,12 +244,14 @@ const seedFreedomAuditCampaign = asyncHandler(async (req, res) => {
 
 const listCampaigns = asyncHandler(async (req, res) => {
   const campaigns = await SocialCampaign.find({ userId: userIdOf(req) }).sort({ updatedAt: -1 }).limit(50);
+  await Promise.all(campaigns.map(activateApprovedScheduleIfReady));
   res.json({ campaigns: campaigns.map((campaign) => ({ ...campaign.toObject(), summary: summarizeCampaign(campaign) })) });
 });
 
 const getCampaign = asyncHandler(async (req, res) => {
   const campaign = await SocialCampaign.findOne({ _id: req.params.campaignId, userId: userIdOf(req) });
   if (!campaign) return res.status(404).json({ error: 'Campaign not found.' });
+  await activateApprovedScheduleIfReady(campaign);
   res.json({ campaign, summary: summarizeCampaign(campaign) });
 });
 
