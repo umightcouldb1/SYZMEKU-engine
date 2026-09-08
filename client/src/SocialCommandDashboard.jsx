@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import './socialCommand.css';
 
 const providerLabels = {
@@ -22,6 +23,13 @@ const authHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
+const clearStoredAuth = () => {
+  localStorage.removeItem('user');
+  localStorage.removeItem('token');
+  localStorage.removeItem('user_role');
+  localStorage.removeItem('syz_onboarding_complete');
+};
+
 const postStatusLabel = (post) => {
   if (post.publishStatus === 'published') return 'Published';
   if (post.publishStatus === 'scheduled') return 'Scheduled';
@@ -30,6 +38,7 @@ const postStatusLabel = (post) => {
 };
 
 export default function SocialCommandDashboard() {
+  const navigate = useNavigate();
   const [providers, setProviders] = useState([]);
   const [connections, setConnections] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
@@ -42,13 +51,24 @@ export default function SocialCommandDashboard() {
   const campaignSummary = activeCampaign?.summary || {};
 
   const api = async (method, url, data) => {
-    const response = await axios.request({
-      method,
-      url,
-      data,
-      headers: authHeaders(),
-    });
-    return response.data;
+    try {
+      const response = await axios.request({
+        method,
+        url,
+        data,
+        headers: authHeaders(),
+      });
+      return response.data;
+    } catch (apiError) {
+      if (apiError?.response?.status === 401) {
+        clearStoredAuth();
+        navigate('/login', {
+          replace: true,
+          state: { from: { pathname: '/app/social-command', search: '' } },
+        });
+      }
+      throw apiError;
+    }
   };
 
   const loadAll = async () => {
@@ -83,7 +103,13 @@ export default function SocialCommandDashboard() {
       window.history.replaceState({}, '', window.location.pathname);
     }
 
-    loadAll().catch((loadError) => setError(loadError?.response?.data?.error || 'Social Command failed to load.'));
+    loadAll().catch((loadError) => {
+      if (loadError?.response?.status === 401) {
+        setError('Your session expired. Sign in again to reconnect Social Command.');
+        return;
+      }
+      setError(loadError?.response?.data?.error || 'Social Command failed to load.');
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
