@@ -2,9 +2,9 @@
 
 ## Master Build Spec
 
-**Current approved milestone: M1 — Isolation and Context Foundation only (2026-09-09).**
+**Current approved work: M2 — Pattern Intelligence implementation for code review only (2026-09-09).**
 Section 15 records the approved M0 reconciliation and governs the M1 implementation.
-Earlier product aspirations are not evidence of implemented functionality or approval for M2–M6.
+Earlier product aspirations are not evidence of implemented functionality or approval beyond the explicit M2 implementation boundary in section 16. M2 release and M3–M6 remain unauthorized.
 
 ### Product Identity
 
@@ -917,7 +917,7 @@ Before any context mutation, verify that LifeContext.user_id and Memory.userId e
 
 ### 15.5 Enablement, validation and rollback
 
-Personal Core writes require CORE_CONTEXT_WRITES_ENABLED exactly true AND the authenticated owner's exact account ID in CORE_CONTEXT_WRITE_USER_IDS. The allowlist is required; empty, wildcard or malformed lists authorize nobody. Roles and request fields do not grant account approval. Personal loops, background jobs, kernel/action execution and system execution/automation additionally require CORE_PERSONAL_EXECUTION_ENABLED exactly true, which defaults off. Scoped reads remain available. Commerce and Operations do not use these gates. The founder-only gate correction is awaiting separate merge/deployment/activation approval; production writes remain paused. See [the founder gate contract](m1-founder-write-gate.md).
+Personal Core writes require CORE_CONTEXT_WRITES_ENABLED exactly true AND the authenticated owner's exact account ID in CORE_CONTEXT_WRITE_USER_IDS. The allowlist is required; empty, wildcard or malformed lists authorize nobody. Roles and request fields do not grant account approval. Personal loops, background jobs, kernel/action execution and system execution/automation additionally require CORE_PERSONAL_EXECUTION_ENABLED exactly true, which defaults off. Scoped reads remain available. Commerce and Operations do not use these gates. The founder-only gate correction was merged and validated on f051abecc137a049dc68e2e890004307bb677c51. Only the existing approved founder account has context writes enabled; personal execution remains disabled. M2 implementation does not change production configuration. See [the founder gate contract](m1-founder-write-gate.md).
 
 Release prerequisites: review the dry-run; verify a transaction-capable replica set and the required ownership indexes in staging; run the two-user fixtures and browser smoke check; obtain separate merge/deployment approval. A standalone Mongo server has no unsafe nontransactional fallback. The database account must be able to read index metadata. Explicit index creation is limited to disposable fixture databases in tests.
 
@@ -927,4 +927,8 @@ Safe operational rollback after any M1 use: retain this M1 revision, set CORE_CO
 
 ### 15.6 Deferred work and approval stop
 
-M2 pattern intelligence, M3 provider/reasoning routing repairs, M4 PermissionGrant and immutable approval lifecycle, M5 Audit import and M6 broader autonomy are not implemented. Existing urgency-based internal action policy is preserved and is not represented as a permission grant. The pre-existing provider-enabled /core/agent analyzeMode defect remains tracked for M3. No live Stripe charge, webhook injection into production, provider publishing, production backfill, merge or deployment is authorized by the M1 implementation step.
+M2 Pattern Intelligence implementation is approved for a dedicated PR and code review only; it is not released or activated. M3 provider/reasoning routing repairs, M4 PermissionGrant and immutable approval lifecycle, M5 Audit import and M6 broader autonomy remain unauthorized. Existing urgency-based internal action policy is preserved and is not represented as a permission grant. The pre-existing provider-enabled /core/agent analyzeMode defect remains tracked for M3. No live Stripe charge, webhook injection into production, provider publishing, production backfill, merge or deployment is authorized by the M1 implementation step.
+
+## 16. Approved M2 implementation boundary
+
+The controlling implementation contract is [M2 Pattern Intelligence](m2-pattern-intelligence.md). It introduces only the justified Pattern authority, preserves existing canonical sources and M1 ownership/privacy, and uses explicit founder-gated evaluation with personal execution disabled. The 28-day window is a versioned v1 default, never dynamically fitted; the one-third contradiction rule is only a conservative promotion heuristic, never scientific probability or proof of falsity. All new M2 production flags remain OFF/unset. No merge, deployment, production index creation, historical migration, Freedom Audit/Social import, campaign mutation, live purchase or M3 work is authorized. Stop at code review.

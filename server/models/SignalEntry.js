@@ -2,6 +2,10 @@ const mongoose = require("mongoose");
 
 const signalSchema = new mongoose.Schema(
   {
+    revision: { type: Number, default: 0 },
+    provenance: require('./patternSourceFields').provenance,
+    event: require('./patternSourceFields').event,
+    eventKey: String,
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -27,6 +31,7 @@ const signalSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-signalSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
+signalSchema.index({userId:1,occurredAt:1,_id:1},{name:'pattern_signal_owner_time'});
+signalSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{},evidenceSource:'event'});
 
 module.exports = mongoose.model("SignalEntry", signalSchema);

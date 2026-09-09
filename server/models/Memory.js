@@ -36,6 +36,7 @@ const biometricMetadataSchema = new mongoose.Schema(
 
 const conversationTurnSchema = new mongoose.Schema(
   {
+    patternRefs: [{patternId:String,revision:Number,sourceEpoch:Number}],
     role: {
       type: String,
       enum: ['user', 'model'],
@@ -118,6 +119,7 @@ memorySchema.methods.appendConversationTurns = function appendConversationTurns(
       role: turn.role,
       text: String(turn.text || '').trim(),
       timestamp: turn.timestamp || new Date(),
+      ...(turn.patternRefs ? {patternRefs:turn.patternRefs.slice(0,5)} : {}),
       ...(turn.biometricMetadata ? { biometricMetadata: turn.biometricMetadata } : {}),
     }))
     .filter((turn) => ['user', 'model'].includes(turn.role) && turn.text);
@@ -125,6 +127,6 @@ memorySchema.methods.appendConversationTurns = function appendConversationTurns(
   this.conversationHistory = [...this.conversationHistory, ...cleanTurns].slice(-80);
 };
 
-memorySchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
+memorySchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{},evidenceSource:true});
 
 module.exports = mongoose.model('Memory', memorySchema);

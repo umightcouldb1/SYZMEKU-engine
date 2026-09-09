@@ -7,4 +7,8 @@ router.put('/context',async(req,res)=>res.json(await core.saveContext(req.body))
 router.delete('/context',async(_req,res)=>{await core.eraseContext();res.json({deleted:true,scope:'personal_core',commerceUnchanged:true});});
 router.patch('/memory/:id',async(req,res)=>res.json(await core.changeMemory(req.params.id,req.body)));
 router.delete('/memory/:id',async(req,res)=>res.json(await core.changeMemory(req.params.id,null)));
+router.patch('/signals/:id',async(req,res)=>res.json(await core.changeObservation(req.params.id,req.body)));
+router.get('/signals/:id([a-fA-F0-9]{24})',async(req,res)=>{const signal=await require('../models/SignalEntry').findById(req.params.id).lean();if(!signal)return res.status(404).json({message:'Observation not found.'});res.set('Cache-Control','private, no-store').json(signal);});
+router.delete('/signals/:id',async(req,res)=>res.json(await core.changeObservation(req.params.id,null,Number(req.headers['if-match']))));
+router.patch('/tasks/:id/intent',async(req,res)=>res.json(await core.saveTaskIntent(req.params.id,req.body)));
 module.exports=router;

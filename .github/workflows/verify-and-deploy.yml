@@ -44,6 +44,12 @@ jobs:
       - name: Verify M1 ownership, privacy and commerce fixtures
         run: npm run m1:test && npm run social-command:test
 
+      - name: Verify M2 rules, privacy, lifecycle and consumers
+        run: npm run m2:test
+
+      - name: Verify M2 in headless Chrome with a disposable database
+        run: npm run m2:browser
+
       - name: Run production verification
         run: npm run test
 

@@ -50,7 +50,7 @@ async function anchorContext() {
   return life;
 }
 
-async function withContextMutation(callback) {
+async function withContextMutation(callback, { evidence = true } = {}) {
   requireCoreScope();
   require('./coreScopeService').requireCoreWrite();
   if (getRequestContext().coreTransaction) return callback(await anchorContext());
@@ -61,11 +61,13 @@ async function withContextMutation(callback) {
     }
   }
   return mongoose.connection.transaction(async () => runWithRequestContext(
-    { ...getRequestContext(), coreTransaction:true }, async () => {
+    { ...getRequestContext(), coreTransaction:true, coreEvidenceMutation:evidence }, async () => {
       const life = await anchorContext();
       // Writing the anchor serializes privacy changes with in-flight model/kernel writes.
       life.writeSequence = (life.writeSequence || 0) + 1;
+      if (evidence) life.patternEvidenceRevision = (life.patternEvidenceRevision || 0) + 1;
       await life.save();
+      if (evidence) await require('./patternInvalidationService').stale();
       return callback(life);
     }
   ));
@@ -98,6 +100,7 @@ function sanitizeContext(payload, current = {}) {
 }
 
 async function invalidateDerived({ conversation = true } = {}) {
+  await require('./patternInvalidationService').redact();
   // Retain execution identities and timestamps, redact payloads that could repeat deleted context.
   const changes = {
     KernelSnapshot:{latest_output:null}, KernelCycle:{output:null,error_summary:''},
@@ -169,6 +172,7 @@ async function getConversation() {
 
 async function appendConversation(turns, expected) {
   return withContextMutation(async life => {
+    if(expected.patternStamp)await require('./patternPresentationService').checkStamp(expected.patternStamp);
     const {userId} = requireCoreScope();
     const memory=await Memory.findOne({userId});
     if (life.revision !== expected.contextRevision || (memory?.revision || 0) !== expected.conversationRevision) throw conflict();
@@ -179,7 +183,7 @@ async function appendConversation(turns, expected) {
     target.sovereignContext = {};
     await target.save();
     return target.toObject();
-  });
+  }, { evidence:false });
 }
 
 async function clearConversation() {
@@ -197,22 +201,26 @@ async function eraseContext() {
     await User.updateOne({_id:requireCoreScope().userId},{$set:{'onboarding.profile':{}}});
     await invalidateDerived();
     for(const name of ['StrategicMemory','SignalEntry','Task','System','Protocol','UserProtocolState','MentorProfile','MentorSignal','MentorTask','MentorMessage','LoopStatus','BehavioralRhythm','EmotionalPattern','ColorProfile','SensoryProfile','SymbolicInterest']) await require('../models/'+name).deleteMany({});
+    await require('./patternInvalidationService').erase();
   });
   invalidateCoreRuntime();
 }
 
 async function ingestObservation(payload) {
   rejectOwnerFields(payload);
+  for (const field of ['provenance','eventKey','revision','createdAt','updatedAt']) if (payload[field] !== undefined) throw scopeError('Source identity is server-owned.',400);
   const allowed=['sleep','stress','energy','mood','symptoms','notes','domain','observationType','value','occurredAt','sourceId','source','confirmed','legacyId'];
   const record=Object.fromEntries(allowed.filter(k=>payload[k] !== undefined).map(k=>[k,payload[k]]));
   for(const key of ['sourceId','source','domain','observationType','legacyId']) if(record[key] !== undefined && typeof record[key] !== 'string') throw scopeError('Observation metadata must be text.',400);
   if (JSON.stringify(record).length > 16000) throw scopeError('Observation is too large.',400);
   return withContextMutation(async life=>{
+    const metadata = await require('./patternSourceService').observationMetadata(payload);
+    if(metadata.event)record.event=metadata.event;
     if(record.sourceId) {
       const existing=await SignalEntry.findOne({sourceId:record.sourceId,source:record.source || 'user'});
-      if(existing) return existing;
+      if(existing) { if(!require('./patternSourceService').sameRetry(existing.toObject({flattenMaps:true}),record))throw scopeError('Source identity already exists with different data. Correct the source explicitly.',409); return existing; }
     }
-    const signal=await SignalEntry.create(record);
+    const signal=await SignalEntry.create({...record,...metadata});
     life.revision += 1;await life.save();
     return signal;
   });
@@ -227,7 +235,8 @@ async function createTask(payload) {
 async function completeTask(id) {
   return withContextMutation(async()=>{
     const task=await Task.findById(id);if(!task) throw scopeError('Task not found.',404);
-    task.status='done';task.completedAt=new Date();await task.save();return task;
+    if(task.status==='done')return task;
+    task.status='done';task.completedAt=new Date();task.revision=(task.revision||0)+1;await task.save();return task;
   });
 }
 async function listMemory(query='') {
@@ -242,6 +251,7 @@ async function changeMemory(id, payload) {
   if(payload) rejectOwnerFields(payload);
   const result=await withContextMutation(async life=>{
     const memory=await StrategicMemory.findById(id);if(!memory) throw scopeError('Memory not found.',404);
+    if(payload?.expectedRevision!==undefined)require('./patternSourceService').ensureExpected(memory,payload.expectedRevision);
     if(payload) {memory.content=text(payload.content,6000);memory.title=text(payload.title || memory.content,80);memory.sourceCommand='';memory.tags=[];memory.confirmed=true;memory.source='user-correction';if(memory.category==='kernel')memory.category='general';memory.revision+=1;await memory.save();}
     else await memory.deleteOne();
     life.revision+=1;await life.save();await invalidateDerived();
@@ -253,6 +263,33 @@ async function changeMemory(id, payload) {
 async function reasoningContext() {
   const [context,latestSignals,latestTasks,strategicMemory,latestSystems] = await Promise.all([getContext(),listObservations(),listTasks(),listMemory(),require('../models/System').find().sort({updatedAt:-1}).limit(10).lean()]);
   return {humanContext:context,latestSignals:latestSignals.slice(0,5),latestTasks:latestTasks.slice(0,10),strategicMemory:strategicMemory.slice(0,10),latestSystems};
+}
+
+async function changeObservation(id,payload,expectedRevision) {
+  if(!/^[a-f\d]{24}$/i.test(id))throw scopeError('Observation not found.',404);
+  if(payload) {rejectOwnerFields(payload);require('../logic/patternRules').exact(payload,['event','notes','occurredAt','expectedRevision']);}
+  const result=await withContextMutation(async life=>{
+    const signal=await SignalEntry.findById(id);if(!signal)throw scopeError('Observation not found.',404);
+    require('./patternSourceService').ensureExpected(signal,payload?.expectedRevision??expectedRevision);
+    if(payload){
+      if(payload.event)signal.event=require('./patternSourceService').eventData(payload.event);
+      if(signal.event?.taskRef&&!await Task.exists({_id:signal.event.taskRef}))throw scopeError('Task not found.',404);
+      if(payload.notes!==undefined)signal.notes=text(payload.notes,2000);
+      if(payload.occurredAt!==undefined){const at=new Date(payload.occurredAt);if(!Number.isFinite(+at)||+at>Date.now())throw scopeError('Invalid occurrence time.',400);signal.occurredAt=at;}
+      signal.revision=(signal.revision||0)+1;await signal.save();
+    }else await signal.deleteOne();
+    life.revision++;await life.save();await invalidateDerived();return payload?signal.toObject():{deleted:true};
+  });invalidateCoreRuntime();return result;
+}
+async function saveTaskIntent(id,payload){
+  require('./patternCapabilityService').requirePatternWrite();rejectOwnerFields(payload);
+  const value=require('./patternSourceService').intentData(payload);
+  return withContextMutation(async life=>{
+    const task=await Task.findById(id);if(!task||!life.goals.some(g=>String(g._id)===value.goalId))throw scopeError('Task or goal not found.',404);
+    require('./patternSourceService').ensureExpected(task,payload.expectedRevision);
+    if(+value.intent.dueAt<Date.now())throw scopeError('New intentions must be recorded before their deadline.',400);
+    task.set(value);task.revision=(task.revision||0)+1;await task.save();await invalidateDerived();return task.toObject();
+  });
 }
 
 async function createProtocol(payload) {
@@ -271,4 +308,4 @@ async function loopStatus() {
   return {active:Boolean(state?.active && runtime?.timer && runtime?.active),last_cycle:state?.last_run_at || null,cycle_count:state?.run_count || 0};
 }
 
-module.exports={getContext,saveContext,onboardingStatus,saveOnboarding,getConversation,appendConversation,clearConversation,eraseContext,ingestObservation,listObservations,listTasks,createTask,completeTask,listMemory,saveMemory,changeMemory,reasoningContext,withContextMutation,createProtocol,listProtocols,saveUserProtocol,listUserProtocols,loopStatus};
+module.exports={getContext,saveContext,onboardingStatus,saveOnboarding,getConversation,appendConversation,clearConversation,eraseContext,ingestObservation,listObservations,listTasks,createTask,completeTask,listMemory,saveMemory,changeMemory,changeObservation,saveTaskIntent,reasoningContext,withContextMutation,createProtocol,listProtocols,saveUserProtocol,listUserProtocols,loopStatus};

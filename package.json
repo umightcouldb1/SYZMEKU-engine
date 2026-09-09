@@ -17,7 +17,11 @@
     "start": "node server.js",
     "test": "npm run server-check && npm run client-build",
     "m1:test": "node --test server/tests/coreScope.test.cjs server/tests/coreLoopRead.test.cjs server/tests/coreFounderGate.test.cjs server/tests/coreContext.test.cjs server/tests/coreMigration.test.cjs server/tests/commerceRegression.test.cjs",
-    "m1:dry-run": "node server/scripts/migrateCoreContextV1.cjs"
+    "m1:dry-run": "node server/scripts/migrateCoreContextV1.cjs",
+    "m2:test": "node --test server/tests/patternRules.test.cjs server/tests/patternIntegration.test.cjs server/tests/patternPrivacy.test.cjs server/tests/patternLifecycle.test.cjs server/tests/patternConsumers.test.cjs",
+    "m2:browser": "node server/tests/patternBrowser.cjs",
+    "m2:prerequisites": "node server/scripts/verifyPatternPrerequisites.cjs",
+    "m2:index-plan": "node server/scripts/provisionPatternIndexes.cjs"
   },
   "keywords": [
     "SYZMEKU",

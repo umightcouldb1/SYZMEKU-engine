@@ -21,6 +21,8 @@ const lifeContextSchema = new mongoose.Schema(
     user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true, index: true },
     schemaVersion: { type: Number, default: 1 },
     revision: { type: Number, default: 0 },
+    patternEvidenceRevision: { type: Number, default: 0 },
+    lastPatternEvaluationAt: Date,
     writeSequence: { type: Number, default: 0 },
     legacySuppressedAt: { type: Date, default: null },
     preferredName: { type: String, default: '', maxlength: 200 },
@@ -45,6 +47,6 @@ const lifeContextSchema = new mongoose.Schema(
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } },
 );
 
-lifeContextSchema.plugin(require('./coreOwned'), {"ownerKey":"user_id","references":{}});
+lifeContextSchema.plugin(require('./coreOwned'), {"ownerKey":"user_id","references":{},evidenceSource:true});
 
 module.exports = mongoose.model('LifeContext', lifeContextSchema);

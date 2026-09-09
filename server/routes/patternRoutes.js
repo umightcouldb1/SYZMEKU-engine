@@ -1,0 +1,16 @@
+const router=require('../utils/asyncRouter')();
+const cap=require('../services/patternCapabilityService');
+const service=require('../services/patternIntelligenceService');
+const view=require('../services/patternPresentationService');
+router.use(require('../middleware/authMiddleware').protect);
+router.use((_req,res,next)=>{res.set('Cache-Control','private, no-store');next();});
+router.get('/capability',(_req,res)=>res.json({enabled:cap.enabled()}));
+router.get('/plan-preview',async(_req,res)=>res.json(await view.planPreview()));
+router.get('/',async(req,res)=>res.json(await view.list({state:req.query.state,cursor:req.query.cursor,limit:req.query.limit?Number(req.query.limit):20})));
+router.post('/evaluate',async(req,res)=>res.json(await service.evaluate(req.body)));
+router.post('/hypotheses',async(req,res)=>{require('../logic/patternRules').exact(req.body,['rule','expectedSourceEpoch']);res.json(await service.evaluate({rules:[req.body.rule],expectedSourceEpoch:req.body.expectedSourceEpoch}));});
+router.param('id',(req,res,next,id)=>/^[a-f\d]{24}$/i.test(id)?next():res.status(404).json({message:'Pattern not found.'}));
+router.get('/:id',async(req,res)=>res.json(await view.detail(req.params.id)));
+router.get('/:id/evidence',async(req,res)=>res.json(await view.evidencePage(req.params.id,{role:req.query.role,offset:Number(req.query.offset||0)})));
+router.post('/:id/feedback',async(req,res)=>res.json(await service.feedback(req.params.id,req.body)));
+module.exports=router;

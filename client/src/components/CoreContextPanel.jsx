@@ -30,7 +30,7 @@ export default function CoreContextPanel({ onChanged }) {
   const change = async operation => {
     setBusy(true); setError('');
     try {
-      await operation(); await refresh(); await onChanged?.(); setEditing(null); setConfirmErase(false);
+      await operation(); window.dispatchEvent(new Event('core-context-changed')); await refresh(); await onChanged?.(); setEditing(null); setConfirmErase(false);
     } catch (e) { setError(e.response?.data?.message || 'The change could not be saved. Please reload and try again.'); }
     finally { setBusy(false); }
   };
