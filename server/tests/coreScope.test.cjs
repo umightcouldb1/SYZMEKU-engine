@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 process.env.NODE_ENV = 'test';
 process.env.CORE_CONTEXT_WRITES_ENABLED = 'true';
+process.env.CORE_CONTEXT_WRITE_USER_IDS = '';
+process.env.CORE_PERSONAL_EXECUTION_ENABLED = 'true'; // Isolated execution regressions only.
 process.env.JWT_SECRET = 'synthetic-m1-test-secret-not-for-deployment';
 process.env.MONGOMS_DOWNLOAD_DIR = path.resolve(__dirname, '../../.cache/mongodb-binaries');
 delete process.env.MONGO_URI;
@@ -32,6 +34,7 @@ async function request(user, route, method = 'GET', body) {
 }
 async function fixtureUser(name, role) {
   const user = await User.create({name,username:name,email:name+'@example.test',password:'synthetic-fixture-hash',role});
+  process.env.CORE_CONTEXT_WRITE_USER_IDS = [process.env.CORE_CONTEXT_WRITE_USER_IDS, String(user._id)].filter(Boolean).join(',');
   const sid = 'fixture-'+name;
   await AuthSession.create({userId:user._id, sessionId:sid, expiresAt:new Date(Date.now()+600000)});
   return {id:String(user._id),sid,token:jwt.sign({id:String(user._id),sid},process.env.JWT_SECRET,{expiresIn:'10m'})};

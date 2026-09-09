@@ -53,6 +53,8 @@ before(async () => {
     if (recording && mutationCommands.has(event.commandName)) mutations.push(event.commandName);
   });
   a = await fixtureUser('read-a'); b = await fixtureUser('read-b'); c = await fixtureUser('read-c');
+  process.env.CORE_CONTEXT_WRITE_USER_IDS = [a.id, b.id, c.id].join(',');
+  delete process.env.CORE_PERSONAL_EXECUTION_ENABLED;
   regular = await fixtureUser('read-regular', 'USER');
   await AgentLoopState.collection.insertMany([
     { singletonKey: 'primary', active: true, latest_agent_summary: 'historical-secret' },
