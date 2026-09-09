@@ -12,7 +12,7 @@ const AlertRecord = require("../../models/AlertRecord");
 const ActionExecution = require("../../models/ActionExecution");
 const { buildActionPolicy, createToolRegistry, executeActionPlan } = require("../../logic/actionKernel");
 const mongoose = require("mongoose");
-const { requireCoreScope, coreCapabilities, rejectOwnerFields, runAuthenticatedCoreJob, scopedRuntime, scopeError } = require('../../services/coreScopeService');
+const { requireCoreScope, coreCapabilities, rejectOwnerFields, runAuthenticatedCoreJob, scopedRuntime, scopeError, readCoreRuntime } = require('../../services/coreScopeService');
 const core = require('../../services/coreContextService');
 const coreSingletonKey = () => 'user:' + requireCoreScope().userId;
 let activeLoopOwner = null;
@@ -136,7 +136,7 @@ const KERNEL_NODES = ["sentinel", "mentor", "planner", "protocol", "recommend"];
 const LOOP_INTERVAL_MS = Number(process.env.AGENT_LOOP_INTERVAL_MS) > 0 ? Number(process.env.AGENT_LOOP_INTERVAL_MS) : 120000;
 const DEV_DEFAULT_ACTIVE =
   process.env.NODE_ENV === "development" && String(process.env.AGENT_LOOP_DEFAULT_ACTIVE || "false").toLowerCase() === "true";
-const loopState = scopedRuntime('loop', () => ({
+const defaultLoopState = () => ({
   active: false,
   intervalMs: LOOP_INTERVAL_MS,
   timer: null,
@@ -150,29 +150,14 @@ const loopState = scopedRuntime('loop', () => ({
   latestActionExecutions: [],
   eventLog: [],
   lastError: null,
-}));
+});
+const loopState = scopedRuntime('loop', defaultLoopState);
 
 const appendLoopEvent = (event) => {
   loopState.eventLog = [{ recordedAt: new Date().toISOString(), ...event }, ...loopState.eventLog].slice(0, 50);
 };
 
-const getLoopStateRecord = async () => {
-  let record = await AgentLoopState.findOne({ singletonKey: coreSingletonKey() });
-  if (record) return record;
-
-  record = await AgentLoopState.create({
-    singletonKey: coreSingletonKey(),
-    active: false,
-    interval_ms: LOOP_INTERVAL_MS,
-    run_count: 0,
-    last_error: "",
-    latest_agent_summary: "",
-    latest_agent_mode: "",
-    latest_agent_next_actions: [],
-  });
-
-  return record;
-};
+const getLoopStateRecord = () => AgentLoopState.findOne({ singletonKey: coreSingletonKey() }).lean();
 
 const syncLoopStateFromRecord = (record) => {
   if (!record) return;
@@ -1016,20 +1001,39 @@ const stopAgentLoop = async () => {
   return loopState;
 };
 
-const loopStatusPayload = () => ({
-  active: loopState.active,
-  interval_ms: loopState.intervalMs,
-  started_at: loopState.startedAt,
-  last_run_at: loopState.lastRunAt,
-  run_count: loopState.runCount,
-  last_error: loopState.lastError,
-  latest_agent_summary: loopState.latestAgentSummary,
-  latest_agent_mode: loopState.latestAgentMode,
-  latest_agent_next_actions: loopState.latestAgentNextActions,
-  latest_action_executions: loopState.latestActionExecutions,
-  last_report: loopState.lastReport,
-  recent_events: loopState.eventLog.slice(0, 10),
+const loopStatusPayload = (state = loopState) => ({
+  active: state.active,
+  interval_ms: state.intervalMs,
+  started_at: state.startedAt,
+  last_run_at: state.lastRunAt,
+  run_count: state.runCount,
+  last_error: state.lastError,
+  latest_agent_summary: state.latestAgentSummary,
+  latest_agent_mode: state.latestAgentMode,
+  latest_agent_next_actions: state.latestAgentNextActions,
+  latest_action_executions: state.latestActionExecutions,
+  last_report: state.lastReport,
+  recent_events: state.eventLog.slice(0, 10),
 });
+
+// Status reads neither create records nor initialize or synchronize personal runtimes.
+const readLoopStatusPayload = async () => {
+  const record = await getLoopStateRecord();
+  if (!record) return loopStatusPayload(defaultLoopState());
+  const runtime = readCoreRuntime('loop');
+  return loopStatusPayload({
+    ...defaultLoopState(),
+    ...runtime,
+    active: Boolean(record.active && runtime?.active && runtime?.timer),
+    intervalMs: Number(record.interval_ms) > 0 ? Number(record.interval_ms) : LOOP_INTERVAL_MS,
+    lastRunAt: record.last_run_at || null,
+    runCount: Number(record.run_count) || 0,
+    lastError: record.last_error || '',
+    latestAgentSummary: record.latest_agent_summary || '',
+    latestAgentMode: record.latest_agent_mode || '',
+    latestAgentNextActions: Array.isArray(record.latest_agent_next_actions) ? record.latest_agent_next_actions : [],
+  });
+};
 
 // M1: historical active flags do not authorize personal background work.
 // An authenticated operator must explicitly restart the existing session-bound timer.
@@ -1473,9 +1477,7 @@ router.get("/autonomy/status", async (_req, res) => {
 });
 
 router.get("/loop/status", async (_req, res) => {
-  const record = await getLoopStateRecord();
-  syncLoopStateFromRecord(record);
-  return res.json(loopStatusPayload());
+  return res.json(await readLoopStatusPayload());
 });
 
 router.post("/loop/start", async (req, res) => {
@@ -1485,6 +1487,9 @@ router.post("/loop/start", async (req, res) => {
     await auditCoreAction(req, "loop_started", { intervalMs: loopState.intervalMs });
     return res.json({ message: "Agent loop started.", ...loopStatusPayload() });
   } catch (error) {
+    if (error?.code === 'CORE_SCOPE_REQUIRED' && error?.statusCode === 503) {
+      return res.status(503).json({ code: error.code, message: error.message, details: error.message });
+    }
     const details = buildLoopStartErrorDetails(error);
     console.error("Loop start failed:", error?.message || error);
     console.error(error?.stack || "No stack trace available.");
@@ -1626,9 +1631,8 @@ router.get("/summary", async (_req, res) => {
     KernelSnapshot.findOne({ singletonKey: coreSingletonKey() }).lean(),
     ActionExecution.find().sort({ timestamp: -1 }).limit(5).lean(),
   ]);
-  if (!autonomyState.lastRunAt) await evaluateMonitorState();
-  const loopRecord = await getLoopStateRecord();
-  syncLoopStateFromRecord(loopRecord);
+  const loopStatus = await readLoopStatusPayload();
+  const monitor = readCoreRuntime('autonomy');
 
   const kernel = snapshot?.latest_output || null;
 
@@ -1654,18 +1658,18 @@ router.get("/summary", async (_req, res) => {
     latest_kernel_timestamp: kernel?.timestamp || null,
     latest_actions: recentActions,
     autonomy_status: {
-      monitoring_enabled: autonomyState.monitoringEnabled,
-      last_monitor_run: autonomyState.lastRunAt,
+      monitoring_enabled: monitor?.monitoringEnabled ?? true,
+      last_monitor_run: monitor?.lastRunAt ?? null,
     },
     loop_status: {
-      active: loopState.active,
-      interval_ms: loopState.intervalMs,
-      last_run_at: loopState.lastRunAt,
-      run_count: loopState.runCount,
-      last_error: loopState.lastError,
-      latest_agent_summary: loopState.latestAgentSummary,
-      latest_agent_mode: loopState.latestAgentMode,
-      latest_agent_next_actions: loopState.latestAgentNextActions,
+      active: loopStatus.active,
+      interval_ms: loopStatus.interval_ms,
+      last_run_at: loopStatus.last_run_at,
+      run_count: loopStatus.run_count,
+      last_error: loopStatus.last_error,
+      latest_agent_summary: loopStatus.latest_agent_summary,
+      latest_agent_mode: loopStatus.latest_agent_mode,
+      latest_agent_next_actions: loopStatus.latest_agent_next_actions,
     },
   });
 });
