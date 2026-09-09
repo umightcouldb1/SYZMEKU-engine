@@ -984,6 +984,7 @@ const startAgentLoop = async ({ intervalMs } = {}) => {
     } catch (error) {
       // A revoked/expired session must not write even a personal error log.
       clearInterval(timer);
+      require('../../services/coreScopeService').invalidateCoreRuntime();
       if (activeLoopOwner === principal.userId) activeLoopOwner = null;
       console.warn('Personal operator loop paused; authenticated restart required.');
     } finally {

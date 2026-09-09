@@ -142,6 +142,14 @@ test('no ownerless background cycle, boot restoration, revoked session or operat
   await AuthSession.updateOne({sessionId:expired.sid},{$set:{revokedAt:new Date()}});
   let ran=false;await assert.rejects(()=>runAuthenticatedCoreJob({userId:expired.id,sessionId:expired.sid},()=>{ran=true;}),/authorized/i);assert.equal(ran,false);
   const own=await runAuthenticatedCoreJob({userId:a.id,sessionId:a.sid},()=>SignalEntry.find());assert(own.every(x=>String(x.userId)===a.id));
+  const running=await fixtureUser('running-operator','COMMANDER_IN_CHIEF');
+  await scope(running,()=>core.m1Internals.startAgentLoop({intervalMs:50}));
+  await AuthSession.updateOne({sessionId:running.sid},{$set:{revokedAt:new Date()}});
+  for(let i=0;i<20;i++) {
+    if(!(await scope(running,()=>require('../services/coreContextService').loopStatus())).active)break;
+    await new Promise(resolve=>setTimeout(resolve,30));
+  }
+  assert.equal((await scope(running,()=>require('../services/coreContextService').loopStatus())).active,false);
   assert.equal(await Task.collection.countDocuments({description:'unexpected-job'}),0);
   assert.equal((await AgentLoopState.collection.findOne({singletonKey:'primary'})).active,true);
 });
