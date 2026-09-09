@@ -41,5 +41,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.4.4",
     "stripe": "^14.0.0"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.4.3"
   }
 }

@@ -28,4 +28,6 @@ const dataRequestSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+dataRequestSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
+
 module.exports = mongoose.model('DataRequest', dataRequestSchema);

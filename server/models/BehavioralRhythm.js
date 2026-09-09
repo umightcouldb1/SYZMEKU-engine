@@ -10,4 +10,6 @@ const behavioralRhythmSchema = new mongoose.Schema(
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } },
 );
 
+behavioralRhythmSchema.plugin(require('./coreOwned'), {"ownerKey":"user_id","references":{}});
+
 module.exports = mongoose.model('BehavioralRhythm', behavioralRhythmSchema);

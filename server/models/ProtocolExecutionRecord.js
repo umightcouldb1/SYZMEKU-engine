@@ -10,4 +10,6 @@ const protocolExecutionRecordSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+protocolExecutionRecordSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{"kernel_cycle_id":"KernelCycle"}});
+
 module.exports = mongoose.model("ProtocolExecutionRecord", protocolExecutionRecordSchema);

@@ -56,7 +56,7 @@ const protect = asyncHandler(async (req, res, next) => {
         }
 
         req.sessionId = decoded.sid;
-        runWithRequestContext({ userId: req.user._id, sessionId: decoded.sid }, next);
+        runWithRequestContext({ userId: req.user._id, sessionId: decoded.sid, authenticated: true }, next);
     } catch (error) {
         console.error(error);
         res.status(401);

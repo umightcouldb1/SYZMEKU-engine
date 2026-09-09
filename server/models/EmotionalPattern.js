@@ -16,4 +16,6 @@ const emotionalPatternSchema = new mongoose.Schema(
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } },
 );
 
+emotionalPatternSchema.plugin(require('./coreOwned'), {"ownerKey":"user_id","references":{}});
+
 module.exports = mongoose.model('EmotionalPattern', emotionalPatternSchema);

@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const { getRequestContext } = require("../utils/requestContext");
 
 const signalSchema = new mongoose.Schema(
   {
@@ -17,22 +16,6 @@ const signalSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-signalSchema.pre("validate", function setSignalUserScope(next) {
-  const { userId } = getRequestContext();
-  if (!this.userId && userId) this.userId = userId;
-  next();
-});
-
-signalSchema.pre(/^find/, function filterSignalsByUser(next) {
-  const { userId } = getRequestContext();
-  if (userId && !this.getFilter().userId) this.where({ userId });
-  next();
-});
-
-signalSchema.pre("countDocuments", function countSignalsByUser(next) {
-  const { userId } = getRequestContext();
-  if (userId && !this.getFilter().userId) this.where({ userId });
-  next();
-});
+signalSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
 
 module.exports = mongoose.model("SignalEntry", signalSchema);

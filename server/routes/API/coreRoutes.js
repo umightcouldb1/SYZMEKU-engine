@@ -1,4 +1,4 @@
-const router = require("express").Router();
+const router = require('../../utils/asyncRouter')();
 const System = require("../../models/System");
 const SignalEntry = require("../../models/SignalEntry");
 const SystemExecution = require("../../models/SystemExecution");
@@ -12,6 +12,9 @@ const AlertRecord = require("../../models/AlertRecord");
 const ActionExecution = require("../../models/ActionExecution");
 const { buildActionPolicy, createToolRegistry, executeActionPlan } = require("../../logic/actionKernel");
 const mongoose = require("mongoose");
+const { requireCoreScope, coreCapabilities, rejectOwnerFields, runAuthenticatedCoreJob, scopedRuntime, scopeError } = require('../../services/coreScopeService');
+const coreSingletonKey = () => 'user:' + requireCoreScope().userId;
+let activeLoopOwner = null;
 const { protect } = require("../../middleware/authMiddleware");
 const DataRequest = require("../../models/DataRequest");
 const User = require("../../models/User");
@@ -22,38 +25,13 @@ const { logAuditEvent } = require("../../utils/audit");
 
 
 router.use(protect);
+router.use((req, _res, next) => { try { requireCoreScope(req.user._id); next(); } catch (error) { next(error); } });
 
-const OPERATOR_ROLES = ["founder", "admin"];
-
-const parseRoleEmails = (value = "") =>
-  new Set(
-    String(value)
-      .split(",")
-      .map((item) => item.trim().toLowerCase())
-      .filter(Boolean)
-  );
-
-const founderEmails = parseRoleEmails(process.env.FOUNDER_EMAILS);
-const adminEmails = parseRoleEmails(process.env.ADMIN_EMAILS);
-
-const resolveOperatorVisibility = (user = {}) => {
-  const role = String(user?.role || "user").toLowerCase();
-  const email = String(user?.email || "").trim().toLowerCase();
-  const matchedEmailRole = founderEmails.has(email) ? "founder" : adminEmails.has(email) ? "admin" : "";
-  const canAccessOperatorMode = OPERATOR_ROLES.includes(role) || Boolean(matchedEmailRole);
-  const effectiveRole = OPERATOR_ROLES.includes(role) ? role : matchedEmailRole || role;
-  const accessSource = OPERATOR_ROLES.includes(role) ? "role" : matchedEmailRole ? "email_allowlist" : "none";
-
-  return {
-    canAccessOperatorMode,
-    role,
-    email,
-    effectiveRole,
-    matchedEmailRole,
-    accessSource,
-    requiredRoles: OPERATOR_ROLES,
-  };
-};
+const OPERATOR_ROLES = ['COMMANDER_IN_CHIEF'];
+const resolveOperatorVisibility = (user = {}) => ({
+  canAccessOperatorMode: coreCapabilities(user).operator,
+  role: user.role, effectiveRole: user.role, accessSource: 'capability', requiredRoles: OPERATOR_ROLES,
+});
 
 const requireOperatorRole = async (req, res, next) => {
   const visibility = resolveOperatorVisibility(req.user);
@@ -144,11 +122,11 @@ const FALLBACK_ANALYSIS = {
   next_actions: ["Adjust model prompt to always return the required schema."],
 };
 
-const autonomyState = {
+const autonomyState = scopedRuntime('autonomy', () => ({
   monitoringEnabled: true,
   lastRunAt: null,
   activeAlerts: [],
-};
+}));
 
 const KERNEL_MODES = ["general", "strategic", "health", "build", "signal", "mentor", "recommend"];
 const KERNEL_NODES = ["sentinel", "mentor", "planner", "protocol", "recommend"];
@@ -156,7 +134,7 @@ const KERNEL_NODES = ["sentinel", "mentor", "planner", "protocol", "recommend"];
 const LOOP_INTERVAL_MS = Number(process.env.AGENT_LOOP_INTERVAL_MS) > 0 ? Number(process.env.AGENT_LOOP_INTERVAL_MS) : 120000;
 const DEV_DEFAULT_ACTIVE =
   process.env.NODE_ENV === "development" && String(process.env.AGENT_LOOP_DEFAULT_ACTIVE || "false").toLowerCase() === "true";
-const loopState = {
+const loopState = scopedRuntime('loop', () => ({
   active: false,
   intervalMs: LOOP_INTERVAL_MS,
   timer: null,
@@ -170,19 +148,19 @@ const loopState = {
   latestActionExecutions: [],
   eventLog: [],
   lastError: null,
-};
+}));
 
 const appendLoopEvent = (event) => {
   loopState.eventLog = [{ recordedAt: new Date().toISOString(), ...event }, ...loopState.eventLog].slice(0, 50);
 };
 
 const getLoopStateRecord = async () => {
-  let record = await AgentLoopState.findOne({ singletonKey: "primary" });
+  let record = await AgentLoopState.findOne({ singletonKey: coreSingletonKey() });
   if (record) return record;
 
   record = await AgentLoopState.create({
-    singletonKey: "primary",
-    active: DEV_DEFAULT_ACTIVE,
+    singletonKey: coreSingletonKey(),
+    active: false,
     interval_ms: LOOP_INTERVAL_MS,
     run_count: 0,
     last_error: "",
@@ -231,11 +209,11 @@ const persistLoopState = async (patch = {}) => {
   };
 
   const record = await AgentLoopState.findOneAndUpdate(
-    { singletonKey: "primary" },
+    { singletonKey: coreSingletonKey() },
     {
       $set: payload,
       $setOnInsert: {
-        singletonKey: "primary",
+        singletonKey: coreSingletonKey(),
       },
     },
     { new: true, upsert: true }
@@ -851,8 +829,8 @@ const runAutonomousReasoningKernel = async ({ trigger = "loop", text = "kernel e
   );
 
   await KernelSnapshot.findOneAndUpdate(
-    { singletonKey: "primary" },
-    { $set: { latest_output: result }, $setOnInsert: { singletonKey: "primary" } },
+    { singletonKey: coreSingletonKey() },
+    { $set: { latest_output: result }, $setOnInsert: { singletonKey: coreSingletonKey() } },
     { upsert: true, new: true }
   );
 
@@ -982,6 +960,9 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
 };
 
 const startAgentLoop = async ({ intervalMs } = {}) => {
+  const principal = requireCoreScope();
+  if (activeLoopOwner && activeLoopOwner !== principal.userId) throw scopeError('An operator loop is already active.', 409);
+  activeLoopOwner = principal.userId;
   const resolvedInterval = Number(intervalMs) > 0 ? Number(intervalMs) : loopState.intervalMs;
   const shouldRestartTimer = Boolean(loopState.timer) && loopState.intervalMs !== resolvedInterval;
   if (loopState.active && loopState.timer && !shouldRestartTimer) return loopState;
@@ -1007,16 +988,23 @@ const startAgentLoop = async ({ intervalMs } = {}) => {
     await persistLoopState({ last_error: loopState.lastError });
   }
 
-  loopState.timer = setInterval(async () => {
+  let tickRunning = false;
+  const timer = setInterval(async () => {
+    if (tickRunning) return;
+    tickRunning = true;
     try {
-      await runAgentLoopCycle();
+      await runAuthenticatedCoreJob(principal, runAgentLoopCycle);
     } catch (error) {
-      loopState.lastError = String(error?.message || error);
-      await KernelCycle.create({ trigger: "loop", output: null, error_summary: loopState.lastError });
-      appendLoopEvent({ type: "loop-cycle-error", error: loopState.lastError });
-      await persistLoopState({ last_error: loopState.lastError });
+      // A revoked/expired session must not write even a personal error log.
+      clearInterval(timer);
+      if (activeLoopOwner === principal.userId) activeLoopOwner = null;
+      console.warn('Personal operator loop paused; authenticated restart required.');
+    } finally {
+      tickRunning = false;
     }
   }, loopState.intervalMs);
+  loopState.timer = timer;
+  timer.unref();
 
   console.log("Agent loop started");
   appendLoopEvent({ type: "loop-started", interval_ms: loopState.intervalMs });
@@ -1025,6 +1013,8 @@ const startAgentLoop = async ({ intervalMs } = {}) => {
 };
 
 const stopAgentLoop = async () => {
+  requireCoreScope();
+  if (activeLoopOwner === requireCoreScope().userId) activeLoopOwner = null;
   if (loopState.timer) {
     clearInterval(loopState.timer);
     loopState.timer = null;
@@ -1052,28 +1042,9 @@ const loopStatusPayload = () => ({
   recent_events: loopState.eventLog.slice(0, 10),
 });
 
-const restoreAgentLoopOnBoot = async () => {
-  if (mongoose.connection.readyState !== 1) return;
-  const record = await getLoopStateRecord();
-  syncLoopStateFromRecord(record);
-  appendLoopEvent({ type: "loop-restored", active: loopState.active, interval_ms: loopState.intervalMs });
-  console.log("Agent loop restored on boot");
-  if (record.active) {
-    await startAgentLoop({ intervalMs: record.interval_ms });
-  }
-};
-
-if (mongoose.connection.readyState === 1) {
-  restoreAgentLoopOnBoot().catch((error) => {
-    console.warn("Failed to restore agent loop on boot:", error?.message || error);
-  });
-} else {
-  mongoose.connection.once("connected", () => {
-    restoreAgentLoopOnBoot().catch((error) => {
-      console.warn("Failed to restore agent loop on boot:", error?.message || error);
-    });
-  });
-}
+// M1: historical active flags do not authorize personal background work.
+// An authenticated operator must explicitly restart the existing session-bound timer.
+const restoreAgentLoopOnBoot = async () => ({ restored: false, reason: 'authenticated_operator_restart_required' });
 
 /* CORE REASONING */
 router.post("/analyze", async (req, res) => {
@@ -1202,7 +1173,7 @@ router.post("/agent/evaluate", async (req, res) => {
 });
 
 router.get("/kernel/status", async (_req, res) => {
-  const snapshot = await KernelSnapshot.findOne({ singletonKey: "primary" }).lean();
+  const snapshot = await KernelSnapshot.findOne({ singletonKey: coreSingletonKey() }).lean();
   return res.json({ latest: snapshot?.latest_output || null, loop: loopStatusPayload() });
 });
 
@@ -1219,6 +1190,7 @@ router.get("/actions", async (_req, res) => {
 
 /* SYSTEM BUILDER */
 router.post("/systems", async (req, res) => {
+  rejectOwnerFields(req.body);
   const system = await System.create(req.body);
   res.json(system);
 });
@@ -1229,6 +1201,7 @@ router.get("/systems", async (req, res) => {
 });
 
 router.put("/systems/:id", async (req, res) => {
+  rejectOwnerFields(req.body);
   const system = await System.findByIdAndUpdate(req.params.id, req.body, { new: true });
   res.json(system);
 });
@@ -1354,6 +1327,7 @@ router.get("/protocol/status", async (req, res) => {
 
 /* SIGNAL LOG */
 router.post("/signals", async (req, res) => {
+  rejectOwnerFields(req.body);
   const entry = await SignalEntry.create(req.body);
   await auditCoreAction(req, "signal_logged", { signalId: entry._id });
   res.json(entry);
@@ -1399,7 +1373,7 @@ router.get("/sentinel/status", async (req, res) => {
   const [latestSignals, openAlerts, latestKernel] = await Promise.all([
     SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
     AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(50).lean(),
-    KernelSnapshot.findOne({ singletonKey: "primary" }).lean(),
+    KernelSnapshot.findOne({ singletonKey: coreSingletonKey() }).lean(),
   ]);
 
   const trends = computeSignalTrendBundle(latestSignals);
@@ -1495,7 +1469,7 @@ router.get("/alerts", async (req, res) => {
 router.get("/autonomy/status", async (_req, res) => {
   const [alertCount, latestKernel] = await Promise.all([
     AlertRecord.countDocuments({ status: "open" }),
-    KernelSnapshot.findOne({ singletonKey: "primary" }).lean(),
+    KernelSnapshot.findOne({ singletonKey: coreSingletonKey() }).lean(),
   ]);
   return res.json({
     monitoring_enabled: autonomyState.monitoringEnabled,
@@ -1558,6 +1532,7 @@ router.post("/loop/stop", async (req, res) => {
 
 /* TASKS */
 router.post("/tasks", async (req, res) => {
+  rejectOwnerFields(req.body);
   const description = typeof req.body?.description === "string" ? req.body.description.trim() : "";
   const source = typeof req.body?.source === "string" ? req.body.source.trim() : "";
   if (!description) return res.status(400).json({ message: "Task description is required." });
@@ -1656,7 +1631,7 @@ router.get("/summary", async (_req, res) => {
     Task.countDocuments({ status: "open" }),
     StrategicMemory.countDocuments(),
     AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(20).lean(),
-    KernelSnapshot.findOne({ singletonKey: "primary" }).lean(),
+    KernelSnapshot.findOne({ singletonKey: coreSingletonKey() }).lean(),
     ActionExecution.find().sort({ timestamp: -1 }).limit(5).lean(),
   ]);
   if (!autonomyState.lastRunAt) await evaluateMonitorState();
@@ -1711,16 +1686,7 @@ router.get("/operator/visibility", async (req, res) => {
   return res.json(resolveOperatorVisibility(req.user));
 });
 
-router.post("/dev/set-role", async (req, res) => {
-  if (String(process.env.NODE_ENV) === "production") {
-    return res.status(403).json({ message: "Dev helper is disabled in production." });
-  }
-
-  const nextRole = String(req.body?.role || "").trim();
-  if (!nextRole) return res.status(400).json({ message: "role is required" });
-  const updated = await User.findByIdAndUpdate(req.user._id, { role: nextRole }, { new: true }).select("name email role");
-  return res.json({ message: "Role updated for testing.", user: updated });
-});
+router.post('/dev/set-role', (_req, res) => res.status(403).json({ message: 'Persisted roles cannot be changed through Core.' }));
 
 router.get("/onboarding/status", async (req, res) => {
   const user = await User.findById(req.user._id).select("onboarding healthSync name").lean();
@@ -1845,4 +1811,5 @@ router.post("/task/complete", async (req, res) => {
   return res.json(task);
 });
 
+router.m1Internals = { runAgentLoopCycle, restoreAgentLoopOnBoot, startAgentLoop, stopAgentLoop, resolveOperatorVisibility };
 module.exports = router;

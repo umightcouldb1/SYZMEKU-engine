@@ -8,4 +8,6 @@ const kernelSnapshotSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+kernelSnapshotSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
+
 module.exports = mongoose.model("KernelSnapshot", kernelSnapshotSchema);

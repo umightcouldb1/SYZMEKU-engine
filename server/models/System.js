@@ -17,4 +17,6 @@ const systemSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+systemSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
+
 module.exports = mongoose.model("System", systemSchema);

@@ -15,7 +15,10 @@ const MentorTask = require('../../models/MentorTask');
 const MentorMessage = require('../../models/MentorMessage');
 const LoopStatus = require('../../models/LoopStatus');
 
+const { rejectOwnerFields } = require('../../services/coreScopeService');
 const router = express.Router();
+router.use(protect);
+router.use((req, _res, next) => { try { rejectOwnerFields(req.body || {}); for (const value of Object.values(req.body || {})) if (value && typeof value === 'object' && !Array.isArray(value)) rejectOwnerFields(value); next(); } catch (e) { next(e); } });
 
 const upsertByUser = (Model, userId, payload = {}) =>
   Model.findOneAndUpdate(

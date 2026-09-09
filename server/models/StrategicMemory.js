@@ -11,4 +11,6 @@ const strategicMemorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+strategicMemorySchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
+
 module.exports = mongoose.model("StrategicMemory", strategicMemorySchema);

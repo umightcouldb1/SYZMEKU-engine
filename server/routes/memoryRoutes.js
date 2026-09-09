@@ -1,4 +1,4 @@
-const router = require('express').Router();
+const router = require('../utils/asyncRouter')();
 const { protect } = require('../middleware/authMiddleware');
 const { getOrCreateLineageMemory } = require('../services/lineageMemoryService');
 

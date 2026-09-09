@@ -13,4 +13,6 @@ const lifeContextSchema = new mongoose.Schema(
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } },
 );
 
+lifeContextSchema.plugin(require('./coreOwned'), {"ownerKey":"user_id","references":{}});
+
 module.exports = mongoose.model('LifeContext', lifeContextSchema);

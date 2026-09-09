@@ -18,4 +18,6 @@ const systemExecutionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+systemExecutionSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{"systemId":"System"}});
+
 module.exports = mongoose.model("SystemExecution", systemExecutionSchema);

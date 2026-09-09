@@ -13,4 +13,6 @@ const alertRecordSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+alertRecordSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
+
 module.exports = mongoose.model("AlertRecord", alertRecordSchema);

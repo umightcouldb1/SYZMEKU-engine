@@ -123,4 +123,6 @@ memorySchema.methods.appendConversationTurns = function appendConversationTurns(
   this.conversationHistory = [...this.conversationHistory, ...cleanTurns].slice(-80);
 };
 
+memorySchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
+
 module.exports = mongoose.model('Memory', memorySchema);

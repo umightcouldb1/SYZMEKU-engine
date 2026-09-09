@@ -4,11 +4,13 @@ const StrategicMemory = require("../models/StrategicMemory");
 const ProtocolExecutionRecord = require("../models/ProtocolExecutionRecord");
 const { getRequestContext } = require("../utils/requestContext");
 
+const { requireCoreScope } = require('../services/coreScopeService');
+
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const createToolRegistry = ({ runProtocolIfNeeded, generateReport, userId = null }) => {
-  const scopedUserId = userId || getRequestContext().userId || null;
+  const scopedUserId = requireCoreScope(userId).userId;
 
   return {
     createTask: async ({ description, source = "action-kernel" }) => {
@@ -25,7 +27,7 @@ const createToolRegistry = ({ runProtocolIfNeeded, generateReport, userId = null
       return task;
     },
     createAlert: async ({ message, severity = "medium", source = "action-kernel" }) => {
-      const fingerprint = normalizeText(message);
+      const fingerprint = `${scopedUserId}:${normalizeText(message)}`;
       const existing = await AlertRecord.findOne({ fingerprint });
       if (existing) {
         existing.count += 1;
@@ -54,6 +56,7 @@ const createToolRegistry = ({ runProtocolIfNeeded, generateReport, userId = null
 };
 
 const buildActionPolicy = ({ reasoningOutput, operatorState }) => {
+  requireCoreScope();
   const urgency = Number(reasoningOutput?.urgency_score) || 0;
   const nextActions = Array.isArray(reasoningOutput?.next_actions) ? reasoningOutput.next_actions : [];
   const repeatedPattern = operatorState?.isRepeatedPattern;
@@ -108,6 +111,7 @@ const buildActionPolicy = ({ reasoningOutput, operatorState }) => {
 };
 
 const executeActionPlan = async ({ policy, toolRegistry }) => {
+  requireCoreScope();
   const actions = [];
 
   for (const planned of policy.queued) {
