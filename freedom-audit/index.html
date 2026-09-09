@@ -159,6 +159,9 @@
     .auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
     .auth-tabs button { background: rgba(255, 255, 255, .06); color: var(--muted); border: 1px solid var(--line); }
     .auth-tabs button.active { background: var(--ink); color: #101112; }
+    .google-auth { display: grid; justify-items: center; gap: 12px; margin-bottom: 18px; }
+    .google-auth p { margin: 0; text-align: center; }
+    #googleSignIn { min-height: 44px; max-width: 100%; }
 
     .domain-card { display: grid; gap: 18px; }
     .question { display: grid; gap: 10px; }
@@ -261,6 +264,13 @@
         </aside>
 
         <div class="panel">
+          <div class="google-auth">
+            <p>Use your Google account to sign in or get started.</p>
+            <div id="googleSignIn" aria-label="Sign in with Google"></div>
+            <p id="googleStatus" class="muted" role="status" aria-live="polite">Loading Google sign-in…</p>
+            <button id="googleRetry" type="button" class="ghost hidden">Retry Google sign-in</button>
+            <p class="muted">or use email and password</p>
+          </div>
           <div class="auth-tabs">
             <button id="loginTab" class="active">Log In</button>
             <button id="signupTab">Create Account</button>
@@ -363,7 +373,8 @@
   <script>
     const CONFIG = {
       apiBase: '__FREEDOM_AUDIT_API_BASE__'.includes('__') ? 'https://syzmeku-api.onrender.com/api' : '__FREEDOM_AUDIT_API_BASE__',
-      bigSyzUrl: '__FREEDOM_AUDIT_BIG_SYZ_URL__'.includes('__') ? 'https://www.toisouljahacademy.com' : '__FREEDOM_AUDIT_BIG_SYZ_URL__'
+      bigSyzUrl: '__FREEDOM_AUDIT_BIG_SYZ_URL__'.includes('__') ? 'https://www.toisouljahacademy.com' : '__FREEDOM_AUDIT_BIG_SYZ_URL__',
+      googleClientId: '__FREEDOM_AUDIT_GOOGLE_CLIENT_ID__'.includes('__') ? '' : '__FREEDOM_AUDIT_GOOGLE_CLIENT_ID__'
     };
 
     const domains = {
@@ -403,7 +414,8 @@
       token: localStorage.getItem('freedomAuditToken') || '',
       authMode: 'login',
       entitled: false,
-      latestResult: null
+      latestResult: null,
+      authBusy: false
     };
 
     const $ = (id) => document.getElementById(id);
@@ -412,6 +424,7 @@
 
     function show(sectionId) {
       ['hero', 'gate', 'audit', 'result'].forEach((id) => $(id).classList.toggle('hidden', id !== sectionId));
+      if (sectionId === 'gate') initializeGoogleSignIn();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -484,17 +497,22 @@
     }
 
     async function refreshEntitlement() {
+      state.entitled = false;
+      state.latestResult = null;
+      const requestedToken = state.token;
       if (!state.token) {
         setStatus('Sign in to check paid access');
         return false;
       }
       try {
         const data = await api('/freedom-audit/entitlement');
+        if (state.token !== requestedToken) return false;
         state.entitled = Boolean(data.entitled);
         state.latestResult = data.latestResult || null;
         setStatus(state.entitled ? 'Paid Freedom Audit access verified' : 'Signed in. Payment required.');
         return state.entitled;
       } catch (error) {
+        if (state.token !== requestedToken) return false;
         setStatus('Session needs sign in');
         if (error.status === 401) {
           state.token = '';
@@ -539,6 +557,7 @@
 
     async function submitAuth(event) {
       event.preventDefault();
+      if (state.authBusy) return;
       const isSignup = state.authMode === 'signup';
       const body = {
         email: $('email').value.trim(),
@@ -546,21 +565,85 @@
       };
       if (isSignup) body.username = $('name').value.trim() || body.email.split('@')[0];
       try {
-        $('authSubmit').disabled = true;
+        setAuthBusy(true);
         const data = await api(`/auth/${isSignup ? 'signup' : 'login'}`, {
           method: 'POST',
           body: JSON.stringify(body)
         });
-        state.token = data.token;
-        localStorage.setItem('freedomAuditToken', state.token);
-        message($('gateMessage'), 'Signed in. Checking your Freedom Audit access now.', 'success');
-        const entitled = await refreshEntitlement();
-        if (sessionId && !entitled) await verifyCheckout();
-        else if (entitled) show('audit');
+        await completeSignIn(data);
       } catch (error) {
         message($('gateMessage'), error.message || 'Unable to sign in.');
       } finally {
-        $('authSubmit').disabled = false;
+        setAuthBusy(false);
+      }
+    }
+
+    function setAuthBusy(busy) {
+      state.authBusy = busy;
+      ['authSubmit', 'loginTab', 'signupTab', 'googleRetry'].forEach(id => { $(id).disabled = busy; });
+      $('googleSignIn').inert = busy;
+      $('googleSignIn').setAttribute('aria-busy', String(busy));
+    }
+
+    async function completeSignIn(data) {
+      if (typeof data.token !== 'string' || !data.token.trim()) throw new Error('Sign-in did not return a session. Please try again.');
+      state.token = data.token;
+      state.entitled = false;
+      state.latestResult = null;
+      localStorage.setItem('freedomAuditToken', state.token);
+      message($('gateMessage'), 'Signed in. Checking your Freedom Audit access now.', 'success');
+      const entitled = await refreshEntitlement();
+      if (sessionId && state.token && !entitled) await verifyCheckout();
+      else if (entitled) show('audit');
+    }
+
+    async function handleGoogleCredential(response) {
+      if (state.authBusy) return;
+      if (!response?.credential) {
+        message($('gateMessage'), 'Google sign-in was not completed. Please try again.');
+        return;
+      }
+      try {
+        setAuthBusy(true);
+        const data = await api('/auth/google', { method: 'POST', body: JSON.stringify({ credential: response.credential }) });
+        await completeSignIn(data);
+      } catch (error) {
+        message($('gateMessage'), error.message || 'Unable to sign in with Google. Please try again.');
+      } finally {
+        setAuthBusy(false);
+      }
+    }
+
+    let googleReady = false;
+    let googleLoading = false;
+    async function initializeGoogleSignIn() {
+      if (googleReady || googleLoading) return;
+      googleLoading = true;
+      $('googleRetry').classList.add('hidden');
+      $('googleStatus').textContent = 'Loading Google sign-in…';
+      try {
+        if (!CONFIG.googleClientId) throw new Error('Google sign-in is unavailable. You can still use email and password.');
+        if (!window.google?.accounts?.id) {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.async = true;
+            const timeout = setTimeout(() => { script.remove(); reject(new Error('Google sign-in took too long to load. Please retry.')); }, 15000);
+            script.onload = () => { clearTimeout(timeout); resolve(); };
+            script.onerror = () => { clearTimeout(timeout); script.remove(); reject(new Error('Google sign-in could not load. Please retry or use email and password.')); };
+            document.head.appendChild(script);
+          });
+        }
+        if (!window.google?.accounts?.id) throw new Error('Google sign-in is unavailable. Please retry.');
+        window.google.accounts.id.initialize({ client_id: CONFIG.googleClientId, callback: handleGoogleCredential, auto_select: false });
+        window.google.accounts.id.renderButton($('googleSignIn'), { type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', width: 250 });
+        googleReady = true;
+        $('googleStatus').textContent = 'One account for Freedom Audit and Big SYZ.';
+      } catch (error) {
+        $('googleStatus').textContent = error.message;
+        $('googleRetry').classList.remove('hidden');
+      } finally {
+        googleLoading = false;
       }
     }
 
@@ -645,6 +728,7 @@
       renderResult(state.latestResult);
     });
     $('authForm').addEventListener('submit', submitAuth);
+    $('googleRetry').addEventListener('click', initializeGoogleSignIn);
     $('loginTab').addEventListener('click', () => setAuthMode('login'));
     $('signupTab').addEventListener('click', () => setAuthMode('signup'));
     $('checkoutButton').addEventListener('click', checkout);

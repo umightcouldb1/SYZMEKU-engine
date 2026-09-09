@@ -2,6 +2,14 @@
 
 Independent paid product app for the SYZMEKU Engine repository.
 
+## Google sign-in
+
+The access gate includes Google sign-in/sign-up and email/password. Both use the existing SYZMEKU account and session system. A first visit to Freedom Audit does not require creating a separate account. Google credentials are sent to `/api/auth/google` for server verification; paid access is still checked through `/api/freedom-audit/entitlement`.
+
+The build defaults to the same public Google web client ID as Big SYZ. An explicit `FREEDOM_AUDIT_GOOGLE_CLIENT_ID` (or `GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID`) must match the backend's accepted audience. In Google Auth Platform, add `https://freedom.toisouljahacademy.com` as an authorized JavaScript origin on that existing web client. Keep the existing Big SYZ origins. Do not use wildcard or arbitrary preview origins.
+
+Use `npm test --prefix freedom-audit` for isolated auth flow fixtures. Before release, verify the actual Google provider flow on the authorized production origin, existing-account reuse, server entitlement response, and the checkout handoff without charging a card. See `docs/freedom-audit-google-signin.md` for the scoped contract.
+
 ## Local Development
 
 From the repository root:

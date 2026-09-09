@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "test": "node --test tests/auth.test.cjs",
     "dev": "node scripts/build.mjs --watch"
   }
 }
