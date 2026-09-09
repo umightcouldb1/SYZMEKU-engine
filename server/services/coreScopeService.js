@@ -20,8 +20,21 @@ const coreCapabilities = (user = {}) => ({
 });
 
 const requireCoreWrite = () => {
-  requireCoreScope();
+  const { userId } = requireCoreScope();
   if (process.env.CORE_CONTEXT_WRITES_ENABLED !== 'true') throw scopeError('Personal Core writes are paused for maintenance.', 503);
+  // An empty, malformed or wildcard list never falls back to global enablement.
+  // IDs come from deployment configuration, never from request bodies or roles.
+  const approvedIds = String(process.env.CORE_CONTEXT_WRITE_USER_IDS || '').split(',').map(id => id.trim().toLowerCase());
+  if (!approvedIds.every(id => /^[a-f\d]{24}$/.test(id)) || !approvedIds.includes(userId.toLowerCase())) {
+    throw scopeError('Personal Core writes are not enabled for this account.', 503);
+  }
+};
+
+const requireCoreExecution = () => {
+  requireCoreWrite();
+  if (process.env.CORE_PERSONAL_EXECUTION_ENABLED !== 'true') {
+    throw scopeError('Personal Core execution is paused for maintenance.', 503);
+  }
 };
 
 const rejectOwnerFields = (payload = {}) => {
@@ -41,7 +54,11 @@ const runAuthenticatedCoreJob = async (principal, callback) => {
   const session = await AuthSession.findOne({ sessionId: principal.sessionId, userId: principal.userId, revokedAt: null, expiresAt: { $gt: new Date() } }).lean();
   const user = session && await User.findById(principal.userId).select('role').lean();
   if (!session || !user || !coreCapabilities(user).operator) throw scopeError('The operator session is no longer authorized.');
-  return runWithRequestContext({ userId: user._id, sessionId: session.sessionId, authenticated: true }, callback);
+  return runWithRequestContext({ userId: user._id, sessionId: session.sessionId, authenticated: true }, () => {
+    // Recheck account approval and execution permission on every tick.
+    requireCoreExecution();
+    return callback();
+  });
 };
 
 const runtime = new Map();
@@ -75,4 +92,4 @@ const invalidateCoreRuntime = () => {
   for (const callback of invalidators) callback(id);
 };
 
-module.exports = { requireCoreScope, requireCoreWrite, scopeError, coreCapabilities, rejectOwnerFields, runAuthenticatedCoreJob, scopedRuntime, invalidateCoreRuntime, onCoreInvalidation, readCoreRuntime };
+module.exports = { requireCoreScope, requireCoreWrite, requireCoreExecution, scopeError, coreCapabilities, rejectOwnerFields, runAuthenticatedCoreJob, scopedRuntime, invalidateCoreRuntime, onCoreInvalidation, readCoreRuntime };

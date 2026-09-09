@@ -13,6 +13,7 @@ async function user(name){const doc=await User.create({name,username:name,email:
 async function request(u,route,method='GET',body){const res=await fetch(base+route,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+u.token},...(body?{body:JSON.stringify(body)}:{})});return {status:res.status,data:await res.json()};}
 before(async()=>{
  db=await MongoMemoryReplSet.create({replSet:{count:1,dbName:'context_fixtures'}});await mongoose.connect(db.getUri());await LifeContext.createIndexes();await Memory.createIndexes();a=await user('context-a');b=await user('context-b');
+ process.env.CORE_CONTEXT_WRITE_USER_IDS=[a.id,b.id].join(',');
  const app=express();app.use(express.json());app.use('/api/core/analyze',require('../routes/memoryAnalyzeRoutes'));app.use('/api/core',require('../routes/coreContextRoutes'));app.use('/api/core',require('../routes/API/coreRoutes'));app.use('/api/memory',require('../routes/memoryRoutes'));app.use('/api/onboarding',require('../routes/onboardingRoutes'));app.use('/api/mentor-system',require('../routes/mentorSystemRoutes'));
  app.use((err,_req,res,_next)=>res.status(err.statusCode || err.status || (res.statusCode>=400?res.statusCode:500)).json({message:err.message}));server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));base='http://127.0.0.1:'+server.address().port;
 });

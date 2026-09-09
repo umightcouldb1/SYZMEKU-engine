@@ -4,7 +4,7 @@ const StrategicMemory = require("../models/StrategicMemory");
 const ProtocolExecutionRecord = require("../models/ProtocolExecutionRecord");
 const { getRequestContext } = require("../utils/requestContext");
 
-const { requireCoreScope } = require('../services/coreScopeService');
+const { requireCoreScope, requireCoreExecution } = require('../services/coreScopeService');
 const core = require('../services/coreContextService');
 
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
@@ -107,7 +107,7 @@ const buildActionPolicy = ({ reasoningOutput, operatorState }) => {
 };
 
 const executeActionPlan = async ({ policy, toolRegistry }) => {
-  requireCoreScope();
+  requireCoreExecution();
   // Detach history payloads from live reasoning objects and transaction-bound documents.
   const snapshot = value => value == null ? null : JSON.parse(JSON.stringify(value));
   const actions = [];

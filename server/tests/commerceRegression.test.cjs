@@ -11,6 +11,7 @@ let db,server,base,a,b;
 async function makeUser(name,role){const u=await User.create({name,username:name,email:name+'@example.test',password:'fixture',role});const sid='commerce-'+name;await AuthSession.create({userId:u._id,sessionId:sid,expiresAt:new Date(Date.now()+600000)});return {id:String(u._id),token:jwt.sign({id:String(u._id),sid},process.env.JWT_SECRET)};}
 async function request(u,route,method='GET',body){const r=await fetch(base+route,{method,headers:{'Content-Type':'application/json',...(u?{Authorization:'Bearer '+u.token}:{})},...(body?{body:JSON.stringify(body)}:{})});return {status:r.status,data:await r.json()};}
 before(async()=>{db=await MongoMemoryReplSet.create({replSet:{count:1,dbName:'commerce_fixtures'}});await mongoose.connect(db.getUri());await require('../models/LifeContext').createIndexes();await require('../models/Memory').createIndexes();a=await makeUser('buyer','USER');b=await makeUser('operator','COMMANDER_IN_CHIEF');
+ process.env.CORE_CONTEXT_WRITE_USER_IDS=[a.id,b.id].join(',');
  const app=express();app.use('/webhook',require('../routes/webhook'));app.use(express.json());app.use('/audit',require('../routes/freedomAuditRoutes'));app.use('/social',require('../routes/socialCommandRoutes'));app.use('/core',require('../routes/coreContextRoutes'));app.use((e,_req,res,_next)=>res.status(e.statusCode || (res.statusCode>=400?res.statusCode:500)).json({error:e.message}));server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));base='http://127.0.0.1:'+server.address().port;
  session={id:'cs_fixture',client_reference_id:a.id,mode:'payment',status:'complete',payment_status:'paid'};
 });
@@ -51,6 +52,12 @@ test('Social roles/providers and campaign ownership survive shared auth; Core de
  assert.equal(JSON.stringify((await UserProfile.findOne({userId:a.id})).toObject()),commerceBefore);
  assert.equal((await request(b,'/core/context','DELETE')).status,200);
  assert(await SocialCampaign.findById(campaign._id));
- process.env.CORE_CONTEXT_WRITES_ENABLED='false';
- try {assert.equal((await request(a,'/audit/checkout/session','POST',{})).status,200);assert.equal((await request(b,'/social/campaigns')).status,200);}finally{process.env.CORE_CONTEXT_WRITES_ENABLED='true';}
+ process.env.CORE_CONTEXT_WRITE_USER_IDS='';
+ try {
+  for (const flag of ['false','true']) {
+   process.env.CORE_CONTEXT_WRITES_ENABLED=flag;
+   assert.equal((await request(a,'/audit/checkout/session','POST',{})).status,200);
+   assert.equal((await request(b,'/social/campaigns')).status,200);
+  }
+ } finally {process.env.CORE_CONTEXT_WRITES_ENABLED='true';process.env.CORE_CONTEXT_WRITE_USER_IDS=[a.id,b.id].join(',');}
 });

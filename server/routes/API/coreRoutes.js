@@ -12,7 +12,7 @@ const AlertRecord = require("../../models/AlertRecord");
 const ActionExecution = require("../../models/ActionExecution");
 const { buildActionPolicy, createToolRegistry, executeActionPlan } = require("../../logic/actionKernel");
 const mongoose = require("mongoose");
-const { requireCoreScope, coreCapabilities, rejectOwnerFields, runAuthenticatedCoreJob, scopedRuntime, scopeError, readCoreRuntime } = require('../../services/coreScopeService');
+const { requireCoreScope, requireCoreExecution, coreCapabilities, rejectOwnerFields, runAuthenticatedCoreJob, scopedRuntime, scopeError, readCoreRuntime } = require('../../services/coreScopeService');
 const core = require('../../services/coreContextService');
 const coreSingletonKey = () => 'user:' + requireCoreScope().userId;
 let activeLoopOwner = null;
@@ -676,6 +676,7 @@ const runProtocolIfNeeded = async (protocolName) => {
 };
 
 const runAutonomousReasoningKernel = async (args = {}) => {
+  requireCoreExecution();
   const expected = (await core.getContext()).revision;
   return core.withContextMutation(life => {
     if (life.revision !== expected) throw scopeError('Context changed during kernel evaluation.', 409);
@@ -805,7 +806,10 @@ const runScopedReasoningKernel = async ({ trigger = "loop", text = "kernel evalu
   return { result, cycleRecord };
 };
 
-const runAgentLoopCycle = async () => core.withContextMutation(() => runScopedAgentLoopCycle());
+const runAgentLoopCycle = async () => {
+  requireCoreExecution();
+  return core.withContextMutation(() => runScopedAgentLoopCycle());
+};
 const runScopedAgentLoopCycle = async () => {
   const { result } = await runAutonomousReasoningKernel({ trigger: "loop", text: "loop autonomous cycle", rawContext: { source: "agent-loop" } });
 
@@ -845,6 +849,7 @@ const runScopedAgentLoopCycle = async () => {
 };
 
 const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution = true }) => {
+  requireCoreExecution();
   const humanContext = await core.getContext();
   const [latestSignals, latestSystems, latestTasks, strategicMemory] = await Promise.all([
     SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
@@ -931,7 +936,7 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
 };
 
 const startAgentLoop = async ({ intervalMs } = {}) => {
-  require("../../services/coreScopeService").requireCoreWrite();
+  requireCoreExecution();
   const principal = requireCoreScope();
   if (activeLoopOwner && activeLoopOwner !== principal.userId) throw scopeError('An operator loop is already active.', 409);
   activeLoopOwner = principal.userId;
@@ -1241,6 +1246,7 @@ router.get("/systems/map", async (req, res) => {
 });
 
 router.post("/systems/run", async (req, res) => {
+  requireCoreExecution();
   const rawName = typeof req.body?.name === "string" ? req.body.name.trim() : "";
   if (!rawName) return res.status(400).json({ message: "System name is required." });
 
@@ -1281,6 +1287,7 @@ router.post("/systems/run", async (req, res) => {
 });
 
 router.post("/systems/automate", async (req, res) => {
+  requireCoreExecution();
   const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
   if (!name) return res.status(400).json({ message: "System name is required." });
 
