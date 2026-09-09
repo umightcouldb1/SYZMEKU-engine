@@ -1,0 +1,10 @@
+.pattern-panel { min-width: 0; }
+.pattern-panel article,.pattern-panel details { padding: 1rem 0; border-top: 1px solid #506176; }
+.pattern-panel label { display: grid; gap: .35rem; margin: .7rem 0; }
+.pattern-panel input,.pattern-panel select { width: 100%; box-sizing: border-box; padding: .6rem; background: #152335; color: #f3f5fa; border: 1px solid #8797aa; border-radius: .4rem; }
+.pattern-panel button { margin: .3rem; padding: .55rem .8rem; min-height: 44px; border-radius: .4rem; cursor: pointer; }
+.pattern-panel button:disabled { cursor: wait; opacity: .65; }
+.pattern-panel :focus-visible { outline: 3px solid #82d9ec; outline-offset: 3px; }
+.pattern-panel p,.pattern-panel li { overflow-wrap: anywhere; line-height: 1.5; }
+.pattern-panel summary { cursor: pointer; min-height: 32px; }
+@media(max-width:600px) { .pattern-panel button { width: calc(100% - .6rem); } }

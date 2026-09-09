@@ -138,7 +138,7 @@ test('explicit canonical task creation and update retain founder ownership', asy
 test('unlisted users and another operator cannot write, read, reference or delete founder records', async () => {
   const before = JSON.stringify(await LifeContext.collection.findOne({ user_id: new mongoose.Types.ObjectId(founder.id) }));
   const ownedModels = require('node:fs').readdirSync(path.resolve(__dirname, '../models')).filter(file => file.endsWith('.js') && require('node:fs').readFileSync(path.resolve(__dirname, '../models', file), 'utf8').includes("plugin(require('./coreOwned')"));
-  assert.equal(ownedModels.length, 26);
+  assert.equal(ownedModels.length, 27);
   await zeroWrites(async () => {
     for (const user of [regular, otherOperator]) {
       await assert.rejects(() => scope(user, requireCoreWrite), paused);

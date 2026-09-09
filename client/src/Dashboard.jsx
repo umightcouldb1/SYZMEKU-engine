@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import OperatorConsole from './OperatorConsole';
 import CoreContextPanel from './components/CoreContextPanel';
+import PatternPanel from './components/PatternPanel';
 import { useBiometric } from './context/BiometricContext';
 import './dashboard.css';
 import './matrixContext.css';
@@ -588,6 +589,7 @@ const Dashboard = ({ user }) => {
         </section>
 
         <section className="mentor-support-panel">
+          <PatternPanel />
           <CoreContextPanel onChanged={async () => {
             setLatestInsight(null); setChatMemory([]); setSovereignContext({}); setHumanContext({});
             window.speechSynthesis?.cancel();
@@ -665,14 +667,14 @@ const Dashboard = ({ user }) => {
             </section>
 
             <section className="mentor-card">
-              <p className="mentor-section-label">Recent Patterns</p>
+              <p className="mentor-section-label">Recent Alerts</p>
               <h2>What needs attention</h2>
               {alerts.length ? alerts.slice(0, 2).map((alert, index) => (
                 <div key={`${index}-${alert?.message || alert}`} className="mentor-warning">
-                  <strong>Pattern detected</strong>
+                  <strong>Alert</strong>
                   <p>{typeof alert === 'string' ? alert : alert?.message}</p>
                 </div>
-              )) : <p>No risk patterns detected.</p>}
+              )) : <p>No active alerts.</p>}
             </section>
 
             <section className="mentor-card">

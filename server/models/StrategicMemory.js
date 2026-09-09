@@ -7,6 +7,8 @@ const strategicMemorySchema = new mongoose.Schema(
     sourceId: { type: String, maxlength: 200 },
     confirmed: { type: Boolean, default: true },
     revision: { type: Number, default: 1 },
+    provenance: require('./patternSourceFields').provenance,
+    derivedFromPatternIds: [{type:mongoose.Schema.Types.ObjectId,ref:'Pattern'}],
     legacyId: { type: String, maxlength: 100 },
     title: { type: String, required: true, trim: true },
     category: { type: String, default: "general", trim: true },
@@ -17,6 +19,6 @@ const strategicMemorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-strategicMemorySchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
+strategicMemorySchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{},evidenceSource:'event'});
 
 module.exports = mongoose.model("StrategicMemory", strategicMemorySchema);

@@ -3,9 +3,22 @@ const { requireCoreScope, requireCoreWrite, scopeError } = require('../services/
 
 // Defense in depth for all personal collections. Raw Model.collection access is reserved
 // for fixture setup and read-only migration inventory, never for application routes.
-module.exports = function coreOwned(schema, { ownerKey = 'userId', references = {} } = {}) {
+module.exports = function coreOwned(schema, { ownerKey = 'userId', references = {}, evidenceSource = false } = {}) {
   schema.set('autoIndex', false); // Production index changes require a reviewed migration.
+  schema.set('autoCreate', false); // Never race automatic DDL against context transactions.
   if (!schema.path(ownerKey)) schema.add({ [ownerKey]: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true } });
+
+  async function requireEvidenceTransaction() {
+    if (!evidenceSource) return;
+    const context=require('../utils/requestContext').getRequestContext();
+    if(context.coreTransaction){
+      if(evidenceSource==='event'&&!context.coreEvidenceMutation)throw scopeError('Evidence changes require a source epoch transaction.',409);
+      return;
+    }
+    // Existing M1-only document callers remain compatible until there are
+    // derivatives. Once a Pattern exists, no writer may bypass its epoch.
+    if (await require('./Pattern').exists({})) throw scopeError('Evidence changes require the canonical context transaction.', 409);
+  }
 
   function validateOwner(doc) {
     const { userId } = requireCoreScope();
@@ -27,13 +40,13 @@ module.exports = function coreOwned(schema, { ownerKey = 'userId', references = 
   }
 
   schema.pre('validate', async function() { validateOwner(this); await validateReferences(this); });
-  schema.pre('save', async function() { validateOwner(this); await validateReferences(this); });
-  schema.pre('deleteOne', { document: true, query: false }, function() { validateOwner(this); });
+  schema.pre('save', async function() { validateOwner(this); await requireEvidenceTransaction(); await validateReferences(this); });
+  schema.pre('deleteOne', { document: true, query: false }, async function() { validateOwner(this); await requireEvidenceTransaction(); });
 
   const queryOps = ['find', 'findOne', 'countDocuments', 'distinct', 'updateOne', 'updateMany', 'findOneAndUpdate', 'deleteOne', 'deleteMany', 'findOneAndDelete'];
   schema.pre(queryOps, async function() {
     const { userId } = requireCoreScope();
-    if (['updateOne','updateMany','findOneAndUpdate','deleteOne','deleteMany','findOneAndDelete'].includes(this.op)) requireCoreWrite();
+    if (['updateOne','updateMany','findOneAndUpdate','deleteOne','deleteMany','findOneAndDelete'].includes(this.op)) { requireCoreWrite(); await requireEvidenceTransaction(); }
     const filter = this.getFilter();
     const supplied = filter[ownerKey];
     if (supplied && String(supplied) !== userId) throw scopeError('Query owner does not match authenticated scope.');
