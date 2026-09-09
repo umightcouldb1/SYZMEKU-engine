@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const actionExecutionSchema = new mongoose.Schema(
   {
+    contextInvalidatedAt: { type: Date, default: null },
     action_name: { type: String, required: true, trim: true },
     input: { type: mongoose.Schema.Types.Mixed, default: null },
     result: { type: mongoose.Schema.Types.Mixed, default: null },

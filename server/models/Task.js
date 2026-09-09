@@ -8,6 +8,9 @@ const taskSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    title: { type: String, default: '', maxlength: 500 },
+    protocol_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Protocol' },
+    legacyId: { type: String, maxlength: 100 },
     description: { type: String, required: true, trim: true },
     status: { type: String, enum: ["open", "done"], default: "open" },
     source: { type: String, default: "" },
@@ -16,6 +19,6 @@ const taskSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-taskSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
+taskSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{"protocol_id":"Protocol"}});
 
 module.exports = mongoose.model("Task", taskSchema);

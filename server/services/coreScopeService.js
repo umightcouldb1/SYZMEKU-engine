@@ -19,6 +19,11 @@ const coreCapabilities = (user = {}) => ({
   personalContext: ['USER', 'COMMANDER_IN_CHIEF'].includes(user.role),
 });
 
+const requireCoreWrite = () => {
+  requireCoreScope();
+  if (process.env.CORE_CONTEXT_WRITES_ENABLED !== 'true') throw scopeError('Personal Core writes are paused for maintenance.', 503);
+};
+
 const rejectOwnerFields = (payload = {}) => {
   for (const key of Object.keys(payload)) {
     if (['userId', 'user_id', 'owner', 'scope', 'singletonKey', 'authenticated', 'sessionId'].includes(key) || key.startsWith('$') || key.includes('.')) {
@@ -29,6 +34,7 @@ const rejectOwnerFields = (payload = {}) => {
 
 // Re-authenticate captured sessions on every background tick. No ownerless boot restore.
 const runAuthenticatedCoreJob = async (principal, callback) => {
+  if (process.env.CORE_CONTEXT_WRITES_ENABLED !== 'true') throw scopeError('Personal Core jobs are paused for maintenance.', 503);
   const AuthSession = require('../models/AuthSession');
   const User = require('../models/User');
   if (!principal?.sessionId || !principal?.userId) throw scopeError();
@@ -39,6 +45,9 @@ const runAuthenticatedCoreJob = async (principal, callback) => {
 };
 
 const runtime = new Map();
+const invalidators = new Set();
+const onCoreInvalidation = callback => invalidators.add(callback);
+const readCoreRuntime = name => runtime.get(`${name}:${requireCoreScope().userId}`);
 const scopedRuntime = (name, factory) => new Proxy({}, {
   get(_target, key) {
     const id = requireCoreScope().userId;
@@ -63,6 +72,7 @@ const invalidateCoreRuntime = () => {
     if (value.timer) clearInterval(value.timer);
     runtime.delete(key);
   }
+  for (const callback of invalidators) callback(id);
 };
 
-module.exports = { requireCoreScope, scopeError, coreCapabilities, rejectOwnerFields, runAuthenticatedCoreJob, scopedRuntime, invalidateCoreRuntime };
+module.exports = { requireCoreScope, requireCoreWrite, scopeError, coreCapabilities, rejectOwnerFields, runAuthenticatedCoreJob, scopedRuntime, invalidateCoreRuntime, onCoreInvalidation, readCoreRuntime };

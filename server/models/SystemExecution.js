@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const systemExecutionSchema = new mongoose.Schema(
   {
+    contextInvalidatedAt: { type: Date, default: null },
     systemId: { type: mongoose.Schema.Types.ObjectId, ref: "System", required: true },
     systemName: { type: String, required: true },
     readiness: { type: String, enum: ["ready", "guarded"], default: "ready" },

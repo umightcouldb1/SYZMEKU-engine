@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const kernelSnapshotSchema = new mongoose.Schema(
   {
+    contextInvalidatedAt: { type: Date, default: null },
     singletonKey: { type: String, required: true, unique: true, default: "primary" },
     latest_output: { type: mongoose.Schema.Types.Mixed, default: null },
   },

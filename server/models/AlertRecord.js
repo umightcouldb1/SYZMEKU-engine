@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const alertRecordSchema = new mongoose.Schema(
   {
+    contextInvalidatedAt: { type: Date, default: null },
     fingerprint: { type: String, required: true, unique: true },
     message: { type: String, required: true, trim: true },
     severity: { type: String, default: "medium", trim: true },

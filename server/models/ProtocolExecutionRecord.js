@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const protocolExecutionRecordSchema = new mongoose.Schema(
   {
+    contextInvalidatedAt: { type: Date, default: null },
     protocol_name: { type: String, required: true, trim: true },
     status: { type: String, enum: ["executed", "skipped", "failed"], default: "executed" },
     details: { type: String, default: "" },

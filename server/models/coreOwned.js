@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { requireCoreScope, scopeError } = require('../services/coreScopeService');
+const { requireCoreScope, requireCoreWrite, scopeError } = require('../services/coreScopeService');
 
 // Defense in depth for all personal collections. Raw Model.collection access is reserved
 // for fixture setup and read-only migration inventory, never for application routes.
@@ -9,10 +9,12 @@ module.exports = function coreOwned(schema, { ownerKey = 'userId', references = 
 
   function validateOwner(doc) {
     const { userId } = requireCoreScope();
+    requireCoreWrite();
     const existing = doc[ownerKey];
     if (existing && String(existing) !== userId) throw scopeError('Record owner does not match authenticated scope.');
     if (!doc.isNew && !existing) throw scopeError('Unowned historical records are restricted.');
     doc[ownerKey] = userId;
+    if (!doc.isNew) doc.$where = { ...doc.$where, [ownerKey]: new mongoose.Types.ObjectId(userId) };
   }
 
   async function validateReferences(value) {
@@ -25,12 +27,13 @@ module.exports = function coreOwned(schema, { ownerKey = 'userId', references = 
   }
 
   schema.pre('validate', async function() { validateOwner(this); await validateReferences(this); });
-  schema.pre('save', function() { validateOwner(this); });
+  schema.pre('save', async function() { validateOwner(this); await validateReferences(this); });
   schema.pre('deleteOne', { document: true, query: false }, function() { validateOwner(this); });
 
   const queryOps = ['find', 'findOne', 'countDocuments', 'distinct', 'updateOne', 'updateMany', 'findOneAndUpdate', 'deleteOne', 'deleteMany', 'findOneAndDelete'];
   schema.pre(queryOps, async function() {
     const { userId } = requireCoreScope();
+    if (['updateOne','updateMany','findOneAndUpdate','deleteOne','deleteMany','findOneAndDelete'].includes(this.op)) requireCoreWrite();
     const filter = this.getFilter();
     const supplied = filter[ownerKey];
     if (supplied && String(supplied) !== userId) throw scopeError('Query owner does not match authenticated scope.');

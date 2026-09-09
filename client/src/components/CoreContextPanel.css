@@ -1,0 +1,16 @@
+.core-context-panel { margin-bottom: 20px; overflow-wrap: anywhere; }
+.core-context-panel form { display: grid; gap: 10px; max-width: 640px; margin: 20px 0; }
+.core-context-panel label { font-weight: 600; }
+.core-context-panel input, .core-context-panel textarea, .core-context-panel select {
+  box-sizing: border-box; width: 100%; min-width: 0; padding: 12px; border: 1px solid #bccbdd;
+  border-radius: 8px; font: inherit; color: #1b2c40; background: #fff;
+}
+.core-context-panel textarea { min-height: 100px; resize: vertical; }
+.core-context-panel button { min-height: 40px; padding: 8px 14px; margin: 4px 8px 4px 0; border-radius: 8px; border: 1px solid #a8bad1; color: #20374f; background: #f0f5fc; cursor: pointer; font: inherit; }
+.core-context-panel button.mentor-button { background: #285ce0; color: #fff; border-color: #285ce0; }
+.core-context-panel button:disabled { opacity: .55; cursor: default; }
+.core-context-panel :focus-visible { outline: 3px solid #185ad8; outline-offset: 3px; }
+.core-context-panel article { padding: 16px 0; border-top: 1px solid #d9e2ee; }
+.core-context-panel details { margin-top: 24px; padding-top: 16px; border-top: 1px solid #d9e2ee; }
+.core-context-panel summary { cursor: pointer; font-weight: 600; }
+.core-context-panel [role="alert"] { color: #a01428; }

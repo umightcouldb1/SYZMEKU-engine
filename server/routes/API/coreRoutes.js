@@ -13,8 +13,10 @@ const ActionExecution = require("../../models/ActionExecution");
 const { buildActionPolicy, createToolRegistry, executeActionPlan } = require("../../logic/actionKernel");
 const mongoose = require("mongoose");
 const { requireCoreScope, coreCapabilities, rejectOwnerFields, runAuthenticatedCoreJob, scopedRuntime, scopeError } = require('../../services/coreScopeService');
+const core = require('../../services/coreContextService');
 const coreSingletonKey = () => 'user:' + requireCoreScope().userId;
 let activeLoopOwner = null;
+require('../../services/coreScopeService').onCoreInvalidation(userId => { if (activeLoopOwner === userId) activeLoopOwner = null; });
 const { protect } = require("../../middleware/authMiddleware");
 const DataRequest = require("../../models/DataRequest");
 const User = require("../../models/User");
@@ -174,7 +176,7 @@ const getLoopStateRecord = async () => {
 
 const syncLoopStateFromRecord = (record) => {
   if (!record) return;
-  loopState.active = Boolean(record.active);
+  loopState.active = Boolean(record.active && loopState.timer);
   loopState.intervalMs = Number(record.interval_ms) > 0 ? Number(record.interval_ms) : LOOP_INTERVAL_MS;
   loopState.lastRunAt = record.last_run_at || null;
   loopState.runCount = Number(record.run_count) || 0;
@@ -254,21 +256,8 @@ const buildLoopStartErrorDetails = (error) => {
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const normalizeRecentCommands = (rawContext) =>
-  Array.isArray(rawContext?.recentCommands)
-    ? rawContext.recentCommands
-        .map((command) => {
-          if (typeof command === "string") return command.trim();
-          if (command && typeof command === "object") {
-            const normalized =
-              typeof command.text === "string" ? command.text : typeof command.command === "string" ? command.command : "";
-            return normalized.trim();
-          }
-          return "";
-        })
-        .filter(Boolean)
-        .slice(0, 20)
-    : [];
+// Browser history is not a context authority; it can contain deleted or another session's data.
+const normalizeRecentCommands = () => [];
 
 const toContextLines = (entries, keys) =>
   entries.map((entry, index) => {
@@ -291,21 +280,7 @@ const toContextLines = (entries, keys) =>
     return line ? `${index + 1}. ${line}` : `${index + 1}. ${JSON.stringify(entry)}`;
   });
 
-const fetchStrategicContext = async () => {
-  try {
-    const [latestSignals, latestSystems, latestTasks, strategicMemory] = await Promise.all([
-      SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
-      System.find().sort({ createdAt: -1 }).limit(5).lean(),
-      Task.find().sort({ createdAt: -1 }).limit(10).lean(),
-      StrategicMemory.find().sort({ updatedAt: -1 }).limit(5).lean(),
-    ]);
-
-    return { latestSignals, latestSystems, latestTasks, strategicMemory };
-  } catch (dbError) {
-    console.warn("Failed to fetch strategic context:", dbError?.message || dbError);
-    return { latestSignals: [], latestSystems: [], latestTasks: [], strategicMemory: [] };
-  }
-};
+const fetchStrategicContext = () => core.reasoningContext();
 
 const mapSystemRecord = (system) => {
   const inputs = Array.isArray(system?.inputs) ? system.inputs.filter(Boolean) : [];
@@ -521,7 +496,7 @@ const buildSharedPromptContext = ({
   ];
 };
 
-const buildAnalysisPrompt = ({ text, mode, modeInstruction, rawContext, latestSignals, latestSystems, latestTasks, strategicMemory }) => {
+const buildAnalysisPrompt = ({ text, mode, modeInstruction, rawContext, humanContext, latestSignals, latestSystems, latestTasks, strategicMemory }) => {
   const recentCommands = normalizeRecentCommands(rawContext);
   const activeRouteType = typeof rawContext?.activeRouteType === "string" ? rawContext.activeRouteType.trim() : "";
 
@@ -541,6 +516,7 @@ const buildAnalysisPrompt = ({ text, mode, modeInstruction, rawContext, latestSi
     "Use this exact shape:",
     '{"objectives":[],"constraints":[],"risks":[],"leverage":[],"next_actions":[]}',
     "",
+    `Current structured human context: ${JSON.stringify(humanContext || {})}`,
     `Analyze mode: ${mode}`,
     `Mode guidance: ${modeInstruction}`,
     ...buildSharedPromptContext({
@@ -714,7 +690,14 @@ const runProtocolIfNeeded = async (protocolName) => {
   }
 };
 
-const runAutonomousReasoningKernel = async ({ trigger = "loop", text = "kernel evaluate", rawContext = {} } = {}) => {
+const runAutonomousReasoningKernel = async (args = {}) => {
+  const expected = (await core.getContext()).revision;
+  return core.withContextMutation(life => {
+    if (life.revision !== expected) throw scopeError('Context changed during kernel evaluation.', 409);
+    return runScopedReasoningKernel(args);
+  });
+};
+const runScopedReasoningKernel = async ({ trigger = "loop", text = "kernel evaluate", rawContext = {} } = {}) => {
   const [latestSignals, latestSystems, openTasks, currentAlerts, strategicMemory, recentKernelCycles] = await Promise.all([
     SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
     System.find().sort({ updatedAt: -1 }).limit(10).lean(),
@@ -725,7 +708,7 @@ const runAutonomousReasoningKernel = async ({ trigger = "loop", text = "kernel e
   ]);
 
   const recentCommands = normalizeRecentCommands(rawContext);
-  const lastOverlayResult = rawContext?.lastOverlayResult || null;
+  const lastOverlayResult = null;
   const operatorContext = {
     latestSignals,
     latestSystems,
@@ -837,7 +820,8 @@ const runAutonomousReasoningKernel = async ({ trigger = "loop", text = "kernel e
   return { result, cycleRecord };
 };
 
-const runAgentLoopCycle = async () => {
+const runAgentLoopCycle = async () => core.withContextMutation(() => runScopedAgentLoopCycle());
+const runScopedAgentLoopCycle = async () => {
   const { result } = await runAutonomousReasoningKernel({ trigger: "loop", text: "loop autonomous cycle", rawContext: { source: "agent-loop" } });
 
   const event = {
@@ -876,6 +860,7 @@ const runAgentLoopCycle = async () => {
 };
 
 const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution = true }) => {
+  const humanContext = await core.getContext();
   const [latestSignals, latestSystems, latestTasks, strategicMemory] = await Promise.all([
     SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
     System.find().sort({ createdAt: -1 }).limit(5).lean(),
@@ -899,6 +884,7 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
       mode: mode_selected,
       modeInstruction: "Generate tactical objectives and next actions for execution planning.",
       rawContext,
+      humanContext,
       latestSignals,
       latestSystems,
       latestTasks,
@@ -924,7 +910,7 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
 
   if (/\bexecute\b/i.test(text) && recommended_tasks.length && allowTaskExecution) {
     const created = await Promise.all(
-      recommended_tasks.map((description) => Task.create({ description, source: "agent-kernel" }))
+      recommended_tasks.map((description) => core.createTask({ description, source: "agent-kernel" }))
     );
     actions_taken.push("create_tasks");
     recommended_tasks.splice(0, recommended_tasks.length, ...created.map((task) => task.description));
@@ -960,6 +946,7 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
 };
 
 const startAgentLoop = async ({ intervalMs } = {}) => {
+  require("../../services/coreScopeService").requireCoreWrite();
   const principal = requireCoreScope();
   if (activeLoopOwner && activeLoopOwner !== principal.userId) throw scopeError('An operator loop is already active.', 409);
   activeLoopOwner = principal.userId;
@@ -1004,6 +991,7 @@ const startAgentLoop = async ({ intervalMs } = {}) => {
     }
   }, loopState.intervalMs);
   loopState.timer = timer;
+  loopState.active = true;
   timer.unref();
 
   console.log("Agent loop started");
@@ -1065,14 +1053,15 @@ router.post("/analyze", async (req, res) => {
 
   if (!text) return res.status(400).json({ message: "Command text is required." });
 
-  const rawContext = req.body?.context;
-  const { latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
+  const rawContext = {};
+  const { humanContext, latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
 
   const prompt = buildAnalysisPrompt({
     text: effectiveCommand,
     mode: analyzeMode,
     modeInstruction: analyzeModeInstructions[analyzeMode] || analyzeModeInstructions.general,
     rawContext,
+    humanContext,
     latestSignals,
     latestSystems,
     latestTasks,
@@ -1092,14 +1081,15 @@ router.post("/recommend", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
   if (!text) return res.status(400).json({ message: "Command text is required." });
 
-  const rawContext = req.body?.context;
-  const { latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
+  const rawContext = {};
+  const { humanContext, latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
 
   const prompt = buildAnalysisPrompt({
     text,
     mode: "recommend",
     modeInstruction: "Prioritize decisive, high-leverage next actions based on current state.",
     rawContext,
+    humanContext,
     latestSignals,
     latestSystems,
     latestTasks,
@@ -1119,8 +1109,8 @@ router.post("/mentor", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
   if (!text) return res.status(400).json({ message: "Mentor prompt text is required." });
 
-  const rawContext = req.body?.context;
-  const { latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
+  const rawContext = {};
+  const { humanContext, latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
 
   const prompt = [
     "You are Mentor Node: a high-trust AI mentor embedded in SYZMEKU.",
@@ -1140,6 +1130,7 @@ router.post("/mentor", async (req, res) => {
       modeInstruction:
         "Deliver reflection, reframing, motivational clarity, and one internal alignment step grounded in the provided context.",
       rawContext,
+      humanContext,
       latestSignals,
       latestSystems,
       latestTasks,
@@ -1160,14 +1151,14 @@ router.post("/agent", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
   if (!text) return res.status(400).json({ message: "Agent goal is required." });
 
-  const rawContext = req.body?.context;
+  const rawContext = {};
   const result = await runAgentKernelEvaluation({ text, rawContext, allowTaskExecution: true });
   return res.json(result);
 });
 
 router.post("/agent/evaluate", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "agent evaluate";
-  const rawContext = req.body?.context || {};
+  const rawContext = {};
   const { result } = await runAutonomousReasoningKernel({ trigger: "manual", text, rawContext });
   return res.json(result);
 });
@@ -1328,7 +1319,7 @@ router.get("/protocol/status", async (req, res) => {
 /* SIGNAL LOG */
 router.post("/signals", async (req, res) => {
   rejectOwnerFields(req.body);
-  const entry = await SignalEntry.create(req.body);
+  const entry = await core.ingestObservation(req.body);
   await auditCoreAction(req, "signal_logged", { signalId: entry._id });
   res.json(entry);
 });
@@ -1537,7 +1528,7 @@ router.post("/tasks", async (req, res) => {
   const source = typeof req.body?.source === "string" ? req.body.source.trim() : "";
   if (!description) return res.status(400).json({ message: "Task description is required." });
 
-  const task = await Task.create({ description, source });
+  const task = await core.createTask({ description, source });
   await auditCoreAction(req, "task_created", { taskId: task._id, source: task.source });
   return res.json(task);
 });
@@ -1565,7 +1556,7 @@ router.post("/tasks/save-recommendation", async (req, res) => {
     nextActions
       .map((action) => (typeof action === "string" ? action.trim() : ""))
       .filter(Boolean)
-      .map((description) => Task.create({ description, source: "recommendation" }))
+      .map((description) => core.createTask({ description, source: "recommendation" }))
   );
 
   return res.json({ tasks: created });
@@ -1576,7 +1567,7 @@ router.post("/memory/save", async (req, res) => {
   const content = typeof req.body?.content === "string" ? req.body.content.trim() : "";
   if (!content) return res.status(400).json({ message: "Memory content is required." });
 
-  const memory = await StrategicMemory.create({
+  const memory = await core.saveMemory({
     title: content.split(".")[0].slice(0, 80) || "Strategic note",
     category: typeof req.body?.category === "string" ? req.body.category.trim() : "general",
     content,
@@ -1688,62 +1679,8 @@ router.get("/operator/visibility", async (req, res) => {
 
 router.post('/dev/set-role', (_req, res) => res.status(403).json({ message: 'Persisted roles cannot be changed through Core.' }));
 
-router.get("/onboarding/status", async (req, res) => {
-  const user = await User.findById(req.user._id).select("onboarding healthSync name").lean();
-  console.info('[onboarding] status requested', {
-    userId: String(req.user._id),
-    completed: Boolean(user?.onboarding?.completed),
-  });
-  return res.json({
-    completed: Boolean(user?.onboarding?.completed),
-    completedAt: user?.onboarding?.completedAt || null,
-    profile: user?.onboarding?.profile || {},
-    healthSync: user?.healthSync || { provider: "health_connect", status: "disconnected" },
-    welcomeName: user?.onboarding?.profile?.preferredName || user?.name || "there",
-  });
-});
-
-router.post("/onboarding/complete", async (req, res) => {
-  const payload = req.body || {};
-  const profile = {
-    preferredName: String(payload.preferredName || "").trim(),
-    lifeStage: String(payload.lifeStage || "").trim(),
-    supportAreas: Array.isArray(payload.supportAreas) ? payload.supportAreas.filter(Boolean) : [],
-    mentorStyle: String(payload.mentorStyle || "gentle").trim() || "gentle",
-    baseline: {
-      sleep: Number(payload?.baseline?.sleep || 0),
-      stress: Number(payload?.baseline?.stress || 0),
-      energy: Number(payload?.baseline?.energy || 0),
-      mood: String(payload?.baseline?.mood || "").trim(),
-      symptoms: String(payload?.baseline?.symptoms || "").trim(),
-      focusChallenge: String(payload?.baseline?.focusChallenge || "").trim(),
-    },
-    goals: Array.isArray(payload.goals) ? payload.goals.filter(Boolean) : [],
-    signalSetup: String(payload.signalSetup || "manual"),
-  };
-
-  const user = await User.findByIdAndUpdate(
-    req.user._id,
-    {
-      $set: {
-        onboarding: {
-          completed: true,
-          completedAt: new Date(),
-          profile,
-        },
-      },
-    },
-    { new: true }
-  ).select("onboarding");
-
-  console.info('[onboarding] completion saved', {
-    userId: String(req.user._id),
-    completed: Boolean(user?.onboarding?.completed),
-    completedAt: user?.onboarding?.completedAt || null,
-  });
-
-  return res.json({ onboarding: user?.onboarding || null });
-});
+router.get('/onboarding/status',async(_req,res)=>res.json(await core.onboardingStatus()));
+router.post('/onboarding/complete',async(req,res)=>res.json({onboarding:await core.saveOnboarding(req.body)}));
 
 router.get("/health-sync/status", async (req, res) => {
   const user = await User.findById(req.user._id).select("healthSync").lean();
@@ -1778,7 +1715,7 @@ router.post("/health-sync/connect", async (req, res) => {
 router.post("/health-sync/mock-import", async (req, res) => {
   const parsed = parseSleepPayload(req.body || {});
   const hours = Number(parsed.sleepHours || 7);
-  await SignalEntry.create({ sleep: hours, stress: Number(req.body?.stress || 3), symptoms: String(req.body?.symptoms || "health-connect-import") });
+  await core.ingestObservation({ sleep: hours, stress: Number(req.body?.stress || 3), symptoms: String(req.body?.symptoms || "health-connect-import") });
   await User.findByIdAndUpdate(req.user._id, {
     $set: {
       healthSync: {

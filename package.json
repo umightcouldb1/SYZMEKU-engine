@@ -15,7 +15,9 @@
     "backfill:workspace-smoke-test": "node scripts/backfill-workspace-smoke-test.cjs",
     "render-build": "npm run setup && npm run test",
     "start": "node server.js",
-    "test": "npm run server-check && npm run client-build"
+    "test": "npm run server-check && npm run client-build",
+    "m1:test": "node --test server/tests/coreScope.test.cjs server/tests/coreContext.test.cjs server/tests/coreMigration.test.cjs server/tests/commerceRegression.test.cjs",
+    "m1:dry-run": "node server/scripts/migrateCoreContextV1.cjs"
   },
   "keywords": [
     "SYZMEKU",

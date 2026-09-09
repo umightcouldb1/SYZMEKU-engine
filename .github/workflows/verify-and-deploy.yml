@@ -41,6 +41,9 @@ jobs:
       - name: Install root, server, and client dependencies
         run: npm run setup
 
+      - name: Verify M1 ownership, privacy and commerce fixtures
+        run: npm run m1:test && npm run social-command:test
+
       - name: Run production verification
         run: npm run test
 
