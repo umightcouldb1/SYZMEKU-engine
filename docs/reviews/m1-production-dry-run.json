@@ -1,0 +1,657 @@
+{
+  "mode": "dry-run-only",
+  "source": "production metadata; read-only; no customer payloads",
+  "generatedAt": "2026-09-09T15:43:27.379Z",
+  "writes": 0,
+  "ownershipAssignments": 0,
+  "unresolvedOwnership": 1,
+  "collections": [
+    {
+      "collection": "strategicmemories",
+      "ownerKey": "userId",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "memories",
+      "ownerKey": "userId",
+      "total": 1,
+      "owned": 1,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "userId_1",
+          "key": {
+            "userId": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "updatedAt_-1",
+          "key": {
+            "updatedAt": -1
+          },
+          "unique": false
+        }
+      ]
+    },
+    {
+      "collection": "signalentries",
+      "ownerKey": "userId",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "userId_1",
+          "key": {
+            "userId": 1
+          },
+          "unique": false
+        }
+      ]
+    },
+    {
+      "collection": "tasks",
+      "ownerKey": "userId",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "userId_1",
+          "key": {
+            "userId": 1
+          },
+          "unique": false
+        }
+      ]
+    },
+    {
+      "collection": "systems",
+      "ownerKey": "userId",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "protocols",
+      "ownerKey": "userId",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "agentloopstates",
+      "ownerKey": "userId",
+      "total": 1,
+      "owned": 0,
+      "unowned": 1,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "singletonKey_1",
+          "key": {
+            "singletonKey": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "kernelsnapshots",
+      "ownerKey": "userId",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "singletonKey_1",
+          "key": {
+            "singletonKey": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "kernelcycles",
+      "ownerKey": "userId",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "actionexecutions",
+      "ownerKey": "userId",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "alertrecords",
+      "ownerKey": "userId",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "fingerprint_1",
+          "key": {
+            "fingerprint": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "systemexecutions",
+      "ownerKey": "userId",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "protocolexecutionrecords",
+      "ownerKey": "userId",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "lifecontexts",
+      "ownerKey": "user_id",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "user_id_1",
+          "key": {
+            "user_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "mentorprofiles",
+      "ownerKey": "user_id",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "user_id_1",
+          "key": {
+            "user_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "mentorsignals",
+      "ownerKey": "user_id",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "user_id_1",
+          "key": {
+            "user_id": 1
+          },
+          "unique": false
+        },
+        {
+          "name": "signal_type_1",
+          "key": {
+            "signal_type": 1
+          },
+          "unique": false
+        },
+        {
+          "name": "recorded_at_1",
+          "key": {
+            "recorded_at": 1
+          },
+          "unique": false
+        }
+      ]
+    },
+    {
+      "collection": "mentortasks",
+      "ownerKey": "user_id",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "user_id_1",
+          "key": {
+            "user_id": 1
+          },
+          "unique": false
+        }
+      ]
+    },
+    {
+      "collection": "mentormessages",
+      "ownerKey": "user_id",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "user_id_1",
+          "key": {
+            "user_id": 1
+          },
+          "unique": false
+        }
+      ]
+    },
+    {
+      "collection": "loopstatuses",
+      "ownerKey": "user_id",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "user_id_1",
+          "key": {
+            "user_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "userprotocolstates",
+      "ownerKey": "user_id",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "user_id_1",
+          "key": {
+            "user_id": 1
+          },
+          "unique": false
+        },
+        {
+          "name": "user_id_1_protocol_id_1",
+          "key": {
+            "user_id": 1,
+            "protocol_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "behavioralrhythms",
+      "ownerKey": "user_id",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "user_id_1",
+          "key": {
+            "user_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "emotionalpatterns",
+      "ownerKey": "user_id",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "user_id_1",
+          "key": {
+            "user_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "colorprofiles",
+      "ownerKey": "user_id",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "user_id_1",
+          "key": {
+            "user_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "sensoryprofiles",
+      "ownerKey": "user_id",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "user_id_1",
+          "key": {
+            "user_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "symbolicinterests",
+      "ownerKey": "user_id",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "user_id_1",
+          "key": {
+            "user_id": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    {
+      "collection": "datarequests",
+      "ownerKey": "userId",
+      "total": 0,
+      "owned": 0,
+      "unowned": 0,
+      "orphaned": 0,
+      "invalidOwnerType": 0,
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "userId_1",
+          "key": {
+            "userId": 1
+          },
+          "unique": false
+        },
+        {
+          "name": "requestType_1",
+          "key": {
+            "requestType": 1
+          },
+          "unique": false
+        },
+        {
+          "name": "status_1",
+          "key": {
+            "status": 1
+          },
+          "unique": false
+        }
+      ]
+    }
+  ],
+  "disposition": "Quarantine unresolved ownership. No account is assigned by default. Review evidence and a separate migration proposal before any backfill.",
+  "indexPlan": "Keep existing global unique indexes; scoped new singleton/fingerprint values do not collide with historic keys. Verify unique LifeContext.user_id and Memory.userId indexes before enabling context writes. No index is changed by this script.",
+  "normalizationNote": "The _id_ index is inherently unique even when the driver omits its unique flag. Counts and other metadata are unchanged from the read-only capture."
+}

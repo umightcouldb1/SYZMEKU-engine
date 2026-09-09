@@ -11,4 +11,6 @@ const protocolSchema = new mongoose.Schema(
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } },
 );
 
+protocolSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
+
 module.exports = mongoose.model('Protocol', protocolSchema);

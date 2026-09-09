@@ -1,4 +1,4 @@
-const router = require("express").Router();
+const router = require('../../utils/asyncRouter')();
 const System = require("../../models/System");
 const SignalEntry = require("../../models/SignalEntry");
 const SystemExecution = require("../../models/SystemExecution");
@@ -12,6 +12,11 @@ const AlertRecord = require("../../models/AlertRecord");
 const ActionExecution = require("../../models/ActionExecution");
 const { buildActionPolicy, createToolRegistry, executeActionPlan } = require("../../logic/actionKernel");
 const mongoose = require("mongoose");
+const { requireCoreScope, coreCapabilities, rejectOwnerFields, runAuthenticatedCoreJob, scopedRuntime, scopeError } = require('../../services/coreScopeService');
+const core = require('../../services/coreContextService');
+const coreSingletonKey = () => 'user:' + requireCoreScope().userId;
+let activeLoopOwner = null;
+require('../../services/coreScopeService').onCoreInvalidation(userId => { if (activeLoopOwner === userId) activeLoopOwner = null; });
 const { protect } = require("../../middleware/authMiddleware");
 const DataRequest = require("../../models/DataRequest");
 const User = require("../../models/User");
@@ -22,38 +27,13 @@ const { logAuditEvent } = require("../../utils/audit");
 
 
 router.use(protect);
+router.use((req, _res, next) => { try { requireCoreScope(req.user._id); next(); } catch (error) { next(error); } });
 
-const OPERATOR_ROLES = ["founder", "admin"];
-
-const parseRoleEmails = (value = "") =>
-  new Set(
-    String(value)
-      .split(",")
-      .map((item) => item.trim().toLowerCase())
-      .filter(Boolean)
-  );
-
-const founderEmails = parseRoleEmails(process.env.FOUNDER_EMAILS);
-const adminEmails = parseRoleEmails(process.env.ADMIN_EMAILS);
-
-const resolveOperatorVisibility = (user = {}) => {
-  const role = String(user?.role || "user").toLowerCase();
-  const email = String(user?.email || "").trim().toLowerCase();
-  const matchedEmailRole = founderEmails.has(email) ? "founder" : adminEmails.has(email) ? "admin" : "";
-  const canAccessOperatorMode = OPERATOR_ROLES.includes(role) || Boolean(matchedEmailRole);
-  const effectiveRole = OPERATOR_ROLES.includes(role) ? role : matchedEmailRole || role;
-  const accessSource = OPERATOR_ROLES.includes(role) ? "role" : matchedEmailRole ? "email_allowlist" : "none";
-
-  return {
-    canAccessOperatorMode,
-    role,
-    email,
-    effectiveRole,
-    matchedEmailRole,
-    accessSource,
-    requiredRoles: OPERATOR_ROLES,
-  };
-};
+const OPERATOR_ROLES = ['COMMANDER_IN_CHIEF'];
+const resolveOperatorVisibility = (user = {}) => ({
+  canAccessOperatorMode: coreCapabilities(user).operator,
+  role: user.role, effectiveRole: user.role, accessSource: 'capability', requiredRoles: OPERATOR_ROLES,
+});
 
 const requireOperatorRole = async (req, res, next) => {
   const visibility = resolveOperatorVisibility(req.user);
@@ -144,11 +124,11 @@ const FALLBACK_ANALYSIS = {
   next_actions: ["Adjust model prompt to always return the required schema."],
 };
 
-const autonomyState = {
+const autonomyState = scopedRuntime('autonomy', () => ({
   monitoringEnabled: true,
   lastRunAt: null,
   activeAlerts: [],
-};
+}));
 
 const KERNEL_MODES = ["general", "strategic", "health", "build", "signal", "mentor", "recommend"];
 const KERNEL_NODES = ["sentinel", "mentor", "planner", "protocol", "recommend"];
@@ -156,7 +136,7 @@ const KERNEL_NODES = ["sentinel", "mentor", "planner", "protocol", "recommend"];
 const LOOP_INTERVAL_MS = Number(process.env.AGENT_LOOP_INTERVAL_MS) > 0 ? Number(process.env.AGENT_LOOP_INTERVAL_MS) : 120000;
 const DEV_DEFAULT_ACTIVE =
   process.env.NODE_ENV === "development" && String(process.env.AGENT_LOOP_DEFAULT_ACTIVE || "false").toLowerCase() === "true";
-const loopState = {
+const loopState = scopedRuntime('loop', () => ({
   active: false,
   intervalMs: LOOP_INTERVAL_MS,
   timer: null,
@@ -170,19 +150,19 @@ const loopState = {
   latestActionExecutions: [],
   eventLog: [],
   lastError: null,
-};
+}));
 
 const appendLoopEvent = (event) => {
   loopState.eventLog = [{ recordedAt: new Date().toISOString(), ...event }, ...loopState.eventLog].slice(0, 50);
 };
 
 const getLoopStateRecord = async () => {
-  let record = await AgentLoopState.findOne({ singletonKey: "primary" });
+  let record = await AgentLoopState.findOne({ singletonKey: coreSingletonKey() });
   if (record) return record;
 
   record = await AgentLoopState.create({
-    singletonKey: "primary",
-    active: DEV_DEFAULT_ACTIVE,
+    singletonKey: coreSingletonKey(),
+    active: false,
     interval_ms: LOOP_INTERVAL_MS,
     run_count: 0,
     last_error: "",
@@ -196,7 +176,7 @@ const getLoopStateRecord = async () => {
 
 const syncLoopStateFromRecord = (record) => {
   if (!record) return;
-  loopState.active = Boolean(record.active);
+  loopState.active = Boolean(record.active && loopState.timer);
   loopState.intervalMs = Number(record.interval_ms) > 0 ? Number(record.interval_ms) : LOOP_INTERVAL_MS;
   loopState.lastRunAt = record.last_run_at || null;
   loopState.runCount = Number(record.run_count) || 0;
@@ -231,11 +211,11 @@ const persistLoopState = async (patch = {}) => {
   };
 
   const record = await AgentLoopState.findOneAndUpdate(
-    { singletonKey: "primary" },
+    { singletonKey: coreSingletonKey() },
     {
       $set: payload,
       $setOnInsert: {
-        singletonKey: "primary",
+        singletonKey: coreSingletonKey(),
       },
     },
     { new: true, upsert: true }
@@ -276,21 +256,8 @@ const buildLoopStartErrorDetails = (error) => {
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const normalizeRecentCommands = (rawContext) =>
-  Array.isArray(rawContext?.recentCommands)
-    ? rawContext.recentCommands
-        .map((command) => {
-          if (typeof command === "string") return command.trim();
-          if (command && typeof command === "object") {
-            const normalized =
-              typeof command.text === "string" ? command.text : typeof command.command === "string" ? command.command : "";
-            return normalized.trim();
-          }
-          return "";
-        })
-        .filter(Boolean)
-        .slice(0, 20)
-    : [];
+// Browser history is not a context authority; it can contain deleted or another session's data.
+const normalizeRecentCommands = () => [];
 
 const toContextLines = (entries, keys) =>
   entries.map((entry, index) => {
@@ -313,21 +280,7 @@ const toContextLines = (entries, keys) =>
     return line ? `${index + 1}. ${line}` : `${index + 1}. ${JSON.stringify(entry)}`;
   });
 
-const fetchStrategicContext = async () => {
-  try {
-    const [latestSignals, latestSystems, latestTasks, strategicMemory] = await Promise.all([
-      SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
-      System.find().sort({ createdAt: -1 }).limit(5).lean(),
-      Task.find().sort({ createdAt: -1 }).limit(10).lean(),
-      StrategicMemory.find().sort({ updatedAt: -1 }).limit(5).lean(),
-    ]);
-
-    return { latestSignals, latestSystems, latestTasks, strategicMemory };
-  } catch (dbError) {
-    console.warn("Failed to fetch strategic context:", dbError?.message || dbError);
-    return { latestSignals: [], latestSystems: [], latestTasks: [], strategicMemory: [] };
-  }
-};
+const fetchStrategicContext = () => core.reasoningContext();
 
 const mapSystemRecord = (system) => {
   const inputs = Array.isArray(system?.inputs) ? system.inputs.filter(Boolean) : [];
@@ -543,7 +496,7 @@ const buildSharedPromptContext = ({
   ];
 };
 
-const buildAnalysisPrompt = ({ text, mode, modeInstruction, rawContext, latestSignals, latestSystems, latestTasks, strategicMemory }) => {
+const buildAnalysisPrompt = ({ text, mode, modeInstruction, rawContext, humanContext, latestSignals, latestSystems, latestTasks, strategicMemory }) => {
   const recentCommands = normalizeRecentCommands(rawContext);
   const activeRouteType = typeof rawContext?.activeRouteType === "string" ? rawContext.activeRouteType.trim() : "";
 
@@ -563,6 +516,7 @@ const buildAnalysisPrompt = ({ text, mode, modeInstruction, rawContext, latestSi
     "Use this exact shape:",
     '{"objectives":[],"constraints":[],"risks":[],"leverage":[],"next_actions":[]}',
     "",
+    `Current structured human context: ${JSON.stringify(humanContext || {})}`,
     `Analyze mode: ${mode}`,
     `Mode guidance: ${modeInstruction}`,
     ...buildSharedPromptContext({
@@ -736,7 +690,14 @@ const runProtocolIfNeeded = async (protocolName) => {
   }
 };
 
-const runAutonomousReasoningKernel = async ({ trigger = "loop", text = "kernel evaluate", rawContext = {} } = {}) => {
+const runAutonomousReasoningKernel = async (args = {}) => {
+  const expected = (await core.getContext()).revision;
+  return core.withContextMutation(life => {
+    if (life.revision !== expected) throw scopeError('Context changed during kernel evaluation.', 409);
+    return runScopedReasoningKernel(args);
+  });
+};
+const runScopedReasoningKernel = async ({ trigger = "loop", text = "kernel evaluate", rawContext = {} } = {}) => {
   const [latestSignals, latestSystems, openTasks, currentAlerts, strategicMemory, recentKernelCycles] = await Promise.all([
     SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
     System.find().sort({ updatedAt: -1 }).limit(10).lean(),
@@ -747,7 +708,7 @@ const runAutonomousReasoningKernel = async ({ trigger = "loop", text = "kernel e
   ]);
 
   const recentCommands = normalizeRecentCommands(rawContext);
-  const lastOverlayResult = rawContext?.lastOverlayResult || null;
+  const lastOverlayResult = null;
   const operatorContext = {
     latestSignals,
     latestSystems,
@@ -851,15 +812,16 @@ const runAutonomousReasoningKernel = async ({ trigger = "loop", text = "kernel e
   );
 
   await KernelSnapshot.findOneAndUpdate(
-    { singletonKey: "primary" },
-    { $set: { latest_output: result }, $setOnInsert: { singletonKey: "primary" } },
+    { singletonKey: coreSingletonKey() },
+    { $set: { latest_output: result }, $setOnInsert: { singletonKey: coreSingletonKey() } },
     { upsert: true, new: true }
   );
 
   return { result, cycleRecord };
 };
 
-const runAgentLoopCycle = async () => {
+const runAgentLoopCycle = async () => core.withContextMutation(() => runScopedAgentLoopCycle());
+const runScopedAgentLoopCycle = async () => {
   const { result } = await runAutonomousReasoningKernel({ trigger: "loop", text: "loop autonomous cycle", rawContext: { source: "agent-loop" } });
 
   const event = {
@@ -898,6 +860,7 @@ const runAgentLoopCycle = async () => {
 };
 
 const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution = true }) => {
+  const humanContext = await core.getContext();
   const [latestSignals, latestSystems, latestTasks, strategicMemory] = await Promise.all([
     SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
     System.find().sort({ createdAt: -1 }).limit(5).lean(),
@@ -921,6 +884,7 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
       mode: mode_selected,
       modeInstruction: "Generate tactical objectives and next actions for execution planning.",
       rawContext,
+      humanContext,
       latestSignals,
       latestSystems,
       latestTasks,
@@ -946,7 +910,7 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
 
   if (/\bexecute\b/i.test(text) && recommended_tasks.length && allowTaskExecution) {
     const created = await Promise.all(
-      recommended_tasks.map((description) => Task.create({ description, source: "agent-kernel" }))
+      recommended_tasks.map((description) => core.createTask({ description, source: "agent-kernel" }))
     );
     actions_taken.push("create_tasks");
     recommended_tasks.splice(0, recommended_tasks.length, ...created.map((task) => task.description));
@@ -982,6 +946,10 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
 };
 
 const startAgentLoop = async ({ intervalMs } = {}) => {
+  require("../../services/coreScopeService").requireCoreWrite();
+  const principal = requireCoreScope();
+  if (activeLoopOwner && activeLoopOwner !== principal.userId) throw scopeError('An operator loop is already active.', 409);
+  activeLoopOwner = principal.userId;
   const resolvedInterval = Number(intervalMs) > 0 ? Number(intervalMs) : loopState.intervalMs;
   const shouldRestartTimer = Boolean(loopState.timer) && loopState.intervalMs !== resolvedInterval;
   if (loopState.active && loopState.timer && !shouldRestartTimer) return loopState;
@@ -1007,16 +975,25 @@ const startAgentLoop = async ({ intervalMs } = {}) => {
     await persistLoopState({ last_error: loopState.lastError });
   }
 
-  loopState.timer = setInterval(async () => {
+  let tickRunning = false;
+  const timer = setInterval(async () => {
+    if (tickRunning) return;
+    tickRunning = true;
     try {
-      await runAgentLoopCycle();
+      await runAuthenticatedCoreJob(principal, runAgentLoopCycle);
     } catch (error) {
-      loopState.lastError = String(error?.message || error);
-      await KernelCycle.create({ trigger: "loop", output: null, error_summary: loopState.lastError });
-      appendLoopEvent({ type: "loop-cycle-error", error: loopState.lastError });
-      await persistLoopState({ last_error: loopState.lastError });
+      // A revoked/expired session must not write even a personal error log.
+      clearInterval(timer);
+      require('../../services/coreScopeService').invalidateCoreRuntime();
+      if (activeLoopOwner === principal.userId) activeLoopOwner = null;
+      console.warn('Personal operator loop paused; authenticated restart required.');
+    } finally {
+      tickRunning = false;
     }
   }, loopState.intervalMs);
+  loopState.timer = timer;
+  loopState.active = true;
+  timer.unref();
 
   console.log("Agent loop started");
   appendLoopEvent({ type: "loop-started", interval_ms: loopState.intervalMs });
@@ -1025,6 +1002,8 @@ const startAgentLoop = async ({ intervalMs } = {}) => {
 };
 
 const stopAgentLoop = async () => {
+  requireCoreScope();
+  if (activeLoopOwner === requireCoreScope().userId) activeLoopOwner = null;
   if (loopState.timer) {
     clearInterval(loopState.timer);
     loopState.timer = null;
@@ -1052,28 +1031,9 @@ const loopStatusPayload = () => ({
   recent_events: loopState.eventLog.slice(0, 10),
 });
 
-const restoreAgentLoopOnBoot = async () => {
-  if (mongoose.connection.readyState !== 1) return;
-  const record = await getLoopStateRecord();
-  syncLoopStateFromRecord(record);
-  appendLoopEvent({ type: "loop-restored", active: loopState.active, interval_ms: loopState.intervalMs });
-  console.log("Agent loop restored on boot");
-  if (record.active) {
-    await startAgentLoop({ intervalMs: record.interval_ms });
-  }
-};
-
-if (mongoose.connection.readyState === 1) {
-  restoreAgentLoopOnBoot().catch((error) => {
-    console.warn("Failed to restore agent loop on boot:", error?.message || error);
-  });
-} else {
-  mongoose.connection.once("connected", () => {
-    restoreAgentLoopOnBoot().catch((error) => {
-      console.warn("Failed to restore agent loop on boot:", error?.message || error);
-    });
-  });
-}
+// M1: historical active flags do not authorize personal background work.
+// An authenticated operator must explicitly restart the existing session-bound timer.
+const restoreAgentLoopOnBoot = async () => ({ restored: false, reason: 'authenticated_operator_restart_required' });
 
 /* CORE REASONING */
 router.post("/analyze", async (req, res) => {
@@ -1094,14 +1054,15 @@ router.post("/analyze", async (req, res) => {
 
   if (!text) return res.status(400).json({ message: "Command text is required." });
 
-  const rawContext = req.body?.context;
-  const { latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
+  const rawContext = {};
+  const { humanContext, latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
 
   const prompt = buildAnalysisPrompt({
     text: effectiveCommand,
     mode: analyzeMode,
     modeInstruction: analyzeModeInstructions[analyzeMode] || analyzeModeInstructions.general,
     rawContext,
+    humanContext,
     latestSignals,
     latestSystems,
     latestTasks,
@@ -1121,14 +1082,15 @@ router.post("/recommend", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
   if (!text) return res.status(400).json({ message: "Command text is required." });
 
-  const rawContext = req.body?.context;
-  const { latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
+  const rawContext = {};
+  const { humanContext, latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
 
   const prompt = buildAnalysisPrompt({
     text,
     mode: "recommend",
     modeInstruction: "Prioritize decisive, high-leverage next actions based on current state.",
     rawContext,
+    humanContext,
     latestSignals,
     latestSystems,
     latestTasks,
@@ -1148,8 +1110,8 @@ router.post("/mentor", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
   if (!text) return res.status(400).json({ message: "Mentor prompt text is required." });
 
-  const rawContext = req.body?.context;
-  const { latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
+  const rawContext = {};
+  const { humanContext, latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
 
   const prompt = [
     "You are Mentor Node: a high-trust AI mentor embedded in SYZMEKU.",
@@ -1169,6 +1131,7 @@ router.post("/mentor", async (req, res) => {
       modeInstruction:
         "Deliver reflection, reframing, motivational clarity, and one internal alignment step grounded in the provided context.",
       rawContext,
+      humanContext,
       latestSignals,
       latestSystems,
       latestTasks,
@@ -1189,20 +1152,20 @@ router.post("/agent", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
   if (!text) return res.status(400).json({ message: "Agent goal is required." });
 
-  const rawContext = req.body?.context;
+  const rawContext = {};
   const result = await runAgentKernelEvaluation({ text, rawContext, allowTaskExecution: true });
   return res.json(result);
 });
 
 router.post("/agent/evaluate", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "agent evaluate";
-  const rawContext = req.body?.context || {};
+  const rawContext = {};
   const { result } = await runAutonomousReasoningKernel({ trigger: "manual", text, rawContext });
   return res.json(result);
 });
 
 router.get("/kernel/status", async (_req, res) => {
-  const snapshot = await KernelSnapshot.findOne({ singletonKey: "primary" }).lean();
+  const snapshot = await KernelSnapshot.findOne({ singletonKey: coreSingletonKey() }).lean();
   return res.json({ latest: snapshot?.latest_output || null, loop: loopStatusPayload() });
 });
 
@@ -1219,6 +1182,7 @@ router.get("/actions", async (_req, res) => {
 
 /* SYSTEM BUILDER */
 router.post("/systems", async (req, res) => {
+  rejectOwnerFields(req.body);
   const system = await System.create(req.body);
   res.json(system);
 });
@@ -1229,6 +1193,7 @@ router.get("/systems", async (req, res) => {
 });
 
 router.put("/systems/:id", async (req, res) => {
+  rejectOwnerFields(req.body);
   const system = await System.findByIdAndUpdate(req.params.id, req.body, { new: true });
   res.json(system);
 });
@@ -1354,7 +1319,8 @@ router.get("/protocol/status", async (req, res) => {
 
 /* SIGNAL LOG */
 router.post("/signals", async (req, res) => {
-  const entry = await SignalEntry.create(req.body);
+  rejectOwnerFields(req.body);
+  const entry = await core.ingestObservation(req.body);
   await auditCoreAction(req, "signal_logged", { signalId: entry._id });
   res.json(entry);
 });
@@ -1399,7 +1365,7 @@ router.get("/sentinel/status", async (req, res) => {
   const [latestSignals, openAlerts, latestKernel] = await Promise.all([
     SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
     AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(50).lean(),
-    KernelSnapshot.findOne({ singletonKey: "primary" }).lean(),
+    KernelSnapshot.findOne({ singletonKey: coreSingletonKey() }).lean(),
   ]);
 
   const trends = computeSignalTrendBundle(latestSignals);
@@ -1495,7 +1461,7 @@ router.get("/alerts", async (req, res) => {
 router.get("/autonomy/status", async (_req, res) => {
   const [alertCount, latestKernel] = await Promise.all([
     AlertRecord.countDocuments({ status: "open" }),
-    KernelSnapshot.findOne({ singletonKey: "primary" }).lean(),
+    KernelSnapshot.findOne({ singletonKey: coreSingletonKey() }).lean(),
   ]);
   return res.json({
     monitoring_enabled: autonomyState.monitoringEnabled,
@@ -1558,11 +1524,12 @@ router.post("/loop/stop", async (req, res) => {
 
 /* TASKS */
 router.post("/tasks", async (req, res) => {
+  rejectOwnerFields(req.body);
   const description = typeof req.body?.description === "string" ? req.body.description.trim() : "";
   const source = typeof req.body?.source === "string" ? req.body.source.trim() : "";
   if (!description) return res.status(400).json({ message: "Task description is required." });
 
-  const task = await Task.create({ description, source });
+  const task = await core.createTask({ description, source });
   await auditCoreAction(req, "task_created", { taskId: task._id, source: task.source });
   return res.json(task);
 });
@@ -1590,7 +1557,7 @@ router.post("/tasks/save-recommendation", async (req, res) => {
     nextActions
       .map((action) => (typeof action === "string" ? action.trim() : ""))
       .filter(Boolean)
-      .map((description) => Task.create({ description, source: "recommendation" }))
+      .map((description) => core.createTask({ description, source: "recommendation" }))
   );
 
   return res.json({ tasks: created });
@@ -1601,7 +1568,7 @@ router.post("/memory/save", async (req, res) => {
   const content = typeof req.body?.content === "string" ? req.body.content.trim() : "";
   if (!content) return res.status(400).json({ message: "Memory content is required." });
 
-  const memory = await StrategicMemory.create({
+  const memory = await core.saveMemory({
     title: content.split(".")[0].slice(0, 80) || "Strategic note",
     category: typeof req.body?.category === "string" ? req.body.category.trim() : "general",
     content,
@@ -1656,7 +1623,7 @@ router.get("/summary", async (_req, res) => {
     Task.countDocuments({ status: "open" }),
     StrategicMemory.countDocuments(),
     AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(20).lean(),
-    KernelSnapshot.findOne({ singletonKey: "primary" }).lean(),
+    KernelSnapshot.findOne({ singletonKey: coreSingletonKey() }).lean(),
     ActionExecution.find().sort({ timestamp: -1 }).limit(5).lean(),
   ]);
   if (!autonomyState.lastRunAt) await evaluateMonitorState();
@@ -1711,73 +1678,10 @@ router.get("/operator/visibility", async (req, res) => {
   return res.json(resolveOperatorVisibility(req.user));
 });
 
-router.post("/dev/set-role", async (req, res) => {
-  if (String(process.env.NODE_ENV) === "production") {
-    return res.status(403).json({ message: "Dev helper is disabled in production." });
-  }
+router.post('/dev/set-role', (_req, res) => res.status(403).json({ message: 'Persisted roles cannot be changed through Core.' }));
 
-  const nextRole = String(req.body?.role || "").trim();
-  if (!nextRole) return res.status(400).json({ message: "role is required" });
-  const updated = await User.findByIdAndUpdate(req.user._id, { role: nextRole }, { new: true }).select("name email role");
-  return res.json({ message: "Role updated for testing.", user: updated });
-});
-
-router.get("/onboarding/status", async (req, res) => {
-  const user = await User.findById(req.user._id).select("onboarding healthSync name").lean();
-  console.info('[onboarding] status requested', {
-    userId: String(req.user._id),
-    completed: Boolean(user?.onboarding?.completed),
-  });
-  return res.json({
-    completed: Boolean(user?.onboarding?.completed),
-    completedAt: user?.onboarding?.completedAt || null,
-    profile: user?.onboarding?.profile || {},
-    healthSync: user?.healthSync || { provider: "health_connect", status: "disconnected" },
-    welcomeName: user?.onboarding?.profile?.preferredName || user?.name || "there",
-  });
-});
-
-router.post("/onboarding/complete", async (req, res) => {
-  const payload = req.body || {};
-  const profile = {
-    preferredName: String(payload.preferredName || "").trim(),
-    lifeStage: String(payload.lifeStage || "").trim(),
-    supportAreas: Array.isArray(payload.supportAreas) ? payload.supportAreas.filter(Boolean) : [],
-    mentorStyle: String(payload.mentorStyle || "gentle").trim() || "gentle",
-    baseline: {
-      sleep: Number(payload?.baseline?.sleep || 0),
-      stress: Number(payload?.baseline?.stress || 0),
-      energy: Number(payload?.baseline?.energy || 0),
-      mood: String(payload?.baseline?.mood || "").trim(),
-      symptoms: String(payload?.baseline?.symptoms || "").trim(),
-      focusChallenge: String(payload?.baseline?.focusChallenge || "").trim(),
-    },
-    goals: Array.isArray(payload.goals) ? payload.goals.filter(Boolean) : [],
-    signalSetup: String(payload.signalSetup || "manual"),
-  };
-
-  const user = await User.findByIdAndUpdate(
-    req.user._id,
-    {
-      $set: {
-        onboarding: {
-          completed: true,
-          completedAt: new Date(),
-          profile,
-        },
-      },
-    },
-    { new: true }
-  ).select("onboarding");
-
-  console.info('[onboarding] completion saved', {
-    userId: String(req.user._id),
-    completed: Boolean(user?.onboarding?.completed),
-    completedAt: user?.onboarding?.completedAt || null,
-  });
-
-  return res.json({ onboarding: user?.onboarding || null });
-});
+router.get('/onboarding/status',async(_req,res)=>res.json(await core.onboardingStatus()));
+router.post('/onboarding/complete',async(req,res)=>res.json({onboarding:await core.saveOnboarding(req.body)}));
 
 router.get("/health-sync/status", async (req, res) => {
   const user = await User.findById(req.user._id).select("healthSync").lean();
@@ -1812,7 +1716,7 @@ router.post("/health-sync/connect", async (req, res) => {
 router.post("/health-sync/mock-import", async (req, res) => {
   const parsed = parseSleepPayload(req.body || {});
   const hours = Number(parsed.sleepHours || 7);
-  await SignalEntry.create({ sleep: hours, stress: Number(req.body?.stress || 3), symptoms: String(req.body?.symptoms || "health-connect-import") });
+  await core.ingestObservation({ sleep: hours, stress: Number(req.body?.stress || 3), symptoms: String(req.body?.symptoms || "health-connect-import") });
   await User.findByIdAndUpdate(req.user._id, {
     $set: {
       healthSync: {
@@ -1845,4 +1749,5 @@ router.post("/task/complete", async (req, res) => {
   return res.json(task);
 });
 
+router.m1Internals = { runAgentLoopCycle, restoreAgentLoopOnBoot, startAgentLoop, stopAgentLoop, resolveOperatorVisibility };
 module.exports = router;

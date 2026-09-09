@@ -12,4 +12,6 @@ const mentorTaskSchema = new mongoose.Schema(
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } },
 );
 
+mentorTaskSchema.plugin(require('./coreOwned'), {"ownerKey":"user_id","references":{"protocol_id":"Protocol"}});
+
 module.exports = mongoose.model('MentorTask', mentorTaskSchema);

@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const Memory = require('../models/Memory');
+const core = require('../services/coreContextService');
 const { protect } = require('../middleware/authMiddleware');
 const { requestModelJson } = require('../services/modelRouter');
 const { getOrCreateLineageMemory } = require('../services/lineageMemoryService');
@@ -130,7 +130,7 @@ If stress is high, coherence is Support Needed/Strained, or Gentle_Reset_Mode is
 
 [SYSTEM ARCHITECTURE DIRECTIVE: BIG SYZ LINEAGE MEMORY]
 You are Big SYZ, an emotionally intelligent mentor and strategic operating system.
-The user's onboarding blueprint must govern every response across the entire app.
+Use the current server-owned human context and sourced facts below. The current request may correct them. Missing wellness data is not a requirement to establish a goal.
 Treat emotions and biometric coherence as adaptive signal context, not diagnosis, identity verification, or medical evidence.
 Use the real-time coherence vector to adjust tone, pacing, and strategic load:
 - If coherence is Aligned, be concise, direct, and action-oriented.
@@ -142,10 +142,10 @@ Return ONLY valid JSON with this exact shape:
 Each field must be an array of concise strings.
 
 Sovereign Matrix Note:
-${sovereignContext.sovereignMatrixNote || context.sovereignMatrixNote || '(none saved)'}
+${sovereignContext.sovereignMatrixNote || '(none saved)'}
 
 Onboarding Reflection:
-${sovereignContext.onboardingReflection || context.onboardingReflection || '(none saved)'}
+${sovereignContext.onboardingReflection || '(none saved)'}
 
 Life Stage Choices:
 ${Array.isArray(sovereignContext.lifeStageChoices) && sovereignContext.lifeStageChoices.length ? sovereignContext.lifeStageChoices.join(', ') : context.lifeStage || '(none saved)'}
@@ -167,8 +167,12 @@ ${JSON.stringify({
   lifeStage: context.lifeStage || '',
   supportAreas: context.supportAreas || [],
   goals: context.goals || [],
-  recentCommands: context.recentCommands || [],
-}).slice(0, 3000)}
+  constraints: context.constraints || [],
+  resources: context.resources || [],
+  obligations: context.obligations || [],
+  relationships: context.relationships || [],
+  durableMemory: context.durableMemory || [],
+})}
 `.trim();
 
 const getModelText = (modelResult = {}) =>
@@ -180,12 +184,15 @@ router.post('/', protect, async (req, res) => {
 
   try {
     const userId = req.user.id || req.user._id;
-    const rawContext = req.body?.context && typeof req.body.context === 'object' ? req.body.context : {};
     const biometricMetadata = sanitizeBiometricMetadata(req.body?.biometricMetadata);
-    const { memory, sovereignContext } = await getOrCreateLineageMemory(userId);
+    const { memory, sovereignContext, context: humanContext, durableMemory } = await getOrCreateLineageMemory(userId);
     const prompt = buildLineagePrompt({
       text,
-      context: rawContext,
+      context: {
+        goals:humanContext.goals || [], preferredName:humanContext.preferredName, lifeStage:humanContext.lifeStage,
+        supportAreas:humanContext.supportAreas || [], constraints:humanContext.constraints || [], resources:humanContext.resources || [],
+        obligations:humanContext.obligations || [], relationships:humanContext.relationships || [],
+        durableMemory:(durableMemory || []).slice(0,20).map(({content,source,confirmed})=>({content,source,confirmed})) },
       sovereignContext,
       history: memory.conversationHistory || [],
       biometricMetadata,
@@ -212,19 +219,7 @@ router.post('/', protect, async (req, res) => {
       { role: 'model', text: modelSummary, timestamp: now, biometricMetadata },
     ];
 
-    const updatedMemory = await Memory.findOneAndUpdate(
-      { userId },
-      {
-        $set: { sovereignContext },
-        $push: {
-          conversationHistory: {
-            $each: turns,
-            $slice: -80,
-          },
-        },
-      },
-      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-    ).lean();
+    const updatedMemory = await core.appendConversation(turns, { contextRevision: humanContext.revision || 0, conversationRevision: memory.revision || 0 });
 
     return res.json({
       ...parsed,
@@ -234,13 +229,13 @@ router.post('/', protect, async (req, res) => {
       lineage_status: 'Lineage Sync Established',
       memory_turns: updatedMemory?.conversationHistory?.length || 0,
       conversationHistory: updatedMemory?.conversationHistory || [],
-      sovereignContext: updatedMemory?.sovereignContext || sovereignContext,
-      sovereign_context: updatedMemory?.sovereignContext || sovereignContext,
+      sovereignContext,
+      sovereign_context: sovereignContext,
       biometricMetadata,
       model: modelResult.model,
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       message: 'Lineage memory analysis failed.',
       details: String(error?.message || error).slice(0, 500),
     });

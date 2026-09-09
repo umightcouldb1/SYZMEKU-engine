@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import OperatorConsole from './OperatorConsole';
+import CoreContextPanel from './components/CoreContextPanel';
 import { useBiometric } from './context/BiometricContext';
 import './dashboard.css';
 import './matrixContext.css';
@@ -15,7 +16,7 @@ const DAILY_GREETING = () => {
 const buildInsightMessage = (summary, analysis) => {
   if (analysis?.reasoning_summary) return analysis.reasoning_summary;
   if (summary?.recommended_next_move) return summary.recommended_next_move;
-  return 'Your signals are stable. Focus on one high-leverage task before noon.';
+  return 'Choose one goal or next step you would like help with today.';
 };
 
 const QUICK_PROMPTS = {
@@ -160,7 +161,8 @@ const Dashboard = ({ user }) => {
   const [summary, setSummary] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [alerts, setAlerts] = useState([]);
-  const [signals, setSignals] = useState({ sleep: 6, stress: 3, symptoms: 'calm' });
+  const [signals, setSignals] = useState({ sleep: '', stress: '', symptoms: '' });
+  const [humanContext, setHumanContext] = useState({});
   const [chatInput, setChatInput] = useState('');
   const [chatMemory, setChatMemory] = useState([]);
   const [lineageStatus, setLineageStatus] = useState('Lineage Sync Pending');
@@ -182,8 +184,8 @@ const Dashboard = ({ user }) => {
     getLatestCoherencePayload,
   } = useBiometric();
 
-  const onboardingProfile = useMemo(() => getOnboardingProfile(user), [user]);
-  const matrixNote = sovereignContext?.sovereignMatrixNote || getMatrixNote(onboardingProfile);
+  const onboardingProfile = humanContext;
+  const matrixNote = sovereignContext?.sovereignMatrixNote || '';
   const latestMentorText = useMemo(
     () => [...chatMemory].reverse().find((entry) => entry.speaker === 'syz')?.text || '',
     [chatMemory],
@@ -238,6 +240,7 @@ const Dashboard = ({ user }) => {
     setTelemetrySync(telemetryRes.data || null);
 
     if (memoryRes.data?.success) {
+      setHumanContext(memoryRes.data.context || {});
       setChatMemory(mapPersistentHistoryToChatMemory(memoryRes.data.conversationHistory || []));
       setSovereignContext(memoryRes.data.sovereignContext || null);
       setLineageStatus(memoryRes.data.status || 'Lineage Sync Established');
@@ -246,12 +249,14 @@ const Dashboard = ({ user }) => {
     const latestSignal = signalsRes.data?.entries?.[0];
     if (latestSignal) {
       const nextSignals = {
-        sleep: latestSignal.sleep ?? 6,
-        stress: latestSignal.stress ?? 3,
-        symptoms: latestSignal.symptoms ?? 'calm',
+        sleep: latestSignal.sleep ?? '',
+        stress: latestSignal.stress ?? '',
+        symptoms: latestSignal.symptoms ?? '',
       };
       setSignals(nextSignals);
       updateContextualMetrics(nextSignals);
+    } else {
+      setSignals({sleep:'',stress:'',symptoms:''});
     }
   };
 
@@ -583,6 +588,11 @@ const Dashboard = ({ user }) => {
         </section>
 
         <section className="mentor-support-panel">
+          <CoreContextPanel onChanged={async () => {
+            setLatestInsight(null); setChatMemory([]); setSovereignContext({}); setHumanContext({});
+            window.speechSynthesis?.cancel();
+            await refreshMentorData();
+          }} />
           <div className="mentor-support-grid mentor-grid">
             {matrixNote && (
               <section className="mentor-card mentor-matrix-note-card">

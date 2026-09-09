@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const { getRequestContext } = require("../utils/requestContext");
 
 const signalSchema = new mongoose.Schema(
   {
@@ -9,6 +8,17 @@ const signalSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    domain: { type: String, default: 'wellness', maxlength: 80 },
+    observationType: { type: String, default: 'check-in', maxlength: 80 },
+    value: { type: mongoose.Schema.Types.Mixed, default: null },
+    occurredAt: { type: Date, default: Date.now },
+    schemaVersion: { type: Number, default: 1 },
+    sourceId: { type: String, maxlength: 200 },
+    source: { type: String, default: 'user', maxlength: 120 },
+    confirmed: { type: Boolean, default: true },
+    legacyId: { type: String, maxlength: 100 },
+    energy: Number,
+    mood: { type: String, maxlength: 200 },
     sleep: Number,
     stress: Number,
     symptoms: String,
@@ -17,22 +27,6 @@ const signalSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-signalSchema.pre("validate", function setSignalUserScope(next) {
-  const { userId } = getRequestContext();
-  if (!this.userId && userId) this.userId = userId;
-  next();
-});
-
-signalSchema.pre(/^find/, function filterSignalsByUser(next) {
-  const { userId } = getRequestContext();
-  if (userId && !this.getFilter().userId) this.where({ userId });
-  next();
-});
-
-signalSchema.pre("countDocuments", function countSignalsByUser(next) {
-  const { userId } = getRequestContext();
-  if (userId && !this.getFilter().userId) this.where({ userId });
-  next();
-});
+signalSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
 
 module.exports = mongoose.model("SignalEntry", signalSchema);

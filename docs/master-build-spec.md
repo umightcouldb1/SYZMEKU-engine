@@ -2,6 +2,10 @@
 
 ## Master Build Spec
 
+**Current approved milestone: M1 — Isolation and Context Foundation only (2026-09-09).**
+Section 15 records the approved M0 reconciliation and governs the M1 implementation.
+Earlier product aspirations are not evidence of implemented functionality or approval for M2–M6.
+
 ### Product Identity
 
 **Big SYZ** is the user-facing, emotionally intelligent mentor platform.  
@@ -104,7 +108,7 @@ Should hide:
 
 #### Operator Mode
 
-Advanced mode for founder/admin/operator.
+Advanced mode for the server-mapped operator capability of `COMMANDER_IN_CHIEF`.
 
 Should show:
 
@@ -233,8 +237,7 @@ Fields:
 
 Roles:
 
-- founder
-- admin
+- COMMANDER_IN_CHIEF (server-side operator capability; own personal data only)
 - user
 - clinician
 - support
@@ -860,3 +863,68 @@ Build:
 **It helps users understand patterns in their lives, reflect clearly, and take aligned next steps — safely, securely, and intelligently.**
 
 Use this as the controlling document going forward.
+
+
+## 15. Approved M1 implementation contract
+
+### 15.1 Scope and authorities
+
+M0 is approved. M1 adds ownership isolation, structured human context, compatibility adapters, privacy consistency, tests and a read-only migration inventory. No parallel physical domain collection, scheduler, or Action Kernel is introduced.
+
+| Authority | Physical model | M1 responsibility |
+| --- | --- | --- |
+| Account identity | User | Existing authentication and persisted USER / COMMANDER_IN_CHIEF roles |
+| Human context | LifeContext | Goals, success measures, constraints, resources, obligations, relationships, values and narrative |
+| Observations | SignalEntry | Cross-domain observations alongside existing wellness fields |
+| Durable facts | StrategicMemory | Sourced facts and unconfirmed insights, correction/deletion |
+| Conversation | Memory | Existing bounded conversation history, revision checks |
+| Tasks | Task | Canonical tasks; legacy mentor task routes adapt here |
+| Execution/history | Existing Kernel/Action/System/Protocol models | Owner-scoped history with privacy redaction |
+
+The shared service is server/services/coreContextService.js. New context reads/writes and compatibility ingestion go through it. Legacy mentor endpoints no longer write MentorProfile, MentorSignal, MentorTask or MentorMessage as competing authorities. Existing historical rows stay restricted until separately reviewed; the inventory is not a backfill. Read-time onboarding compatibility is a projection; the first explicit mutation anchors existing account-owned context into LifeContext. A suppression marker prevents future onboarding fallback after correction/deletion.
+
+### 15.2 Security-first boundary
+
+The security-only checkpoint preceded context schema/UX changes. All 26 personal model APIs require an authenticated request/job scope. Missing scope fails closed; query filters add an AND owner boundary; document ownership cannot be changed; referenced Core records must belong to the same owner. Personal bulk writes, replacements, update pipelines and cross-collection aggregation are denied. Raw collection access is reserved for fixture setup, index metadata inspection and read-only inventory, not app data access.
+
+Authentication establishes scope from the verified AuthSession and User, never request-body ownership. COMMANDER_IN_CHIEF maps to operator capability and does not bypass tenant ownership. No persisted account role migration exists. /core/dev/set-role always denies.
+
+The existing single personal operator loop captures an authenticated principal, rechecks the session and role on every tick, prevents overlapping ticks and does not restore from a historical active flag on boot. Personal singleton keys are user:<id>; alert fingerprints are owner-prefixed. Social scheduling remains separate and unchanged. A future multi-user scheduling/grant state machine is outside M1.
+
+### 15.3 Context and privacy behavior
+
+- GET /api/core/context inspects canonical context or a read-only account onboarding projection.
+- PUT /api/core/context accepts bounded structured fields and an optional expectedRevision; mismatched revisions return 409. Subdocument IDs must already belong to that context.
+- POST /api/core/signals ingests versioned cross-domain observations; supplied source/sourceId retries deduplicate within the owner. Neither mood nor sleep is required.
+- PATCH /api/core/memory/:id corrects a durable fact. DELETE removes it. Both are scoped.
+- DELETE /api/memory/conversation clears conversation and known derived summaries.
+- DELETE /api/core/context removes owned personal context, observations, facts, tasks, systems, protocols and legacy mentor data. It retains an empty suppression marker and redacts context payloads in execution history while preserving history IDs, timestamps and statuses. Account/authentication, commerce and Social records remain separate. Existing DataRequest administrative request records are retained.
+- Correction/deletion clears conversation, known kernel summaries, kernel-generated memory and derived recommendation tasks; redacts alert messages and execution payloads; and stops the affected personal loop/cache. User-authored tasks/facts unrelated to the edited record are not semantically rewritten. Full pattern/source dependency invalidation is M2, not claimed by M1.
+- Legacy intake metadata cannot retain duplicate canonical name/goals/context fields. Browser-stored operator history is discarded; model prompts use server-owned context rather than cached client goals, narrative, prior commands or overlays.
+- A revision check prevents an in-flight conversation response from being persisted after correction/deletion. Context/privacy and kernel persistence use MongoDB transactions, with a per-owner LifeContext write sequence to serialize competing mutations. Action history snapshots detach live objects and transaction sessions.
+
+The UI provides non-wellness goal creation/editing, success measures, sourced fact inspection/correction/removal and an explicit two-step personal-data deletion control. Saving a context correction may clear earlier conversation and derived recommendations; this is disclosed in the UI.
+
+### 15.4 Schema and index contract
+
+All 26 personal schemas use coreOwned with automatic index building disabled. Global personal schemas gain required ObjectId userId ownership; existing userId/user_id spellings are preserved. Existing unique indexes are retained. No collection is renamed or created as a new domain authority.
+
+LifeContext adds schemaVersion, revision, writeSequence, legacySuppressedAt, preferredName, lifeStage, mentorStyle, narrative, supportAreas, values, goals and sourced constraints/resources/obligations/relationships plus noncanonical legacy intake metadata. Goal subdocuments carry stable IDs, domain, successMeasure, status, confirmed, source and optional targetDate. Other context items carry stable IDs, description, kind, hard, source and optional validUntil. Existing primary_focus/stress_level/current_challenges fields remain.
+
+SignalEntry adds schemaVersion, domain, observationType, value, occurredAt, source/sourceId, confirmed, legacyId, energy and mood; sleep/stress/symptoms/notes remain. StrategicMemory adds schemaVersion, revision, source/sourceId, confirmed and legacyId. Memory adds schemaVersion/revision and new conversation-turn IDs. Task adds title, protocol_id and legacyId. KernelSnapshot, KernelCycle, ActionExecution, AlertRecord, SystemExecution and ProtocolExecutionRecord add contextInvalidatedAt. AuditLog permits the already-emitted ai_gateway category.
+
+Before any context mutation, verify that LifeContext.user_id and Memory.userId each have their existing single-field unique index. Missing or unreadable index metadata returns 503. The inventory reports existing index definitions; it changes none. Production owner-only indexes declared on previously global schemas are NOT auto-created by this release; any performance/index migration needs separate review. Existing global unique singleton/fingerprint indexes remain safe because new values include owner identity. Atomic sourceId deduplication uses the per-owner transaction anchor, not an unapproved new unique index.
+
+### 15.5 Enablement, validation and rollback
+
+Personal Core writes/jobs are disabled unless CORE_CONTEXT_WRITES_ENABLED is exactly true. Scoped reads remain available. Commerce and Operations do not use this flag. Do not enable it in production as part of this PR.
+
+Release prerequisites: review the dry-run; verify a transaction-capable replica set and the required ownership indexes in staging; run the two-user fixtures and browser smoke check; obtain separate merge/deployment approval. A standalone Mongo server has no unsafe nontransactional fallback. The database account must be able to read index metadata. Explicit index creation is limited to disposable fixture databases in tests.
+
+Automated gate: npm run m1:test (22 groups) and npm run social-command:test. Fixtures create isolated MongoDB replica sets with synthetic users and mocked provider calls. The old remote account/role-mutating technical harness now invokes these fixtures. PR CI runs these gates before the existing production build check. CI's Render step remains workflow_dispatch-only.
+
+Safe operational rollback after any M1 use: retain this M1 revision, set CORE_CONTEXT_WRITES_ENABLED=false and restart/drain all app processes so timers and in-flight requests stop. Verify scoped reads and denied writes/jobs. Do not restore old database snapshots or reactivate legacy writers; suppression markers and redactions must survive. Never deploy the pre-M1 base as rollback. The security-only commit is an auditable pre-context checkpoint, not a supported downgrade after canonical data has been written. If a code rollback is necessary, prepare a reviewed patch that retains ownership guards, canonical readers, privacy markers and the write pause.
+
+### 15.6 Deferred work and approval stop
+
+M2 pattern intelligence, M3 provider/reasoning routing repairs, M4 PermissionGrant and immutable approval lifecycle, M5 Audit import and M6 broader autonomy are not implemented. Existing urgency-based internal action policy is preserved and is not represented as a permission grant. The pre-existing provider-enabled /core/agent analyzeMode defect remains tracked for M3. No live Stripe charge, webhook injection into production, provider publishing, production backfill, merge or deployment is authorized by the M1 implementation step.

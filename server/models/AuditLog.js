@@ -4,7 +4,7 @@ const auditLogSchema = new mongoose.Schema(
   {
     category: {
       type: String,
-      enum: ['auth', 'access', 'core-action', 'social-command'],
+      enum: ['auth', 'access', 'core-action', 'social-command', 'ai_gateway'],
       required: true,
       index: true,
     },

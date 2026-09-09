@@ -1,32 +1,7 @@
-const router = require('express').Router();
+const router = require('../utils/asyncRouter')();
 const { protect } = require('../middleware/authMiddleware');
-const { getOrCreateLineageMemory } = require('../services/lineageMemoryService');
-
+const core = require('../services/coreContextService');
 router.use(protect);
-
-router.get('/', async (req, res) => {
-  const { memory, sovereignContext } = await getOrCreateLineageMemory(req.user._id);
-
-  return res.json({
-    success: true,
-    conversationHistory: memory.conversationHistory || [],
-    sovereignContext,
-    status: 'Lineage Sync Established',
-    updatedAt: memory.updatedAt,
-  });
-});
-
-router.delete('/conversation', async (req, res) => {
-  const { memory, sovereignContext } = await getOrCreateLineageMemory(req.user._id);
-  memory.conversationHistory = [];
-  await memory.save();
-
-  return res.json({
-    success: true,
-    conversationHistory: [],
-    sovereignContext,
-    status: 'Lineage Sync Established',
-  });
-});
-
-module.exports = router;
+router.get('/', async (_req,res) => { const {memory,sovereignContext,context}=await core.getConversation();res.json({success:true,conversationHistory:memory.conversationHistory || [],sovereignContext,context,status:'Lineage Sync Established',updatedAt:memory.updatedAt}); });
+router.delete('/conversation',async(_req,res)=>{await core.clearConversation();const {sovereignContext}=await core.getConversation();res.json({success:true,conversationHistory:[],sovereignContext,status:'Lineage Sync Established'});});
+module.exports=router;

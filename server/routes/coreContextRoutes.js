@@ -1,0 +1,10 @@
+const router=require('../utils/asyncRouter')();
+const {protect}=require('../middleware/authMiddleware');
+const core=require('../services/coreContextService');
+router.use(protect);
+router.get('/context',async(_req,res)=>res.json(await core.getContext()));
+router.put('/context',async(req,res)=>res.json(await core.saveContext(req.body)));
+router.delete('/context',async(_req,res)=>{await core.eraseContext();res.json({deleted:true,scope:'personal_core',commerceUnchanged:true});});
+router.patch('/memory/:id',async(req,res)=>res.json(await core.changeMemory(req.params.id,req.body)));
+router.delete('/memory/:id',async(req,res)=>res.json(await core.changeMemory(req.params.id,null)));
+module.exports=router;

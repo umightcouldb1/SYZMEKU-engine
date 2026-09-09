@@ -15,4 +15,6 @@ const agentLoopStateSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+agentLoopStateSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
+
 module.exports = mongoose.model("AgentLoopState", agentLoopStateSchema);

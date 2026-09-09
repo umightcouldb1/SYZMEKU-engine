@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const actionExecutionSchema = new mongoose.Schema(
   {
+    contextInvalidatedAt: { type: Date, default: null },
     action_name: { type: String, required: true, trim: true },
     input: { type: mongoose.Schema.Types.Mixed, default: null },
     result: { type: mongoose.Schema.Types.Mixed, default: null },
@@ -14,5 +15,7 @@ const actionExecutionSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+actionExecutionSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{"reasoning_cycle_id":"KernelCycle"}});
 
 module.exports = mongoose.model("ActionExecution", actionExecutionSchema);

@@ -13,4 +13,6 @@ const userProtocolStateSchema = new mongoose.Schema(
 
 userProtocolStateSchema.index({ user_id: 1, protocol_id: 1 }, { unique: true });
 
+userProtocolStateSchema.plugin(require('./coreOwned'), {"ownerKey":"user_id","references":{"protocol_id":"Protocol"}});
+
 module.exports = mongoose.model('UserProtocolState', userProtocolStateSchema);

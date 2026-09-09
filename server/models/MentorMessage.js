@@ -9,4 +9,6 @@ const mentorMessageSchema = new mongoose.Schema(
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } },
 );
 
+mentorMessageSchema.plugin(require('./coreOwned'), {"ownerKey":"user_id","references":{}});
+
 module.exports = mongoose.model('MentorMessage', mentorMessageSchema);

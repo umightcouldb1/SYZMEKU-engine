@@ -101,7 +101,8 @@ const Dashboard = ({ user }) => {
 
   const saveSessionMemory = useMemo(
     () => (nextMemory) => {
-      localStorage.setItem(SESSION_MEMORY_KEY, JSON.stringify(nextMemory));
+      // Personal context is server-owned. Do not persist a second browser history.
+      localStorage.removeItem(SESSION_MEMORY_KEY);
     },
     []
   );
@@ -117,7 +118,8 @@ const Dashboard = ({ user }) => {
 
   useEffect(() => {
     try {
-      const parsedSessionMemory = JSON.parse(localStorage.getItem(SESSION_MEMORY_KEY) || 'null');
+      localStorage.removeItem(SESSION_MEMORY_KEY);
+      const parsedSessionMemory = null;
       if (parsedSessionMemory && typeof parsedSessionMemory === 'object') {
         const recentCommands = Array.isArray(parsedSessionMemory.recentCommands)
           ? parsedSessionMemory.recentCommands.slice(0, MAX_COMMAND_HISTORY)

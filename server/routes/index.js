@@ -28,6 +28,11 @@ router.use('/', require('./stripeRoutes'));
 
 // Keep the lineage-aware analyzer ahead of the legacy core router.
 router.use('/core/analyze', require('./memoryAnalyzeRoutes'));
+router.use('/core', require('./coreContextRoutes'));
 router.use('/core', require('./API/coreRoutes'));
+router.use((error, _req, res, next) => {
+  if (error.code !== 'CORE_SCOPE_REQUIRED') return next(error);
+  return res.status(error.statusCode || 403).json({ code: error.code, message: error.message });
+});
 
 module.exports = router;

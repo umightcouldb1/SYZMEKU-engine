@@ -56,7 +56,7 @@ const conversationTurnSchema = new mongoose.Schema(
       default: undefined,
     },
   },
-  { _id: false }
+  { _id: true }
 );
 
 const sovereignContextSchema = new mongoose.Schema(
@@ -94,6 +94,8 @@ const memorySchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    schemaVersion: { type: Number, default: 1 },
+    revision: { type: Number, default: 0 },
     conversationHistory: {
       type: [conversationTurnSchema],
       default: [],
@@ -122,5 +124,7 @@ memorySchema.methods.appendConversationTurns = function appendConversationTurns(
 
   this.conversationHistory = [...this.conversationHistory, ...cleanTurns].slice(-80);
 };
+
+memorySchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
 
 module.exports = mongoose.model('Memory', memorySchema);

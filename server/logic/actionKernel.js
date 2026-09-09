@@ -4,28 +4,26 @@ const StrategicMemory = require("../models/StrategicMemory");
 const ProtocolExecutionRecord = require("../models/ProtocolExecutionRecord");
 const { getRequestContext } = require("../utils/requestContext");
 
+const { requireCoreScope } = require('../services/coreScopeService');
+const core = require('../services/coreContextService');
+
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const createToolRegistry = ({ runProtocolIfNeeded, generateReport, userId = null }) => {
-  const scopedUserId = userId || getRequestContext().userId || null;
+  const scopedUserId = requireCoreScope(userId).userId;
 
   return {
     createTask: async ({ description, source = "action-kernel" }) => {
       if (!scopedUserId) throw new Error("Cannot create a task without an authenticated user scope.");
-      return Task.create({ userId: scopedUserId, description, source });
+      return core.createTask({ description, source });
     },
     completeTask: async ({ id }) => {
       if (!scopedUserId) throw new Error("Cannot complete a task without an authenticated user scope.");
-      const task = await Task.findOne({ _id: id, userId: scopedUserId });
-      if (!task) throw new Error(`Task not found: ${id}`);
-      task.status = "done";
-      task.completedAt = new Date();
-      await task.save();
-      return task;
+      return core.completeTask(id);
     },
     createAlert: async ({ message, severity = "medium", source = "action-kernel" }) => {
-      const fingerprint = normalizeText(message);
+      const fingerprint = `${scopedUserId}:${normalizeText(message)}`;
       const existing = await AlertRecord.findOne({ fingerprint });
       if (existing) {
         existing.count += 1;
@@ -47,13 +45,14 @@ const createToolRegistry = ({ runProtocolIfNeeded, generateReport, userId = null
     },
     runProtocol: async ({ protocolName }) => runProtocolIfNeeded(protocolName),
     saveMemory: async ({ title, content, sourceCommand = "action kernel", tags = [] }) =>
-      StrategicMemory.create({ title, category: "kernel", content, sourceCommand, tags }),
+      core.saveMemory({ title, category: "kernel", content, sourceCommand, tags, source:'kernel', confirmed:false }),
     generateReport: async ({ reasoningOutput, operatorState }) =>
       generateReport({ reasoningOutput, operatorState }),
   };
 };
 
 const buildActionPolicy = ({ reasoningOutput, operatorState }) => {
+  requireCoreScope();
   const urgency = Number(reasoningOutput?.urgency_score) || 0;
   const nextActions = Array.isArray(reasoningOutput?.next_actions) ? reasoningOutput.next_actions : [];
   const repeatedPattern = operatorState?.isRepeatedPattern;
@@ -108,6 +107,9 @@ const buildActionPolicy = ({ reasoningOutput, operatorState }) => {
 };
 
 const executeActionPlan = async ({ policy, toolRegistry }) => {
+  requireCoreScope();
+  // Detach history payloads from live reasoning objects and transaction-bound documents.
+  const snapshot = value => value == null ? null : JSON.parse(JSON.stringify(value));
   const actions = [];
 
   for (const planned of policy.queued) {
@@ -118,8 +120,8 @@ const executeActionPlan = async ({ policy, toolRegistry }) => {
       const result = await tool(planned.input || {});
       actions.push({
         action_name: planned.action_name,
-        input: planned.input || {},
-        result,
+        input: snapshot(planned.input || {}),
+        result: snapshot(result),
         success: true,
         error: "",
         timestamp: startedAt.toISOString(),
@@ -128,7 +130,7 @@ const executeActionPlan = async ({ policy, toolRegistry }) => {
     } catch (error) {
       actions.push({
         action_name: planned.action_name,
-        input: planned.input || {},
+        input: snapshot(planned.input || {}),
         result: null,
         success: false,
         error: String(error?.message || error),
