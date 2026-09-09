@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const SocialCampaign = require('../models/SocialCampaign');
 const SocialConnection = require('../models/SocialConnection');
-const { decryptToken } = require('./tokenCrypto');
+const { decryptToken, encryptToken } = require('./tokenCrypto');
 const { getProvider } = require('./providers');
 
 const buildIdempotencyKey = ({ campaignId, postId }) =>
@@ -13,6 +13,32 @@ const assertCampaignOwner = (campaign, userId) => {
     error.statusCode = 404;
     throw error;
   }
+};
+
+const getFreshAccessToken = async ({ connection, provider }) => {
+  let accessToken = decryptToken(connection.encryptedAccessToken);
+  const refreshToken = decryptToken(connection.encryptedRefreshToken);
+  const expiresAt = connection.tokenExpiresAt ? new Date(connection.tokenExpiresAt).getTime() : null;
+  const refreshWindowMs = Number(process.env.SOCIAL_COMMAND_TOKEN_REFRESH_WINDOW_MS || 5 * 60 * 1000);
+  const shouldRefresh = Boolean(refreshToken && expiresAt && expiresAt <= Date.now() + refreshWindowMs);
+
+  if (!shouldRefresh) return accessToken;
+
+  const tokenSet = await provider.refreshToken({ refreshToken });
+  if (!tokenSet?.access_token) {
+    const error = new Error(`${provider.displayName || provider.id} token refresh did not return an access token.`);
+    error.statusCode = 502;
+    throw error;
+  }
+
+  accessToken = tokenSet.access_token;
+  connection.encryptedAccessToken = encryptToken(accessToken);
+  connection.encryptedRefreshToken = encryptToken(tokenSet.refresh_token || refreshToken);
+  if (tokenSet.expires_in) {
+    connection.tokenExpiresAt = new Date(Date.now() + Number(tokenSet.expires_in) * 1000);
+  }
+  await connection.save();
+  return accessToken;
 };
 
 const publishPost = async ({ userId, campaignId, postId }) => {
@@ -57,7 +83,7 @@ const publishPost = async ({ userId, campaignId, postId }) => {
 
   try {
     const provider = getProvider(post.provider);
-    const accessToken = decryptToken(connection.encryptedAccessToken);
+    const accessToken = await getFreshAccessToken({ connection, provider });
     const result = post.format === 'video' || post.format === 'short' || post.format === 'reel'
       ? await provider.publishVideo({ connection, accessToken, post })
       : post.format === 'image'
