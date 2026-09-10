@@ -21,7 +21,10 @@
     "m2:test": "node --test server/tests/patternRules.test.cjs server/tests/patternIntegration.test.cjs server/tests/patternPrivacy.test.cjs server/tests/patternLifecycle.test.cjs server/tests/patternConsumers.test.cjs",
     "m2:browser": "node server/tests/patternBrowser.cjs",
     "m2:prerequisites": "node server/scripts/verifyPatternPrerequisites.cjs",
-    "m2:index-plan": "node server/scripts/provisionPatternIndexes.cjs"
+    "m2:index-plan": "node server/scripts/provisionPatternIndexes.cjs",
+    "m3:test": "node --test server/tests/reasoningIntegration.test.cjs server/tests/reasoningProvider.test.cjs server/tests/reasoningPatterns.test.cjs",
+    "m3:browser": "node server/tests/reasoningBrowser.cjs",
+    "m3:index-plan": "node server/scripts/provisionReasoningIndexes.cjs"
   },
   "keywords": [
     "SYZMEKU",

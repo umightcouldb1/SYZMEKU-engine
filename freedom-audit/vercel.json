@@ -1,5 +1,5 @@
 {
-  "git": { "deploymentEnabled": { "codex/m2-pattern-intelligence": false } },
+  "git": { "deploymentEnabled": { "codex/m2-pattern-intelligence": false, "codex/m3-reasoning-planning": false } },
   "cleanUrls": true,
   "trailingSlash": false,
   "headers": [

@@ -37,6 +37,7 @@ const biometricMetadataSchema = new mongoose.Schema(
 const conversationTurnSchema = new mongoose.Schema(
   {
     patternRefs: [{patternId:String,revision:Number,sourceEpoch:Number}],
+    reasoningRefs: {type:[String],default:undefined},
     role: {
       type: String,
       enum: ['user', 'model'],
@@ -120,6 +121,7 @@ memorySchema.methods.appendConversationTurns = function appendConversationTurns(
       text: String(turn.text || '').trim(),
       timestamp: turn.timestamp || new Date(),
       ...(turn.patternRefs ? {patternRefs:turn.patternRefs.slice(0,5)} : {}),
+      ...(turn.reasoningRefs ? {reasoningRefs:turn.reasoningRefs.slice(0,100)} : {}),
       ...(turn.biometricMetadata ? { biometricMetadata: turn.biometricMetadata } : {}),
     }))
     .filter((turn) => ['user', 'model'].includes(turn.role) && turn.text);

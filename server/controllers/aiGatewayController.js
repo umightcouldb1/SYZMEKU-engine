@@ -97,6 +97,24 @@ const auditGatewayEvent = async ({ req, provider, success, details = {} }) => {
 };
 
 const processIntelligencePrompt = asyncHandler(async (req, res) => {
+  // Anonymous traffic never enters the personal assembler. Preserve the commander's
+  // explicit local provider; failure must never send their context to the cloud.
+  if (req.user && require('../services/reasoningCapabilityService').enabled()) {
+    const reasoning = require('../services/reasoningService');
+    res.set('Cache-Control', 'private, no-store');
+    const controller = new AbortController();
+    res.on('close', () => { if (!res.writableEnded) controller.abort(); });
+    try {
+      require('../services/coreScopeService').rejectOwnerFields(req.body);
+      const result = await reasoning.generate({ text: getPromptFromRequest(req), selectedGoalIds: req.body.selectedGoalIds }, {
+        purpose: 'mentor', provider: req.user.role === MASTER_ROLE ? 'ollama' : 'gemini', signal: controller.signal,
+      });
+      return res.json({ ...reasoning.compatibility(result), success: true, response: result.summary });
+    } catch (error) {
+      const failure = reasoning.failure(error);
+      return res.status(failure.status).json(failure.body);
+    }
+  }
   const prompt = getPromptFromRequest(req);
   if (!prompt) {
     return res.status(400).json({ message: 'Prompt is required.' });

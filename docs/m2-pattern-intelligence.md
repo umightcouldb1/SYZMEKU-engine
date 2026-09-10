@@ -1,6 +1,6 @@
 # M2 Pattern Intelligence — implementation contract
 
-Status: implementation for code review only. No merge, deployment, production indexes, M2 activation or M3 is authorized. Base: deployed M1 `f051abecc137a049dc68e2e890004307bb677c51`.
+Historical implementation contract. The subsequent approved M2 founder rollout is complete at `323b102039a11b21d2ca6448bd46cc392a65c387`; evidence rules below remain controlling. M3 is separately approved for draft implementation only; see master spec section 17. Personal execution remains disabled.
 
 The architecture and the following clarifications are approved: 28 days is the initial discovery/maintenance default of a versioned methodology, not a universal definition of a human pattern. The one-third contradiction ceiling is only a conservative v1 promotion heuristic. Mixed evidence does not prove a hypothesis false. No windows are fitted to produce favorable results.
 

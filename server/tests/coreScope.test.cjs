@@ -86,7 +86,7 @@ test('unowned and other-user memory/history stay out of authenticated views',asy
 test('personal model operations fail closed without scope and resist query operators',async()=>{
   const fs=require('node:fs');
   const ownedModels=fs.readdirSync(path.resolve(__dirname,'../models')).filter(file=>file.endsWith('.js') && fs.readFileSync(path.resolve(__dirname,'../models',file),'utf8').includes("plugin(require('./coreOwned')"));
-  assert.equal(ownedModels.length,27);
+  assert.equal(ownedModels.length,28);
   for(const Model of ownedModels.map(file=>require('../models/'+file))) {
     for(const operation of [()=>Model.find(),()=>Model.countDocuments(),()=>Model.updateMany({},{$set:{source:'x'}}),()=>Model.deleteMany({}),()=>Model.aggregate([{$match:{}}])]) await assert.rejects(operation,/scope/i);
   }

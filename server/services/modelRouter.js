@@ -103,4 +103,5 @@ const requestModelText = async ({ mode = 'mentor', prompt, parts = [] }) => {
 
 const getModelRoutingConfig = () => ({ ...MODEL_ALIASES });
 
-module.exports = { requestModelJson, requestModelText, resolveModelAlias, getModelRoutingConfig };
+const generateStructured = args => require('./reasoningProviderService').generate(args);
+module.exports = { requestModelJson, requestModelText, resolveModelAlias, getModelRoutingConfig, generateStructured };

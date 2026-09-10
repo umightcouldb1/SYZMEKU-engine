@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import ReasoningPanel from './components/ReasoningPanel';
+import ReasoningResult from './components/ReasoningResult';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import OperatorConsole from './OperatorConsole';
 import CoreContextPanel from './components/CoreContextPanel';
@@ -223,7 +225,9 @@ const Dashboard = ({ user }) => {
   const adminSignatureVerified = Boolean(canAccessOperatorMode);
   const displayName = adminSignatureVerified ? 'Commander Toi' : onboardingProfile.preferredName || user?.name || 'there';
 
+  const contextEpoch = useRef(0);
   const refreshMentorData = async () => {
+    const epoch = contextEpoch.current;
     const [summaryRes, tasksRes, alertsRes, signalsRes, operatorRes, memoryRes, telemetryRes] = await Promise.all([
       axios.get('/api/core/summary').catch(() => ({ data: null })),
       axios.get('/api/core/tasks').catch(() => ({ data: { tasks: [] } })),
@@ -234,6 +238,7 @@ const Dashboard = ({ user }) => {
       axios.get('/api/telemetry/sync').catch(() => ({ data: null })),
     ]);
 
+    if (epoch !== contextEpoch.current) return;
     setSummary(summaryRes.data || null);
     setTasks(tasksRes.data?.tasks || []);
     setAlerts(alertsRes.data?.alerts || []);
@@ -263,6 +268,13 @@ const Dashboard = ({ user }) => {
 
   useEffect(() => {
     refreshMentorData();
+    const invalidate = () => {
+      contextEpoch.current++;
+      setLatestInsight(null); setChatMemory([]); setSovereignContext({}); setHumanContext({}); setSummary(null);
+      window.speechSynthesis?.cancel(); refreshMentorData();
+    };
+    window.addEventListener('core-context-changed', invalidate);
+    return () => { contextEpoch.current++; window.removeEventListener('core-context-changed', invalidate); };
   }, []);
 
   useEffect(() => {
@@ -362,9 +374,10 @@ const Dashboard = ({ user }) => {
   };
 
   const askMentor = async () => {
+    const epoch = contextEpoch.current;
     const question = chatInput.trim();
     if (!question && !mediaAttachment) return;
-    setLoading(true);
+    setLoading(true); setLatestInsight(null); setMediaError('');
     try {
       const mediaLabel = mediaAttachment ? ` [Attached ${mediaAttachment.mimeType}: ${mediaAttachment.name}]` : '';
       const userEntry = {
@@ -401,6 +414,7 @@ const Dashboard = ({ user }) => {
             context: contextWithCurrentTurn,
             biometricMetadata: traumaAwareMetadata,
           });
+      if (epoch !== contextEpoch.current) return;
       const mentorEntry = {
         id: `mentor-${Date.now()}`,
         speaker: 'syz',
@@ -420,6 +434,8 @@ const Dashboard = ({ user }) => {
       } else {
         await refreshMentorData();
       }
+    } catch (error) {
+      if (epoch === contextEpoch.current) { setLatestInsight(null); setMediaError(error.response?.data?.error?.message || error.response?.data?.message || 'Guidance could not be generated.'); }
     } finally {
       setLoading(false);
     }
@@ -589,6 +605,7 @@ const Dashboard = ({ user }) => {
         </section>
 
         <section className="mentor-support-panel">
+          <ReasoningPanel />
           <PatternPanel />
           <CoreContextPanel onChanged={async () => {
             setLatestInsight(null); setChatMemory([]); setSovereignContext({}); setHumanContext({});
@@ -607,7 +624,7 @@ const Dashboard = ({ user }) => {
 
             <section className="mentor-card">
               <p className="mentor-section-label">Today's Insight</p>
-              <h2>Your grounded next step</h2>
+              <h2>Your grounded next step</h2><ReasoningResult result={latestInsight} />
               <p>{buildInsightMessage(summary, latestInsight)}</p>
               <p className="mentor-muted">Emotions are indicators, not commands. Big SYZ reads emotional signals as pattern data and responds with empathy.</p>
               <button type="button" className="mentor-link" onClick={() => setShowReasoning((prev) => !prev)}>

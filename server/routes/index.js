@@ -26,6 +26,8 @@ router.use('/freedom-audit', require('./freedomAuditRoutes'));
 router.use('/social-command', require('./socialCommandRoutes'));
 router.use('/', require('./stripeRoutes'));
 
+// M3 owns explicit personal dispatch when enabled; disabled accounts retain M1/M2.
+router.use('/core', require('./reasoningRoutes'));
 // Keep the lineage-aware analyzer ahead of the legacy core router.
 router.use('/core/analyze', require('./memoryAnalyzeRoutes'));
 router.use('/core/patterns', require('./patternRoutes'));
