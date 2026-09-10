@@ -20,6 +20,7 @@ test('timeout, local-only refusal, bounded body and hidden provider thoughts',as
  await assert.rejects(()=>provider.generate({purpose:'mentor',prompt:'private',provider:'ollama'}),e=>e.statusCode===503&&!e.message.includes('secret'));assert.equal(urls.length,1);assert(!urls[0].includes('google'));
  await assert.rejects(()=>provider.generate({purpose:'mentor',prompt:'private',signal:AbortSignal.abort()}),e=>e.statusCode===504);
  global.fetch=async()=>new Response('x'.repeat(262145));await assert.rejects(()=>provider.generate({purpose:'mentor',prompt:'private'}),e=>e.code==='MODEL_OUTPUT_INVALID');
+ global.fetch=async()=>new Response(null,{status:204});await assert.rejects(()=>provider.generate({purpose:'mentor',prompt:'private'}),e=>e.statusCode===502&&e.code==='MODEL_OUTPUT_INVALID');
  global.fetch=async()=>Response.json({candidates:[{content:{parts:[{thought:true,text:'hidden scratchpad'},{text:'{}'}]}}]});assert.equal((await provider.generate({purpose:'mentor',prompt:'private'})).text,'{}');
 });
 const goal='000000000000000000000001';

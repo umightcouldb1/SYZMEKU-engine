@@ -78,6 +78,11 @@ test('session revocation and allowlist withdrawal while generating suppress outp
   await require('../models/AuthSession').updateOne({sessionId:f.founder.sid},{$set:{revokedAt:null}});process.env.CORE_REASONING_USER_IDS=f.founder.id;
  }
 });
+test('oversized saved artifacts abort the owner transaction without partial records or anchor changes',async()=>{
+ const Record=require('../models/ReasoningRecord');const before=await f.scope(f.founder,()=>core.getContext()),count=await Record.collection.countDocuments({});
+ await assert.rejects(()=>f.scope(f.founder,()=>core.withContextMutation(()=>Record.create({purpose:'mentor',requestKey:'oversized-artifact',requestHash:'fixture-hash',payload:{summary:'x'.repeat(65537)}}),{evidence:false})),e=>e.code==='REASONING_RECORD_TOO_LARGE');
+ assert.equal(await Record.collection.countDocuments({}),count);assert.deepEqual(await f.scope(f.founder,()=>core.getContext()),before);
+});
 test('full erase deletes only owned reasoning, leaves ownerless history quarantined, and never restores a loop',async()=>{
  const Record=require('../models/ReasoningRecord'),Loop=require('../models/AgentLoopState');const ownerless={active:true,latest_agent_summary:'RESTRICTED-HISTORY'};await Loop.collection.insertOne(ownerless);await Record.collection.insertOne({payload:{summary:'OWNERLESS-GUIDANCE'},requestKey:'ownerless'});
  process.env.CORE_CONTEXT_WRITE_USER_IDS=f.founder.id+','+f.other.id;process.env.CORE_REASONING_USER_IDS=f.founder.id+','+f.other.id;

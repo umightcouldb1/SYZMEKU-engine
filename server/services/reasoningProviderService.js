@@ -34,6 +34,7 @@ async function generate({
   try {
     response = await fetch(url, {
       method: 'POST',
+      redirect: 'error',
       signal,
       headers: {
         'Content-Type': 'application/json',
@@ -74,6 +75,7 @@ async function generate({
     if (status === 429 && Number.isFinite(retry) && retry > 0) err.retryAfterSeconds = Math.min(retry, 300);
     throw err;
   }
+  if (!response.body) throw error('MODEL_OUTPUT_INVALID', 'The provider returned no content.', 502);
   const reader = response.body.getReader();
   let bytes = 0,
     chunks = [];

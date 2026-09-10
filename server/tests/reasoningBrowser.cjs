@@ -28,6 +28,7 @@ async function main(){
   const fill=async(selector,value)=>evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   const ready=()=>waitFor(`[...document.querySelectorAll('button')].some(e=>e.textContent==='Generate preview'&&!e.disabled)`);
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});await call('Page.navigate',{url:fixture.base});await waitFor(`!!document.querySelector('[aria-label="Reasoning and planning"]')`);
+  await evaluate(`document.querySelector('.reasoning-panel input[type="checkbox"]').click()`);await waitFor(`document.body.innerText.includes('1. Publish a design portfolio')`);
   await fill('.reasoning-panel textarea','Help me prepare a portfolio outline.');await ready();await button('Generate preview');
   await waitFor(`document.body.innerText.includes('Clarify the saved constraint')`);assert.equal(await require('../models/ReasoningRecord').collection.countDocuments({}),0);
   await button('Generate and save');await waitFor(`document.body.innerText.includes('Saved guidance')`);
@@ -35,6 +36,7 @@ async function main(){
   await fill('.reasoning-panel textarea','Help me prepare a portfolio outline.');await ready();await button('Generate preview');await waitFor(`document.body.innerText.includes('Clarify the saved constraint')`);
   await waitFor(`[...document.querySelectorAll('button')].some(e=>e.textContent==='This constraint has changed…'&&!e.disabled)`);await button('This constraint has changed…');await waitFor(`!!document.querySelector('.reasoning-panel form textarea')`);await fill('.reasoning-panel form textarea','Personal autonomous execution disabled');await button('Confirm saved constraint correction');await waitFor(`!document.querySelector('.reasoning-panel form')`);
   await ready();await button('Generate preview');await waitFor(`document.body.innerText.includes('No supported Patterns are available')`);assert(await evaluate(`!!document.querySelector('[aria-label="Draft plan"]')`));assert(!await evaluate(`document.querySelector('.reasoning-result').innerText.includes('before October')`));
+  await evaluate(`document.querySelector('.reasoning-result details summary').click()`);await button('Review recorded evidence (Goal)');await waitFor(`document.querySelector('.reasoning-result blockquote')?.innerText.includes('Publish a design portfolio')`);
   await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:true}).then(r=>fs.writeFileSync(path.join(cache,'reasoning-desktop.png'),Buffer.from(r.data,'base64')));
   await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
   assert(await evaluate('document.documentElement.scrollWidth<=window.innerWidth'));

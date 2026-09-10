@@ -72,6 +72,10 @@ const schema = new mongoose.Schema({
   timestamps: true
 });
 schema.path('payload').validate(v => !v || Buffer.byteLength(JSON.stringify(v)) <= 65536, 'Saved reasoning exceeds size limit.');
+schema.pre('validate', function () {
+  // Reserve a small envelope for timestamps/owner defaults added during save.
+  if (Buffer.byteLength(JSON.stringify(this.toObject())) > 65024) throw require('../services/reasoningCapabilityService').error('REASONING_RECORD_TOO_LARGE', 'Saved guidance exceeds the record limit. Narrow this request.', 413);
+});
 schema.plugin(require('./coreOwned'), {
   ownerKey: 'userId'
 });

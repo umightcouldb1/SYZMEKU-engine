@@ -25,7 +25,10 @@ router.post('/', protect, async (req, res) => {
     // Onboarding is a transient reflection of explicit choices, not evidence or
     // a goal-selection decision. Canonical saving remains /profile-context.
     res.set('Cache-Control', 'private, no-store');
-    if (choices.length > 20 || choices.some(c => c.length > 200) || typedText.length > 2000 || (!choices.length && !typedText)) return res.status(400).json({ ok: false, error: { code: 'INVALID_REQUEST', message: 'Supply bounded reflection inputs.' } });
+    if (choices.length > 20 || choices.some(c => c.length > 200) || typedText.length > 2000 || (!choices.length && !typedText)) {
+      const failure=require('../services/reasoningService').failure(require('../services/reasoningCapabilityService').error('INVALID_REQUEST','Supply bounded reflection inputs.'));
+      return res.status(failure.status).json(failure.body);
+    }
     try {
       require('../services/coreScopeService').rejectOwnerFields(req.body);
       await require('../services/reasoningCapabilityService').recheck();

@@ -178,7 +178,8 @@ async function change(id, body) {
     if (!r) throw cap.error('NOT_FOUND', 'Saved reasoning not found.', 404);
     if (r.revision !== body.expectedRevision) throw cap.error('REVISION_CONFLICT', 'Saved reasoning changed.', 409);
     if (body.status !== undefined && !['draft', 'archived'].includes(body.status)) throw cap.error('INVALID_REQUEST', 'Invalid draft status.');
-    if (body.plan) {
+    if (body.plan !== undefined) {
+      if (!['planner', 'agent-plan'].includes(r.purpose)) throw cap.error('INVALID_REQUEST', 'Only saved plans support plan editing.');
       const snapshot = await context.assemble({
         purpose: r.purpose,
         selectedGoalIds: r.selectedGoalIds.map(String),
