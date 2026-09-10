@@ -16,6 +16,6 @@ const actionExecutionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-actionExecutionSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{"reasoning_cycle_id":"KernelCycle"}});
+actionExecutionSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{"reasoning_cycle_id":"KernelCycle"},reasoningSource:true});
 
 module.exports = mongoose.model("ActionExecution", actionExecutionSchema);

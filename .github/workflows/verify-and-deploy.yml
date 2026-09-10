@@ -50,6 +50,9 @@ jobs:
       - name: Verify M2 in headless Chrome with a disposable database
         run: npm run m2:browser
 
+      - name: Verify M3 context, provider, privacy and browser fixtures
+        run: npm run m3:test && npm run m3:browser
+
       - name: Run production verification
         run: npm run test
 

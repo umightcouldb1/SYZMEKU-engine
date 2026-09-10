@@ -10,6 +10,6 @@ const kernelCycleSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-kernelCycleSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{}});
+kernelCycleSchema.plugin(require('./coreOwned'), {"ownerKey":"userId","references":{},reasoningSource:true});
 
 module.exports = mongoose.model("KernelCycle", kernelCycleSchema);

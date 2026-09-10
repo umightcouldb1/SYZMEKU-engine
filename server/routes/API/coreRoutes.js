@@ -872,7 +872,7 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
   let leverage = [];
   let next_actions = [];
 
-  if (process.env.Gemini_API_Key) {
+  { // Credential resolution belongs to the shared model router.
     const prompt = buildAnalysisPrompt({
       text,
       mode: mode_selected,
@@ -885,7 +885,7 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
       strategicMemory,
     });
 
-    const { error, result } = await requestModelAnalysisJson({ mode: analyzeMode, prompt });
+    const { error, result } = await requestModelAnalysisJson({ mode: mode_selected, prompt });
     const usedResult = result || error || FALLBACK_ANALYSIS;
     objectives = usedResult.objectives || [];
     constraints = usedResult.constraints || [];
@@ -893,9 +893,6 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
     leverage = usedResult.leverage || [];
     next_actions = usedResult.next_actions || [];
     actions_taken.push(mode_selected === "recommend" ? "recommend" : "analyze");
-  } else {
-    objectives = ["Gemini_API_Key is missing on the server."];
-    next_actions = ["Add Gemini_API_Key to enable full agent reasoning."];
   }
 
   if (/\b(execute|orchestrate|agent)\b/i.test(text) || /\b(task|todo|plan)\b/i.test(text)) {
@@ -1049,49 +1046,7 @@ const readLoopStatusPayload = async () => {
 const restoreAgentLoopOnBoot = async () => ({ restored: false, reason: 'authenticated_operator_restart_required' });
 
 /* CORE REASONING */
-router.post("/analyze", async (req, res) => {
-  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
-
-  const analyzeModeInstructions = {
-    general: "Balance strategic and practical reasoning using signals, systems, and recent context.",
-    strategic: "Emphasize priorities, leverage, sequencing, and decision quality.",
-    health: "Emphasize signals, stability, recovery, and stress patterns.",
-    build: "Emphasize product design, architecture, engineering execution, and UX quality.",
-    signal: "Emphasize trends, anomalies, and recent state changes in the signal stream.",
-  };
-
-  const modeMatch = text.match(/^(strategic|health|build|signal)\b\s*(.*)$/i);
-  const analyzeMode = modeMatch ? modeMatch[1].toLowerCase() : "general";
-  const modeSpecificCommand = modeMatch ? modeMatch[2].trim() : text;
-  const effectiveCommand = modeSpecificCommand || text;
-
-  if (!text) return res.status(400).json({ message: "Command text is required." });
-
-  const rawContext = {};
-  const { humanContext, latestSignals, latestSystems, latestTasks, strategicMemory } = await fetchStrategicContext();
-
-  const prompt = buildAnalysisPrompt({
-    text: effectiveCommand,
-    mode: analyzeMode,
-    modeInstruction: analyzeModeInstructions[analyzeMode] || analyzeModeInstructions.general,
-    rawContext,
-    humanContext,
-    latestSignals,
-    latestSystems,
-    latestTasks,
-    strategicMemory,
-  });
-
-  try {
-    const { error, result } = await requestModelAnalysisJson({ mode: analyzeMode, prompt });
-    if (typeof patternView !== "undefined") await patternView.checkStamp(patternContext);
-    if (error) return res.json(error);
-    return res.json(result);
-  } catch (error) {
-    return res.status(502).json({ message: "Gemini request failed.", details: String(error?.message || error).slice(0, 500) });
-  }
-});
-
+// Analyze is dispatched once by reasoningRoutes / memoryAnalyzeRoutes.
 router.post("/recommend", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
   if (!text) return res.status(400).json({ message: "Command text is required." });

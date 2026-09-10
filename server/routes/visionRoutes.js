@@ -38,6 +38,20 @@ Return a concise mentor response in 2-4 sentences, followed by one grounded next
 `.trim();
 
 router.post('/analyze', protect, async (req, res) => {
+  if (require('../services/reasoningCapabilityService').enabled()) {
+    const reasoning = require('../services/reasoningService');
+    res.set('Cache-Control', 'private, no-store');
+    const controller = new AbortController();
+    res.on('close', () => { if (!res.writableEnded) controller.abort(); });
+    try {
+      require('../services/coreScopeService').rejectOwnerFields(req.body);
+      const result = await reasoning.generate({ text: req.body.text || 'Review this attachment for my selected goal.', selectedGoalIds: req.body.selectedGoalIds, media: req.body.media || req.body.attachment || req.body.context?.mediaAttachment }, { purpose: 'vision', signal: controller.signal });
+      return res.json(reasoning.compatibility(result));
+    } catch (error) {
+      const failure = reasoning.failure(error);
+      return res.status(failure.status).json(failure.body);
+    }
+  }
   const text = String(req.body?.text || '').trim();
   const context = req.body?.context && typeof req.body.context === 'object' ? req.body.context : {};
   const media = cleanMediaAttachment(req.body?.media || req.body?.attachment || context?.mediaAttachment);

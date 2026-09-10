@@ -47,6 +47,7 @@ async function getPatternContext({purpose='mentor',limit=5}={}){
   const result={sourceEpoch:epoch,patterns,unavailableReasons:[]};await checkStamp(result);return result;
 }
 async function planPreview(){
+  if(require('./reasoningCapabilityService').enabled())return require('./reasoningService').preview();
   capability.requirePatternRead();const patternContext=await getPatternContext({purpose:'planner'}),core=require('./coreContextService');
   const context=await core.getContext(),tasks=await core.listTasks({status:'open'});await checkStamp(patternContext);
   return {patternContext,goals:context.goals||[],suggestions:tasks.slice(0,3).map(t=>({taskId:t._id,description:t.description})),execution:'disabled',message:'A draft for your review. No tasks or actions were created.'};

@@ -2,9 +2,9 @@
 
 ## Master Build Spec
 
-**Current approved work: M2 — Pattern Intelligence implementation for code review only (2026-09-09).**
+**Current approved work: M3 — Reasoning & Planning Reconciliation implementation for a dedicated draft PR only (2026-09-09).**
 Section 15 records the approved M0 reconciliation and governs the M1 implementation.
-Earlier product aspirations are not evidence of implemented functionality or approval beyond the explicit M2 implementation boundary in section 16. M2 release and M3–M6 remain unauthorized.
+M1 and M2 have completed their separately approved founder rollout at deployed SHA `323b102039a11b21d2ca6448bd46cc392a65c387`. Founder M1 writes and M2 are ON; personal execution is OFF. M3 implementation is approved under section 17. M3 merge/deployment/activation and M4–M6 remain unauthorized.
 
 ### Product Identity
 
@@ -927,8 +927,14 @@ Safe operational rollback after any M1 use: retain this M1 revision, set CORE_CO
 
 ### 15.6 Deferred work and approval stop
 
-M2 Pattern Intelligence implementation is approved for a dedicated PR and code review only; it is not released or activated. M3 provider/reasoning routing repairs, M4 PermissionGrant and immutable approval lifecycle, M5 Audit import and M6 broader autonomy remain unauthorized. Existing urgency-based internal action policy is preserved and is not represented as a permission grant. The pre-existing provider-enabled /core/agent analyzeMode defect remains tracked for M3. No live Stripe charge, webhook injection into production, provider publishing, production backfill, merge or deployment is authorized by the M1 implementation step.
+The earlier M2 implementation-only stop was superseded by explicit controlled release approvals. M1/M2 founder rollout is complete; production personal execution remains disabled. M3 implementation is now approved for a dedicated draft PR only. M4 PermissionGrant, imports and broader autonomy remain unauthorized. No live purchase, campaign mutation, historical ownership assignment, migration or production index change is authorized by M3 implementation.
 
 ## 16. Approved M2 implementation boundary
 
-The controlling implementation contract is [M2 Pattern Intelligence](m2-pattern-intelligence.md). It introduces only the justified Pattern authority, preserves existing canonical sources and M1 ownership/privacy, and uses explicit founder-gated evaluation with personal execution disabled. The 28-day window is a versioned v1 default, never dynamically fitted; the one-third contradiction rule is only a conservative promotion heuristic, never scientific probability or proof of falsity. All new M2 production flags remain OFF/unset. No merge, deployment, production index creation, historical migration, Freedom Audit/Social import, campaign mutation, live purchase or M3 work is authorized. Stop at code review.
+The controlling evidence contract remains [M2 Pattern Intelligence](m2-pattern-intelligence.md). Its historical implementation-only authorization statement was superseded by the separately approved founder release at `323b102039a11b21d2ca6448bd46cc392a65c387`. M3 preserves all M2 windows, confidence, promotion, contradiction, independence and suppression rules. Only the existing founder is approved in production; no general-user rollout follows from M3 work.
+
+## 17. Approved M3 draft implementation boundary
+
+The controlling implementation contract is [M3 reasoning and planning](m3-reasoning-planning.md). It provides one scoped assembly/orchestrator/provider contract, goal-first proposals, PlanV1, an explicit planning-only agent path, and the one justified ReasoningRecord authority. Corrections remain explicit M1 operations; M3 cannot silently change goals/constraints or create Tasks. Source privacy and invalidation remain active with M3 disabled.
+
+Current approval ends at draft-PR code review. Do not merge, deploy, provision production ReasoningRecord indexes, enable M3, migrate/backfill, enable personal execution, or begin M4. Preserve approved founder M1/M2 state, ownerless quarantine, Commerce/Auth and Social boundaries. Both proposed ReasoningRecord indexes and a future founder-only M3 rollout require separate approval.

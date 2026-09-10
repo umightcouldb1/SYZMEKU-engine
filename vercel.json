@@ -1,5 +1,5 @@
 {
-  "git": { "deploymentEnabled": { "codex/m2-pattern-intelligence": false } },
+  "git": { "deploymentEnabled": { "codex/m2-pattern-intelligence": false, "codex/m3-reasoning-planning": false } },
   "version": 2,
   "installCommand": "npm install --prefix client",
   "buildCommand": "npm run prepare-client-env && npm run build --prefix client",

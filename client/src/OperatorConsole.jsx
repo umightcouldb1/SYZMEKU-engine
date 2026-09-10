@@ -1,3 +1,4 @@
+import ReasoningResult from './components/ReasoningResult';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import './dashboard.css';
@@ -98,6 +99,12 @@ const Dashboard = ({ user }) => {
   const [uploadedImageInfo, setUploadedImageInfo] = useState('');
   const [operatorSummary, setOperatorSummary] = useState(null);
   const recognitionRef = useRef(null);
+  const contextEpoch = useRef(0);
+  useEffect(() => {
+    const clear = () => { contextEpoch.current++; setResult(null); setShowOverlay(false); setLastOverlayResult(null); setCommandHistory([]); window.speechSynthesis?.cancel(); };
+    window.addEventListener('core-context-changed', clear);
+    return () => { contextEpoch.current++; window.removeEventListener('core-context-changed', clear); };
+  }, []);
 
   const saveSessionMemory = useMemo(
     () => (nextMemory) => {
@@ -178,6 +185,7 @@ const Dashboard = ({ user }) => {
 
   const submitCommand = async (overrideCommand = '') => {
     const rawCommand = (overrideCommand || command).trim();
+    const epoch = contextEpoch.current;
     if (!rawCommand || loading) return;
 
     const lowered = rawCommand.toLowerCase();
@@ -350,7 +358,7 @@ const Dashboard = ({ user }) => {
         const goal = rawCommand.split(/\s+/).slice(1).join(' ').trim();
         setOutputTitle(lowered.startsWith('plan ') ? 'STRATEGIC PLAN' : 'BUILD PLAN');
         nextRoute = lowered.startsWith('plan ') ? 'plan' : 'build';
-        response = await axios.post('/api/core/analyze', { text: `strategic goal: ${goal}`, context: sessionContext });
+        response = await axios.post('/api/core/agent/plan', { text: goal });
         setOutputMode('analyze');
       } else if (lowered === 'monitor run') {
         setOutputTitle('AUTONOMOUS MONITOR');
@@ -448,6 +456,7 @@ const Dashboard = ({ user }) => {
       }
 
       const data = response?.data;
+      if (epoch !== contextEpoch.current) return;
       setResult(data);
       setShowOverlay(true);
       addCommandToHistory(rawCommand);
@@ -458,7 +467,7 @@ const Dashboard = ({ user }) => {
       setCommand('');
       await fetchSummary();
     } catch (err) {
-      const message = err?.response?.data?.message || err.message || 'Command execution failed.';
+      const message = err?.response?.data?.error?.message || err?.response?.data?.message || err.message || 'Command execution failed.';
       const details = err?.response?.data?.details || '';
       setOutputMode('error');
       setOutputTitle('COMMAND ERROR');
@@ -610,9 +619,9 @@ const Dashboard = ({ user }) => {
             <div className="overlay-top"><p>{outputTitle}</p><button type="button" onClick={() => setShowOverlay(false)}>DISMISS</button></div>
             <div className="overlay-meta"><p>&gt; COMMAND: {commandLabel}</p><p>&gt; ROUTE: {routeLabel}</p></div>
 
-            {outputMode === 'analyze' && (<div><p><strong>Summary:</strong> {(result?.objectives || [])[0] || 'No summary available.'}</p>{ANALYSIS_SECTIONS.map((section) => <div key={section}><p>{section.toUpperCase()}</p><ul>{(Array.isArray(result?.[section]) ? result[section] : []).map((item, index) => <li key={`${section}-${index}`}>{item}</li>)}</ul></div>)}</div>)}
+            {outputMode === 'analyze' && result?.schemaVersion !== 'reasoning-v1' && (<div><p><strong>Summary:</strong> {(result?.objectives || [])[0] || 'No summary available.'}</p>{ANALYSIS_SECTIONS.map((section) => <div key={section}><p>{section.toUpperCase()}</p><ul>{(Array.isArray(result?.[section]) ? result[section] : []).map((item, index) => <li key={`${section}-${index}`}>{item}</li>)}</ul></div>)}</div>)}
             {outputMode === 'agent' && (<div><p><strong>Summary:</strong> {result?.summary || 'No summary available.'}</p><p><strong>Mode selected:</strong> {result?.mode_selected || '-'}</p><p><strong>Actions taken:</strong> {(result?.actions_taken || []).join(', ') || '-'}</p><p><strong>Recommended tasks:</strong> {(result?.recommended_tasks || []).join(' | ') || '-'}</p>{ANALYSIS_SECTIONS.map((section) => <div key={section}><p>{section.toUpperCase()}</p><ul>{(Array.isArray(result?.[section]) ? result[section] : []).map((item, index) => <li key={`${section}-${index}`}>{item}</li>)}</ul></div>)}</div>)}
-            {outputMode === 'signals' && <div>{(Array.isArray(result) ? result : result?.entries || []).map((item, index) => <div key={index}>Sleep {item?.sleep ?? 'n/a'} | Stress {item?.stress ?? 'n/a'} | Symptoms {item?.symptoms || '-'} | {formatRecordedAt(item?.createdAt)}</div>)}</div>}
+            <ReasoningResult result={result} />{outputMode === 'signals' && <div>{(Array.isArray(result) ? result : result?.entries || []).map((item, index) => <div key={index}>Sleep {item?.sleep ?? 'n/a'} | Stress {item?.stress ?? 'n/a'} | Symptoms {item?.symptoms || '-'} | {formatRecordedAt(item?.createdAt)}</div>)}</div>}
             {outputMode === 'systems' && <div>{(Array.isArray(result) ? result : [result?.system]).filter(Boolean).map((item, i) => <div key={`sys-${i}`} className="item-card system-card"><p><strong>{item?.name || 'Unnamed System'}</strong></p><p>Automation: {item?.automationEnabled ? 'enabled' : 'disabled'}</p><p>Escalation: {item?.escalationLevel || 'low'}</p></div>)}</div>}
             {outputMode === 'system-map' && <div>{(result?.systems || []).map((item, i) => <div key={`map-${i}`} className="item-card system-card"><p><strong>{item?.name || 'Unnamed System'}</strong></p><p>Purpose: {item?.purpose || '-'}</p></div>)}</div>}
             {outputMode === 'tasks' && <div>{((result?.tasks || result || [])).length ? ((result?.tasks || result || [])).map((task, i) => <div key={`task-${i}`} className="item-card task-card"><p><strong>{task?.description || '(empty)'}</strong></p><p>ID: {task?._id || 'unknown'} | Status: {task?.status || 'open'}</p></div>) : <p>No tasks available.</p>}</div>}

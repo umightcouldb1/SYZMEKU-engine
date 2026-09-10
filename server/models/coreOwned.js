@@ -3,13 +3,13 @@ const { requireCoreScope, requireCoreWrite, scopeError } = require('../services/
 
 // Defense in depth for all personal collections. Raw Model.collection access is reserved
 // for fixture setup and read-only migration inventory, never for application routes.
-module.exports = function coreOwned(schema, { ownerKey = 'userId', references = {}, evidenceSource = false } = {}) {
+module.exports = function coreOwned(schema, { ownerKey = 'userId', references = {}, evidenceSource = false, reasoningSource = false } = {}) {
   schema.set('autoIndex', false); // Production index changes require a reviewed migration.
   schema.set('autoCreate', false); // Never race automatic DDL against context transactions.
   if (!schema.path(ownerKey)) schema.add({ [ownerKey]: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true } });
 
   async function requireEvidenceTransaction() {
-    if (!evidenceSource) return;
+    if (!evidenceSource && !reasoningSource) return;
     const context=require('../utils/requestContext').getRequestContext();
     if(context.coreTransaction){
       if(evidenceSource==='event'&&!context.coreEvidenceMutation)throw scopeError('Evidence changes require a source epoch transaction.',409);
@@ -17,7 +17,7 @@ module.exports = function coreOwned(schema, { ownerKey = 'userId', references = 
     }
     // Existing M1-only document callers remain compatible until there are
     // derivatives. Once a Pattern exists, no writer may bypass its epoch.
-    if (await require('./Pattern').exists({})) throw scopeError('Evidence changes require the canonical context transaction.', 409);
+    if ((evidenceSource && await require('./Pattern').exists({})) || await require('./ReasoningRecord').exists({})) throw scopeError('Evidence changes require the canonical context transaction.', 409);
   }
 
   function validateOwner(doc) {
