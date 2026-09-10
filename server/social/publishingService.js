@@ -62,6 +62,13 @@ const publishPost = async ({ userId, campaignId, postId }) => {
     return { post, skipped: true, reason: 'already_published' };
   }
 
+  // C0 approval binds the exact prepared version and publishing payload.
+  // Ordinary existing campaigns retain their existing authorization path.
+  await require('../enterprise/content/service').assertPublication({ db: SocialCampaign.db.db, campaign, post });
+  if (campaign.metadata?.c0) {
+    await require('../enterprise/content/mediaIntegrity').verifyMediaBytes({ url: post.mediaAssets?.[0]?.url, sha256: post.metadata?.c0MediaSha256 });
+  }
+
   const connection = await SocialConnection.findOne({
     _id: post.connectedAccountId,
     userId,

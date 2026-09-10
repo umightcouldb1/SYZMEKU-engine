@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import './commander.css';
+import ContentQueue from './ContentQueue';
 export default function CommanderDashboard(){
   const [data,setData]=useState(null),[error,setError]=useState('');
   useEffect(()=>{let alive=true;const load=async()=>{try{const {data:result}=await axios.get('/api/enterprise/brief');if(alive){setData(result);setError('');}}catch(e){if(alive){setData(null);setError(e.response?.status===404?'Commander access unavailable.':'Could not load current business analysis.');}}};load();const timer=setInterval(load,60000);return()=>{alive=false;clearInterval(timer);};},[]);
   const brief=data?.brief;
   return <main className="commander"><header><p className="commander-eyebrow">T.O.I. • PRIVATE COMMANDER CENTER</p><h1>Freedom Audit launch</h1><p>Enterprise intelligence · Observation and recommendations</p><span className="commander-badge">Consequential execution disabled</span></header>
+    <ContentQueue />
     {error&&<p role="alert">{error}</p>}{!error&&!brief&&<p>Waiting for the first monitoring cycle…</p>}
     {brief&&<><p className="commander-update">Updated {new Date(data.lastSuccessAt).toLocaleString()} {data.stale?'· STALE — current state unverified':''} {data.lastError?'· Monitoring read failed':''}</p>
     <section className="commander-stats" aria-label="Launch results"><article><p>Customer sales</p><strong>{brief.revenue.sales??'Unavailable'}</strong><small>Founder checks excluded</small></article><article><p>Gross paid revenue</p><strong>{brief.revenue.amount===null?'Unavailable':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(brief.revenue.amount/100)}</strong><small>Before refunds and fees</small></article><article><p>Buyer traffic</p><strong>{brief.funnel.find(x=>x.stage==='Landing visits')?.count??'Not measured'}</strong><small>Browser events ≠ people</small></article></section>

@@ -146,6 +146,7 @@ app.listen(PORT, () => {
 });
 
 require('./enterprise/monitor').startMonitor({ connection: mongoose.connection });
+require('./enterprise/content/service').startDaily({ connection: mongoose.connection });
 
 const schedulerEnabled = process.env.SOCIAL_COMMAND_SCHEDULER_ENABLED !== 'false';
 const schedulerIntervalMs = Math.max(60_000, Number(process.env.SOCIAL_COMMAND_SCHEDULER_INTERVAL_MS || 300_000));
