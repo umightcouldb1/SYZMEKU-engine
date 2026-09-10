@@ -44,6 +44,9 @@ jobs:
       - name: Verify M1 ownership, privacy and commerce fixtures
         run: npm run m1:test && npm run social-command:test
 
+      - name: Verify E0 business isolation, monitoring and event fixtures
+        run: npm run e0:test && npm run e0:browser
+
       - name: Verify M2 rules, privacy, lifecycle and consumers
         run: npm run m2:test
 
