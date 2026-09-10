@@ -25,6 +25,7 @@ router.use('/ai', require('./aiGatewayRoutes'));
 router.use('/freedom-audit', require('./freedomAuditRoutes'));
 router.use('/social-command', require('./socialCommandRoutes'));
 router.use('/enterprise', require('./enterpriseRoutes'));
+router.use('/content-factory', require('./contentFactoryRoutes'));
 router.use('/', require('./stripeRoutes'));
 
 // M3 owns explicit personal dispatch when enabled; disabled accounts retain M1/M2.

@@ -26,7 +26,9 @@
     "m2:index-plan": "node server/scripts/provisionPatternIndexes.cjs",
     "m3:test": "node --test server/tests/reasoningIntegration.test.cjs server/tests/reasoningProvider.test.cjs server/tests/reasoningPatterns.test.cjs",
     "m3:browser": "node server/tests/reasoningBrowser.cjs",
-    "m3:index-plan": "node server/scripts/provisionReasoningIndexes.cjs"
+    "m3:index-plan": "node server/scripts/provisionReasoningIndexes.cjs",
+    "c0:test": "node --test server/tests/contentFactory.test.cjs",
+    "c0:browser": "node server/tests/contentFactoryBrowser.cjs"
   },
   "keywords": [
     "SYZMEKU",

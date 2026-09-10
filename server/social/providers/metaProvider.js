@@ -213,7 +213,7 @@ class MetaProvider extends SocialProviderAdapter {
         method: 'POST',
         body: new URLSearchParams({
           image_url: imageUrl,
-          caption: [post.caption, post.hashtags?.join(' ')].filter(Boolean).join('\n\n'),
+          caption: require('../contentMetadata').captionWithTags(post.caption, post.hashtags),
           access_token: accessToken,
         }),
       });
@@ -234,7 +234,8 @@ class MetaProvider extends SocialProviderAdapter {
     if (connection.accountType === 'facebook_page') {
       const body = new URLSearchParams({
         file_url: videoUrl,
-        description: [post.caption, post.link].filter(Boolean).join('\n\n'),
+        title: post.title || '',
+        description: [require('../contentMetadata').captionWithTags(post.caption, post.hashtags), post.link].filter(Boolean).join('\n\n'),
         access_token: accessToken,
       });
       return requestJson(`${GRAPH_BASE}/${connection.providerAccountId}/videos`, { method: 'POST', body });
@@ -246,7 +247,7 @@ class MetaProvider extends SocialProviderAdapter {
         body: new URLSearchParams({
           media_type: 'REELS',
           video_url: videoUrl,
-          caption: [post.caption, post.hashtags?.join(' ')].filter(Boolean).join('\n\n'),
+          caption: require('../contentMetadata').captionWithTags(post.caption, post.hashtags),
           share_to_feed: String(post.metadata?.shareToFeed ?? true),
           access_token: accessToken,
         }),
