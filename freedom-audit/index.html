@@ -370,6 +370,7 @@
     </main>
   </div>
 
+  <script async src="/business-telemetry.js"></script>
   <script>
     const CONFIG = {
       apiBase: '__FREEDOM_AUDIT_API_BASE__'.includes('__') ? 'https://syzmeku-api.onrender.com/api' : '__FREEDOM_AUDIT_API_BASE__',
@@ -423,6 +424,7 @@
     const sessionId = params.get('session_id') || '';
 
     function show(sectionId) {
+      if (sectionId === 'audit') window.freedomBusinessEvent?.('product_start');
       ['hero', 'gate', 'audit', 'result'].forEach((id) => $(id).classList.toggle('hidden', id !== sectionId));
       if (sectionId === 'gate') initializeGoogleSignIn();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -441,6 +443,7 @@
     }
 
     async function api(path, options = {}) {
+      if (['/auth/google', '/auth/login', '/auth/register'].includes(path)) window.freedomBusinessEvent?.('sign_in_start');
       const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
       if (state.token) headers.Authorization = `Bearer ${state.token}`;
       const response = await fetch(`${CONFIG.apiBase}${path}`, {
@@ -454,6 +457,9 @@
         error.status = response.status;
         throw error;
       }
+      if (['/auth/google', '/auth/login', '/auth/register'].includes(path)) window.freedomBusinessEvent?.('sign_in_success');
+      if (path === '/freedom-audit/checkout/session') window.freedomBusinessEvent?.('checkout_start');
+      if (path === '/freedom-audit/score') window.freedomBusinessEvent?.('product_complete');
       return payload;
     }
 
@@ -648,6 +654,7 @@
     }
 
     async function checkout() {
+      window.freedomBusinessEvent?.('cta_click');
       if (!state.token) {
         message($('gateMessage'), 'Sign in or create an account before checkout so your purchase can be attached to your profile.');
         return;

@@ -12,6 +12,7 @@ import LegalPage from './components/LegalPage';
 import Profile from './components/Profile';
 import RequireAuth from './components/RequireAuth';
 import SocialCommandDashboard from './SocialCommandDashboard';
+import CommanderDashboard from './CommanderDashboard';
 import { BiometricProvider } from './context/BiometricContext';
 import PrivateLayout from './layouts/PrivateLayout';
 import './entryFlow.css';
@@ -236,6 +237,7 @@ function App() {
               </RequireAuth>
             }
           />
+          <Route path="/app/commander" element={<RequireAuth allowedRoles={[COMMANDER_ROLE]}><CommanderDashboard /></RequireAuth>} />
           <Route path="/app/profile" element={onboardingCompleted ? <Profile /> : <Navigate to="/onboarding" replace />} />
           <Route path="/profile" element={onboardingCompleted ? <Profile /> : <Navigate to="/onboarding" replace />} />
           <Route path="/dashboard" element={<Navigate to={APP_HOME_ROUTE} replace />} />

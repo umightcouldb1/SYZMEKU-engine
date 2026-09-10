@@ -22,5 +22,6 @@ const rendered = template
 
 writeFileSync(join(dist, 'index.html'), rendered);
 copyFileSync(join(root, 'vercel.json'), join(dist, 'vercel.json'));
+copyFileSync(join(root, 'business-telemetry.js'), join(dist, 'business-telemetry.js'));
 
 console.log(`Freedom Audit build complete. API base: ${apiBase}`);

@@ -4,6 +4,8 @@
   "description": "Automated business intelligence, content distribution, and client management for T.O.I. Souljah Academy",
   "main": "server.js",
   "scripts": {
+    "e0:test": "node --test server/tests/enterprise.test.cjs",
+    "e0:browser": "node server/tests/enterpriseBrowser.cjs",
     "setup": "npm install && npm install --prefix server && npm install --prefix client",
     "dev": "node scripts/dev-local.cjs",
     "dev:server": "npm run dev --prefix server",
