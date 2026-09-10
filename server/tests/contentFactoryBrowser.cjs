@@ -34,8 +34,14 @@ async function main(){
   assert.equal(await evaluate("document.body.innerText.includes('TOI_VOICE_V1')"),true);
   await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false}).then(r=>fs.writeFileSync(path.join(cache,'content-mobile.png'),Buffer.from(r.data,'base64')));
   assert.equal(await evaluate("[...document.querySelectorAll('button')].find(b=>b.textContent==='APPROVE').disabled"),true);
+  await evaluate("document.querySelector('[data-content-id=variant-b-facebook]').scrollIntoView()");
+  await waitFor("document.querySelector('[data-content-id=variant-b-facebook] img').naturalWidth>0");
+  assert.equal(await evaluate("document.querySelector('[data-content-id=variant-b-facebook] .content-lineage').textContent.includes('TOI_BRAND')"),true);
+  await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false}).then(r=>fs.writeFileSync(path.join(cache,'content-artwork-mobile.png'),Buffer.from(r.data,'base64')));
   await evaluate("[...document.querySelector('[data-content-id=variant-b-facebook]').querySelectorAll('button')].find(b=>b.textContent==='HOLD').click()");
-  await waitFor("document.querySelector('[data-content-id=variant-b-facebook]').innerText.includes('HOLD')");
+  await waitFor("document.querySelector('[data-content-id=variant-b-facebook] .content-card-top').textContent.includes('HOLD')");
+  await evaluate("[...document.querySelector('[data-content-id=variant-b-facebook]').querySelectorAll('button')].find(b=>b.textContent==='Voice feedback').click()");
+  assert.equal(await evaluate("document.querySelector('[data-content-id=variant-b-facebook] option[value=authentic_preserve_pattern]')!==null"),true);
   for(let tries=0;tries<30;tries++){const d=await fixture.mongoose.connection.db.collection('enterprisestates').findOne({itemId:'variant-b-facebook'});if(d.status==='HOLD')break;await new Promise(r=>setTimeout(r,50));}
   assert.equal((await fixture.mongoose.connection.db.collection('enterprisestates').findOne({itemId:'variant-b-facebook'})).status,'HOLD');
   assert.equal(await fixture.mongoose.connection.db.collection('socialcampaigns').countDocuments({}),0);

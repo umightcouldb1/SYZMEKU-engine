@@ -1,10 +1,14 @@
 const {voiceCheck}=require('./voice');
 const crypto=require('node:crypto');
+const {validateVisual,fitsFrame,VISUAL_REVIEW}=require('./visual');
 function canonical(value){if(Array.isArray(value))return value.map(canonical);if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])]));return value;}
 const hash=value=>crypto.createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 const words=s=>String(s||'').trim().split(/\s+/).filter(Boolean).length;
 function qa(p,learned=[]){const checks=[],add=(id,pass,detail)=>checks.push({id,status:pass?'PASS':'FAIL',detail});const text=[p.title,p.description,p.script,...(p.scenes||[]).map(s=>s.screen)].join('\n');
- const voice=voiceCheck(text,learned,p.approvalExceptions||[]);add('voice',voice.status==='PASS',voice.violations.join('; ')||'Known rejected phrases absent; founder authenticity judgment still required.');
+ const voice=voiceCheck(text,learned,p.approvalExceptions||[],p);add('voice',voice.status==='PASS',voice.violations.join('; ')||'Known rejected phrases absent; founder authenticity judgment still required.');
+ add('visual_contract',validateVisual(p),'Exact TOI_VISUAL_DNA_V1 tokens, intentional symbols and generated scene geometry.');
+ add('visual_text_bounds',fitsFrame(p),'Draft copy fits declared safe layout; actual mobile readability remains pending.');
+ add('discovery_orthography',p.keywords?.some(k=>!(/\b(fuq|shyt|bullshyt|dayem|muthafuqa)\b/i.test(k))),'Plain-language discovery phrases remain separate from signature visible spelling.');
  add('audience',!!p.audience&&!!p.purpose,'Explicit intended problem and purpose.');
  add('discovery',!!p.title&&p.keywords?.length>0&&p.description?.length>30,'Title, intent phrases and description required; search volume is not invented.');
  add('script',p.script?.length>80&&p.type!=='longform-outline','Complete script required.');
@@ -22,7 +26,7 @@ function qa(p,learned=[]){const checks=[],add=(id,pass,detail)=>checks.push({id,
  }
  if(p.type==='longform'){add('longform_duration',p.duration>=480&&p.duration<=1200,'8–20 minute estimated runtime.');add('longform_structure',p.chapters?.[0]?.start===0&&p.chapters.length>=4&&p.extractions?.length>=3&&!!p.pinnedComment&&p.titleCandidates?.length===5,'Chapters, title candidates, pinned comment and extraction markers.');add('value_before_offer',p.script.indexOf('thirty-seven')>p.script.length*.65,'Offer follows the standalone exercise.');}
  // Media approval is deliberately separate from text/package checks.
- for(const id of ['rendered_media','mobile_readability','audio_continuity','dead_air','unwanted_speech','blank_frames','transitions','subtitle_alignment','message_accuracy'])checks.push({id,status:p.production?.review?.checks?.[id]===true?'MANUAL_PASS':'PENDING',detail:'Requires the finished immutable media; text does not prove this check.'});
+ for(const id of ['rendered_media','mobile_readability','audio_continuity','dead_air','unwanted_speech','blank_frames','transitions','subtitle_alignment','message_accuracy',...VISUAL_REVIEW])checks.push({id,status:p.production?.review?.checks?.[id]===true?'MANUAL_PASS':'PENDING',detail:'Requires the finished immutable media; text does not prove this check.'});
  if(p.platform==='tiktok')checks.push({id:'tiktok_review',status:'PENDING',detail:'Production review/OAuth approval pending.'});
  const failures=checks.filter(c=>c.status==='FAIL'),pending=checks.filter(c=>c.status==='PENDING');
  return {voice,checks,status:failures.length?'FAIL':pending.length?'PARTIAL':'PASS',canApprove:!failures.length&&!pending.length&&!!p.production?.media?.sha256,packageHash:hash(p)};
