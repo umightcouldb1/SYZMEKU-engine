@@ -13,12 +13,18 @@ function canRead(user, env = process.env) {
 }
 const EVENTS = Object.freeze(['landing_view', 'cta_click', 'sign_in_start', 'sign_in_success', 'checkout_start', 'checkout_return', 'product_start', 'product_complete', 'client_error']);
 const SOURCES = ['facebook', 'instagram', 'youtube', 'tiktok'];
+const safeToken = (value, pattern, fallback = 'unattributed') => {
+  const text = String(value || '');
+  return pattern.test(text) ? text : fallback;
+};
 const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 function parseEvent(body) {
-  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(k => !['id', 'visitId', 'event', 'source', 'campaign', 'returnState'].includes(k)) || !uuid(body.id) || !uuid(body.visitId) || !EVENTS.includes(body.event)) return null;
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(k => !['id', 'visitId', 'event', 'source', 'medium', 'campaign', 'content', 'returnState'].includes(k)) || !uuid(body.id) || !uuid(body.visitId) || !EVENTS.includes(body.event)) return null;
   return { _id: body.id, visitId: body.visitId, event: body.event, product: 'freedom-audit',
     source: SOURCES.includes(body.source) ? body.source : 'unattributed',
-    campaign: body.campaign === 'freedom_audit_launch' ? body.campaign : 'unattributed',
+    medium: safeToken(body.medium, /^[a-z0-9_-]{1,40}$/i),
+    campaign: safeToken(body.campaign, /^(freedom_audit_launch|fa_launch_[a-z0-9_]{1,90})$/i),
+    content: safeToken(body.content, /^fa_launch_[a-z0-9_]{1,90}$/i),
     returnState: ['success', 'canceled'].includes(body.returnState) ? body.returnState : null,
     authority: 'unverified_browser_event' };
 }
