@@ -24,7 +24,13 @@ class TikTokProvider extends SocialProviderAdapter {
         schedulePost: false,
         analytics: false,
         approvalRequired: true,
-        note: 'Direct publishing requires TikTok Content Posting API access, approved video.publish scope, verified media URL prefixes, and app audit for owner-operated production posting.',
+        modes: {
+          directPost: 'Requires approved video.publish production access.',
+          draftHandoff: 'Requires an active TikTok connection authorized for video.upload.',
+          browserHandoff: 'Available through TikTok Studio when the founder is logged in.',
+          manualHandoff: 'Available when API or browser media transfer is unavailable.',
+        },
+        note: 'TikTok supports direct post and Upload-to-TikTok draft handoff as separate modes. Direct posting requires approved video.publish production access; draft handoff requires video.upload authorization.',
       },
     };
   }
@@ -119,6 +125,21 @@ class TikTokProvider extends SocialProviderAdapter {
           disable_comment: Boolean(post.metadata?.disableComment),
           disable_stitch: Boolean(post.metadata?.disableStitch),
         },
+        source_info: { source: 'PULL_FROM_URL', video_url: videoAsset.url },
+      }),
+    });
+  }
+
+  async uploadVideoDraft({ accessToken, post }) {
+    const videoAsset = findPostMediaAsset(post, 'video');
+    if (!videoAsset) throw new Error('TikTok draft handoff requires a hosted video URL from a verified domain or URL prefix.');
+    return requestJson('https://open.tiktokapis.com/v2/post/publish/inbox/video/init/', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: JSON.stringify({
         source_info: { source: 'PULL_FROM_URL', video_url: videoAsset.url },
       }),
     });

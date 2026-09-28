@@ -6,7 +6,7 @@ const { encryptToken, decryptToken } = require('../social/tokenCrypto');
 const { createOAuthState, consumeOAuthState } = require('../social/oauthState');
 const { getProvider, listProviders } = require('../social/providers');
 const { generateCampaignDraft } = require('../social/campaignGenerationService');
-const { publishCampaign, publishPost } = require('../social/publishingService');
+const { publishCampaign, publishPost, getFreshAccessToken } = require('../social/publishingService');
 const { scheduleCampaignPosts, activatePlannedSchedule, processDuePosts } = require('../social/schedulingService');
 const { refreshCampaignAnalytics, summarizeCampaign } = require('../social/analyticsService');
 const { validateMediaAsset } = require('../social/mediaAssetService');
@@ -323,6 +323,52 @@ const scheduleCampaign = asyncHandler(async (req, res) => {
   }
 });
 
+const uploadTikTokDraft = asyncHandler(async (req, res) => {
+  const campaign = await SocialCampaign.findOne({ _id: req.params.campaignId, userId: userIdOf(req) });
+  if (!campaign) return res.status(404).json({ error: 'Campaign not found.' });
+
+  const post = campaign.posts.id(req.params.postId);
+  if (!post || post.provider !== 'tiktok') {
+    return res.status(404).json({ error: 'TikTok post not found.' });
+  }
+
+  const connection = post.connectedAccountId
+    ? await SocialConnection.findOne({
+      _id: post.connectedAccountId,
+      userId: userIdOf(req),
+      provider: 'tiktok',
+      active: true,
+    }).select('+encryptedAccessToken +encryptedRefreshToken')
+    : null;
+
+  if (!connection) {
+    return res.status(409).json({
+      code: 'TIKTOK_CONNECTION_REQUIRED',
+      error: 'TikTok draft handoff requires an active TikTok account connection authorized for video.upload.',
+      fallbackMode: 'BROWSER_HANDOFF',
+    });
+  }
+
+  const provider = getProvider('tiktok');
+  const accessToken = await getFreshAccessToken({ connection, provider });
+  const result = await provider.uploadVideoDraft({ accessToken, post });
+  post.metadata = {
+    ...(post.metadata || {}),
+    tiktokHandoff: {
+      mode: 'DRAFT_HANDOFF',
+      status: 'uploaded',
+      publishId: result.publish_id || result.data?.publish_id || '',
+      uploadedAt: new Date(),
+      captionPreload: 'not_supported_for_video_upload',
+      founderAction: 'Open TikTok inbox notification, review/edit metadata, and post from TikTok.',
+    },
+  };
+  post.error = { message: '', code: '', at: null };
+  await campaign.save();
+  await audit(req, 'tiktok_draft_uploaded', { campaignId: campaign._id, postId: post._id, publishId: post.metadata.tiktokHandoff.publishId });
+  res.json({ campaign, summary: summarizeCampaign(campaign), result, handoff: post.metadata.tiktokHandoff });
+});
+
 const processSchedule = asyncHandler(async (req, res) => {
   const results = await processDuePosts({ limit: Math.min(25, Number(req.body.limit) || 10) });
   res.json({ success: true, results });
@@ -349,6 +395,7 @@ module.exports = {
   approveCampaign,
   publishNow,
   scheduleCampaign,
+  uploadTikTokDraft,
   processSchedule,
   refreshAnalytics,
 };

@@ -16,6 +16,7 @@ const {
   approveCampaign,
   publishNow,
   scheduleCampaign,
+  uploadTikTokDraft,
   processSchedule,
   refreshAnalytics,
 } = require('../controllers/socialCommandController');
@@ -36,6 +37,7 @@ router.put('/campaigns/:campaignId', updateCampaign);
 router.post('/campaigns/:campaignId/approve', approveCampaign);
 router.post('/campaigns/:campaignId/publish', publishNow);
 router.post('/campaigns/:campaignId/posts/:postId/publish', publishNow);
+router.post('/campaigns/:campaignId/posts/:postId/tiktok/draft-upload', uploadTikTokDraft);
 router.post('/campaigns/:campaignId/schedule', scheduleCampaign);
 router.post('/campaigns/:campaignId/analytics/refresh', refreshAnalytics);
 router.post('/scheduler/run-due', processSchedule);

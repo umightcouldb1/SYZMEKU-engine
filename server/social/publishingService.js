@@ -130,4 +130,4 @@ const publishCampaign = async ({ userId, campaignId }) => {
   return results;
 };
 
-module.exports = { publishPost, publishCampaign, buildIdempotencyKey };
+module.exports = { publishPost, publishCampaign, buildIdempotencyKey, getFreshAccessToken };
