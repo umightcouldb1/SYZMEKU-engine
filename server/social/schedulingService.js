@@ -81,6 +81,9 @@ const processDuePosts = async ({ limit = 10 } = {}) => {
         results.push(await publishPost({ userId: campaign.userId, campaignId: campaign._id, postId: post._id }).catch((error) => {
           const result = {
             error: error.message,
+            code: String(error.code || error.providerReason || ''),
+            statusCode: error.statusCode || error.response?.status || null,
+            providerPayload: error.providerPayload,
             campaignId: String(campaign._id),
             postId: String(post._id),
             provider: post.provider,

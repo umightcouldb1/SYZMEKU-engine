@@ -4,6 +4,103 @@ const { google } = require('googleapis');
 const { fetchMediaBuffer } = require('../mediaFetchService');
 const { findPostMediaAsset } = require('../mediaAssetService');
 
+const YOUTUBE_TITLE_MAX_LENGTH = 100;
+const YOUTUBE_DESCRIPTION_MAX_LENGTH = 5000;
+const YOUTUBE_TOTAL_TAG_LENGTH_LIMIT = 450;
+const VALID_PRIVACY_STATUSES = new Set(['public', 'unlisted', 'private']);
+
+const normalizeText = (value = '') =>
+  String(value || '')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+
+const truncateText = (value, maxLength) => {
+  const text = normalizeText(value);
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength - 1).trimEnd();
+};
+
+const normalizeDescription = (value = '') =>
+  String(value || '')
+    .replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim()
+    .slice(0, YOUTUBE_DESCRIPTION_MAX_LENGTH);
+
+const normalizeYouTubeTags = (hashtags = []) => {
+  if (!Array.isArray(hashtags)) return [];
+  const tags = [];
+  let totalLength = 0;
+
+  for (const hashtag of hashtags) {
+    const tag = normalizeText(hashtag).replace(/^#+/, '').slice(0, 30);
+    if (!tag || tags.includes(tag)) continue;
+    const projectedLength = totalLength + tag.length + (tags.length ? 1 : 0);
+    if (projectedLength > YOUTUBE_TOTAL_TAG_LENGTH_LIMIT) break;
+    tags.push(tag);
+    totalLength = projectedLength;
+  }
+
+  return tags;
+};
+
+const normalizePrivacyStatus = (value) => {
+  const status = normalizeText(value || process.env.YOUTUBE_DEFAULT_PRIVACY_STATUS || 'public').toLowerCase();
+  return VALID_PRIVACY_STATUSES.has(status) ? status : 'public';
+};
+
+const normalizeCategoryId = (value) => {
+  const categoryId = normalizeText(value || '27');
+  return /^\d+$/.test(categoryId) ? categoryId : '27';
+};
+
+const buildYouTubeUploadRequest = (post) => {
+  const description = normalizeDescription([post.description || post.caption, post.link].filter(Boolean).join('\n\n'));
+  const tags = normalizeYouTubeTags(post.hashtags);
+  const requestBody = {
+    snippet: {
+      title: truncateText(post.title || 'SYZMEKU Social Command', YOUTUBE_TITLE_MAX_LENGTH) || 'SYZMEKU Social Command',
+      description,
+      categoryId: normalizeCategoryId(post.metadata?.categoryId),
+    },
+    status: {
+      privacyStatus: normalizePrivacyStatus(post.metadata?.privacyStatus),
+      selfDeclaredMadeForKids: false,
+    },
+  };
+
+  if (tags.length > 0) {
+    requestBody.snippet.tags = tags;
+  }
+
+  return requestBody;
+};
+
+const normalizeYouTubeError = (error) => {
+  const providerPayload = error.response?.data || error.providerPayload || {};
+  const apiError = providerPayload.error || providerPayload;
+  const firstDetail = Array.isArray(apiError.errors) ? apiError.errors[0] : null;
+  const reason = firstDetail?.reason || apiError.status || error.code || '';
+  const providerMessage = firstDetail?.message || apiError.message || error.message || 'YouTube upload failed.';
+  const message = reason
+    ? `YouTube upload failed (${reason}): ${providerMessage}`
+    : `YouTube upload failed: ${providerMessage}`;
+  const normalized = new Error(message);
+
+  normalized.statusCode = error.response?.status || apiError.code || error.statusCode || 502;
+  normalized.code = reason || String(normalized.statusCode);
+  normalized.providerReason = reason;
+  normalized.providerPayload = {
+    code: apiError.code || error.response?.status || error.statusCode,
+    message: apiError.message || providerMessage,
+    status: apiError.status,
+    errors: apiError.errors,
+  };
+
+  return normalized;
+};
+
 class YouTubeProvider extends SocialProviderAdapter {
   get id() {
     return 'youtube';
@@ -122,33 +219,22 @@ class YouTubeProvider extends SocialProviderAdapter {
     const auth = new google.auth.OAuth2();
     auth.setCredentials({ access_token: accessToken });
     const youtube = google.youtube({ version: 'v3', auth });
-    const description = [post.description || post.caption, post.link].filter(Boolean).join('\n\n');
-    const tags = Array.isArray(post.hashtags)
-      ? post.hashtags.map((tag) => String(tag || '').replace(/^#/, '')).filter(Boolean)
-      : [];
 
-    const response = await youtube.videos.insert({
-      part: ['snippet', 'status'],
-      requestBody: {
-        snippet: {
-          title: post.title || 'SYZMEKU Social Command',
-          description,
-          tags,
-          categoryId: post.metadata?.categoryId || '27',
-        },
-        status: {
-          privacyStatus: post.metadata?.privacyStatus || process.env.YOUTUBE_DEFAULT_PRIVACY_STATUS || 'public',
-          selfDeclaredMadeForKids: false,
-        },
-      },
-      media: { mimeType, body: stream },
-    });
+    try {
+      const response = await youtube.videos.insert({
+        part: ['snippet', 'status'],
+        requestBody: buildYouTubeUploadRequest(post),
+        media: { mimeType, body: stream },
+      });
 
-    return {
-      id: response.data?.id || '',
-      url: response.data?.id ? `https://www.youtube.com/watch?v=${response.data.id}` : '',
-      data: response.data,
-    };
+      return {
+        id: response.data?.id || '',
+        url: response.data?.id ? `https://www.youtube.com/watch?v=${response.data.id}` : '',
+        data: response.data,
+      };
+    } catch (error) {
+      throw normalizeYouTubeError(error);
+    }
   }
 
   async getAnalytics() {
@@ -168,3 +254,5 @@ class YouTubeProvider extends SocialProviderAdapter {
 }
 
 module.exports = YouTubeProvider;
+module.exports.buildYouTubeUploadRequest = buildYouTubeUploadRequest;
+module.exports.normalizeYouTubeError = normalizeYouTubeError;

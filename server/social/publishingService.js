@@ -7,6 +7,26 @@ const { getProvider } = require('./providers');
 const buildIdempotencyKey = ({ campaignId, postId }) =>
   crypto.createHash('sha256').update(`${campaignId}:${postId}`).digest('hex');
 
+const getPublishErrorDetails = (error) => {
+  const providerReason = error.providerReason
+    || error.providerPayload?.errors?.[0]?.reason
+    || error.providerPayload?.status
+    || error.code
+    || error.statusCode
+    || '';
+  const providerMessage = error.providerPayload?.errors?.[0]?.message
+    || error.providerPayload?.message
+    || error.message
+    || 'Publishing failed.';
+
+  return {
+    message: providerMessage,
+    code: String(providerReason || ''),
+    statusCode: error.statusCode || error.response?.status || null,
+    providerPayload: error.providerPayload,
+  };
+};
+
 const assertCampaignOwner = (campaign, userId) => {
   if (!campaign || String(campaign.userId) !== String(userId)) {
     const error = new Error('Campaign not found.');
@@ -106,10 +126,11 @@ const publishPost = async ({ userId, campaignId, postId }) => {
     await campaign.save();
     return { post, result };
   } catch (error) {
+    const details = getPublishErrorDetails(error);
     post.publishStatus = 'failed';
     post.error = {
-      message: error.message || 'Publishing failed.',
-      code: String(error.statusCode || error.code || ''),
+      message: details.message,
+      code: details.code,
       at: new Date(),
     };
     const retryDelayMinutes = Math.max(5, Number(process.env.SOCIAL_COMMAND_RETRY_DELAY_MINUTES || 15));
