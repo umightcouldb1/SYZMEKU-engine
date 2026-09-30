@@ -16,6 +16,11 @@ async function collect({ db, owner, env = process.env, stripe, fetchImpl = fetch
   const entitlements=await db.collection('userprofiles').aggregate([{$match:{userId:{$ne:userId}}},{$unwind:'$purchasedProducts'},{$match:{'purchasedProducts.priceId':env.FREEDOM_AUDIT_STRIPE_PRICE_ID,'purchasedProducts.status':'paid','purchasedProducts.purchasedAt':range}},{$count:'count'}]).toArray();
   const completions=await db.collection('userprofiles').aggregate([{$match:{userId:{$ne:userId}}},{$project:{dates:'$freedomAudit.results.completedAt'}},{$unwind:'$dates'},{$match:{dates:range}},{$count:'count'}]).toArray();
   const counts=await db.collection('enterpriseevents').aggregate([{$match:{product:'freedom-audit',receivedAt:range}},{$group:{_id:'$event',count:{$sum:1}}}]).toArray();
+  const attribution=await db.collection('enterpriseevents').aggregate([
+    {$match:{product:'freedom-audit',receivedAt:range,campaign:'freedom_audit_launch'}},
+    {$group:{_id:{event:'$event',source:'$source',medium:'$medium',campaign:'$campaign',content:'$content'},count:{$sum:1}}},
+    {$sort:{'_id.source':1,'_id.content':1,'_id.event':1}}
+  ]).toArray();
   const first=await db.collection('enterpriseevents').find({product:'freedom-audit'},{projection:{receivedAt:1}}).sort({receivedAt:1}).limit(1).toArray();
   const commerce={ok:false,customerSessions:0,founderSessions:0,sales:0,revenue:0,attempts:0,paymentAttribution:'NOT INSTRUMENTED'};
   try {
@@ -37,7 +42,7 @@ async function collect({ db, owner, env = process.env, stripe, fetchImpl = fetch
     const began=Date.now();try{const response=await fetchImpl(url,{signal:AbortSignal.timeout(10000),redirect:'error'});health[name]={status:response.status,latencyMs:Date.now()-began};await response.body?.cancel();}catch{health[name]={status:'UNAVAILABLE'};}
   }
   return {window:{start:START,end:now.toISOString(),timeZone:'America/Chicago'},social:{posts,connections,measurements,snapshotCount:snapshots,coverage:campaigns.length===100?'LIMITED — campaign read cap':'Owned campaign receipts; per-post analytics coverage shown separately'},auth,commerce,
-    product:{entitlements:entitlements[0]?.count||0,completions:completions[0]?.count||0},telemetry:{counts,since:first[0]?.receivedAt||null},health,
+    product:{entitlements:entitlements[0]?.count||0,completions:completions[0]?.count||0},telemetry:{counts,attribution,since:first[0]?.receivedAt||null},health,
     personalExecution:env.CORE_PERSONAL_EXECUTION_ENABLED==='true'?'ENABLED — unexpected':'DISABLED',m3:env.CORE_REASONING_RECONCILIATION_ENABLED==='true'?'ON — unexpected':'OFF'};
 }
 module.exports={collect,START};
