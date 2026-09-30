@@ -20,12 +20,13 @@ async function prepareDaily({db,env=process.env,now=new Date()}){
  if(!Number.isFinite(day)||day<1||day>30)return {status:'CALENDAR_COMPLETE_OR_NOT_STARTED'};
  await states.updateOne({_id:'c0:voice:'+owner},{$setOnInsert:{owner,kind:'C0_VOICE',version:1,rules:[]}},{upsert:true});
  const learned=await voiceState(db,owner);let created=0;
- for(const item of catalog().filter(x=>x.package.day<=day)){
+ const bufferDay=Math.min(day+2,7);
+ for(const item of catalog().filter(x=>x.package.day<=bufferDay)){
   const p=regenerate(item.package,learned.rules),version={number:1,hash:hash(p),package:p,createdAt:now,voiceRulesVersion:learned.version};
   try{const r=await states.updateOne({_id:key(owner,item.id)},{$setOnInsert:{kind:'C0_ITEM',owner,itemId:item.id,currentVersion:1,versions:[version],status:'DRAFT',approval:null,createdAt:now,updatedAt:now}},{upsert:true});created+=r.upsertedCount;}catch(e){if(e.code!==11000)throw e;}
  }
- await states.updateOne({_id:'c0:daily:'+owner},{$set:{kind:'C0_DAILY',owner,lastPreparedAt:now,date:today,day,created,calendarStart:start,externalSpend:0}},{upsert:true});
- return {status:'OK',day,created};
+ await states.updateOne({_id:'c0:daily:'+owner},{$set:{kind:'C0_DAILY',owner,lastPreparedAt:now,date:today,day,bufferThroughDay:bufferDay,created,calendarStart:start,externalSpend:0}},{upsert:true});
+ return {status:'OK',day,bufferThroughDay:bufferDay,created};
 }
 function startDaily({connection,env=process.env}){if(!active(env))return()=>{};let running=false;const tick=async()=>{if(running||connection.readyState!==1)return;running=true;try{await prepareDaily({db:connection.db,env});}catch{console.warn('[content-factory] preparation unavailable');}finally{running=false;}};const first=setTimeout(tick,35000),timer=setInterval(tick,15*60*1000);first.unref();timer.unref();return()=>{clearTimeout(first);clearInterval(timer);};}
 function current(doc){return doc.versions.find(v=>v.number===doc.currentVersion);}
