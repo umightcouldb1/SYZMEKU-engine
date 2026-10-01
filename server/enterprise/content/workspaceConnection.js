@@ -18,6 +18,16 @@ const fail = (code, statusCode = 409) => {
   throw error;
 };
 
+const workspaceError = (error) => ({
+  code: String(error?.message || 'GOOGLE_WORKSPACE_REAUTH_REQUIRED').slice(0, 160),
+  statusCode: error?.statusCode || null,
+  providerError: typeof error?.providerPayload?.error === 'string'
+    ? String(error.providerPayload.error).slice(0, 120)
+    : null,
+  providerStatus: error?.providerPayload?.error_description ? 'PROVIDER_REJECTED' : null,
+  observedAt: new Date(),
+});
+
 const firstConfiguredOrigin = () => String(process.env.CLIENT_ORIGIN || '')
   .split(',')
   .map((origin) => origin.trim())
@@ -229,8 +239,19 @@ const getStatus = async ({ owner, verify = false }) => {
     connection = await WorkspaceConnection.findOne({ userId: owner, provider: PROVIDER });
     return { ...safeConnection(connection, 'HEALTHY'), canonicalStorage };
   } catch (error) {
-    await WorkspaceConnection.updateOne({ userId: owner, provider: PROVIDER }, { $set: { status: 'reauth_required' } });
-    return { ...safeConnection(connection, 'BLOCKED'), status: 'reauth_required', error: 'GOOGLE_WORKSPACE_REAUTH_REQUIRED' };
+    const diagnostic = workspaceError(error);
+    await WorkspaceConnection.updateOne(
+      { userId: owner, provider: PROVIDER },
+      { $set: { status: 'reauth_required', 'metadata.lastVerificationError': diagnostic } }
+    );
+    return {
+      ...safeConnection(connection, 'BLOCKED'),
+      status: 'reauth_required',
+      error: diagnostic.code,
+      errorStatusCode: diagnostic.statusCode,
+      providerError: diagnostic.providerError,
+      providerStatus: diagnostic.providerStatus,
+    };
   }
 };
 
