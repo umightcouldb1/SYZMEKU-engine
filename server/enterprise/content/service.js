@@ -28,7 +28,7 @@ async function prepareDaily({db,env=process.env,now=new Date()}){
  await states.updateOne({_id:'c0:daily:'+owner},{$set:{kind:'C0_DAILY',owner,lastPreparedAt:now,date:today,day,bufferThroughDay:bufferDay,created,calendarStart:start,externalSpend:0}},{upsert:true});
  return {status:'OK',day,bufferThroughDay:bufferDay,created};
 }
-function startDaily({connection,env=process.env}){if(!active(env))return()=>{};let running=false;const tick=async()=>{if(running||connection.readyState!==1)return;running=true;try{await prepareDaily({db:connection.db,env});}catch{console.warn('[content-factory] preparation unavailable');}finally{running=false;}};const first=setTimeout(tick,35000),timer=setInterval(tick,15*60*1000);first.unref();timer.unref();return()=>{clearTimeout(first);clearInterval(timer);};}
+function startDaily({connection,env=process.env}){if(!active(env))return()=>{};let running=false;const tick=async()=>{if(running||connection.readyState!==1)return;running=true;try{await prepareDaily({db:connection.db,env});await materializeFounderReview({db:connection.db,owner:ownerId(env)});}catch{console.warn('[content-factory] preparation unavailable');}finally{running=false;}};const first=setTimeout(tick,35000),timer=setInterval(tick,15*60*1000);first.unref();timer.unref();return()=>{clearTimeout(first);clearInterval(timer);};}
 function current(doc){return doc.versions.find(v=>v.number===doc.currentVersion);}
 async function list(db,owner){
  const learned=await voiceState(db,owner);
