@@ -44,10 +44,24 @@ Proposed identifiers use `fa_c0_<platform>_<type>_v1_dNN`. They label intended c
 
 The actual Academy account can open Google Vids and the existing Freedom Audit Campaign project. It was inspected without changes. No documented public Vids timeline-authoring API was found; no such API is claimed.
 
-- Google Slides APIs can create editable scene drafts and speaker notes. `googleProduction.createSlides` prepares these inputs without generation. The protected exact-version route is present, but production currently lacks dedicated Drive/Slides OAuth file access. `CONTENT_FACTORY_GOOGLE_ACCESS_TOKEN` is an optional server credential, not an API key and never returned to the browser. A short-lived token alone is not a durable OAuth integration.
+- Commander now exposes a founder-only **Google Workspace Production Connection** panel. `POST /api/content-factory/workspace/connect` starts an OAuth consent flow for the exact enterprise owner, and `/api/content-factory/google/callback` stores encrypted Workspace tokens in `workspaceconnections`. The app no longer treats `CONTENT_FACTORY_GOOGLE_ACCESS_TOKEN` as the production architecture.
+- Required server environment for the durable flow: `GOOGLE_OAUTH_CLIENT_ID` or `GOOGLE_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `CONTENT_FACTORY_GOOGLE_REDIRECT_URI`, and `SOCIAL_TOKEN_ENCRYPTION_KEY`. The redirect URI should be the production API callback, for example `https://syzmeku-api.onrender.com/api/content-factory/google/callback`. Tokens are encrypted server-side, owner-scoped, refreshable and revocable; they are never returned to the browser.
+- Requested scopes are `openid`, `email`, `profile`, `drive.file`, and `presentations`. `drive.file` is intentional: it permits app-created or explicitly selected files without granting broad Drive access. If a pre-existing Drive tree was not created/opened by this app, the app may need to create its own canonical folders under `T.O.I. Souljah Academy/Content Factory/`.
+- Google Slides APIs can create editable scene drafts and speaker notes. `googleProduction.createSlides` prepares these inputs without generation and now uses the durable Workspace connection. Missing/revoked authorization returns `GOOGLE_WORKSPACE_REAUTH_REQUIRED` instead of silently producing filler.
 - Vids can import Slides, turning slides into scenes and speaker notes into scripts. Aspect ratio, timings and audio still require interactive editor verification. Creation/import can be operated through UI where available; unattended product automation is not claimed.
-- Drive API `files.download` supports completed Vids MP4 via long-running operations. The adapter validates an explicit Vids file ID/type and requests that operation. Automated operation polling, private asset ingestion/rendering and verified public asset delivery are not active in C0.
+- Drive API `files.download` supports completed Vids MP4 via long-running operations. The adapter validates an explicit Vids file ID/type and requests that operation. Timeline authoring, premium source generation, and fine text/audio placement remain hybrid/browser/editor work until Google exposes and this app implements a supported API.
 - No Veo, Gemini media generation, voice cloning, paid voice generation, purchase or subscription operation is invoked. No newly rendered media is claimed. Existing audio from Control A is not represented as suitable narration for a rewritten script.
+
+### Vids automation boundary
+
+Current classification:
+
+- Fully automatable: Workspace OAuth refresh, app-created Drive folder creation, app-created asset upload/reference, Slides draft creation, app-created Drive organization, Vids MP4 download request for a completed Vids file.
+- Browser-automatable while an authenticated session is available: open/copy Vids projects, submit premium generation, insert generated media, save generated result, export through the Vids UI.
+- Founder interaction required: Google consent, any Google security challenge, subjective premium creative approval, final Vids edits where browser automation cannot safely manipulate the editor.
+- Not currently automatable through a verified public app API: Vids timeline authoring, exact scene-level Vids arrangement, direct editable text placement inside a Vids project, native Vids narration/music/captions control.
+
+The durable hybrid production boundary is therefore: Content Factory prepares package inputs and persists Workspace/Drive artifacts; Google Vids owns premium source generation when available; SYZMEKU deterministic tooling owns exact timing, typography, subtitles, audio mixing, final encoding, checksum/versioning and Commander review. The factory must hold production or reuse approved assets when Vids is unavailable; it must not substitute generic filler.
 
 References: [Vids creation/import](https://support.google.com/a/users/answer/14819770?hl=en), [Drive Vids download](https://developers.google.com/workspace/drive/api/guides/manage-downloads), [Slides API](https://developers.google.com/workspace/slides/api/reference/rest/v1/presentations/batchUpdate), [Shorts links](https://support.google.com/youtube/answer/13748639?hl=en).
 

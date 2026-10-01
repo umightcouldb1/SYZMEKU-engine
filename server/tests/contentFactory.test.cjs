@@ -19,6 +19,22 @@ test('exact approved version stages one Social draft and edits invalidate the di
 test('categorized positive feedback persists with selected voice and is never treated as a rejection',async()=>{const item=await get('first-longform');const response=await f.request(f.founder,'/api/content-factory/'+item.id,'PATCH',{expectedHash:item.hash,action:'FEEDBACK',feedback:{category:'authentic_preserve_pattern',phrase:'What keeps getting to make the decision?',note:'Keep this direct question.'}});assert.equal(response.status,200);const rules=(await service.voiceState(db,f.founder.id)).rules,rule=rules.at(-1);assert.equal(rule.voice,'TOI_FOUNDER');assert.equal(rule.category,'authentic_preserve_pattern');assert.equal(voiceCheck(rule.phrase,rules,[],{voice:'TOI_FOUNDER',intensity:0}).status,'PASS');assert.equal((await get(item.id)).hash,item.hash);assert.equal((await get(item.id)).approval,null);});
 test('ordinary Social campaigns bypass only the new C0 guard; hashtags are normalized and deduplicated',async()=>{await service.assertPublication({db,campaign:{metadata:{},userId:'any'},post:{}});const {captionWithTags}=require('../social/contentMetadata');assert.equal(captionWithTags('Hello #LifeAudit',['LifeAudit','#FreedomAudit','bad tag']), 'Hello #LifeAudit\n\n#FreedomAudit');const source=require('node:fs').readFileSync(require('node:path').join(__dirname,'../social/providers/metaProvider.js'),'utf8');assert(source.includes("title: post.title || ''"));assert(!source.includes("post.hashtags?.join(' ')"));});
 test('Google adapter never invokes generation; missing OAuth is explicit; Slides notes and Vids download use actual APIs',async()=>{const {createSlides,requestVidsDownload}=require('../enterprise/content/googleProduction');await assert.rejects(createSlides({package:catalog.variant('facebook')}),/GOOGLE_WORKSPACE_CONNECTION_REQUIRED/);const calls=[],p=catalog.variant('facebook');const fetchImpl=async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>url.endsWith('/presentations')?{presentationId:'mock_slide_id'}:url.includes('?fields=slides')?{slides:p.scenes.map((_,i)=>({slideProperties:{notesPage:{notesProperties:{speakerNotesObjectId:'note_'+i}}}}))}:url.includes('?fields=id')?{mimeType:'application/vnd.google-apps.vid'}:{name:'operations/test'}};};assert.equal((await createSlides({token:'synthetic',package:p,fetchImpl})).status,'SLIDES_DRAFT_CREATED');assert(calls.every(c=>!(/generativelanguage|veo|generateContent/.test(c.url))));assert.equal((await requestVidsDownload({token:'synthetic',fileId:'mock_vid_12345',fetchImpl})).name,'operations/test');});
+test('Workspace production connection is durable OAuth, not pasted access token',async()=>{
+ const missing=await f.request(f.founder,'/api/content-factory/workspace/status');
+ assert.equal(missing.status,200);
+ assert.equal(missing.data.connected,false);
+ assert.equal(missing.data.tokenRefresh,'MISSING');
+ const notConfigured=await f.request(f.founder,'/api/content-factory/workspace/connect','POST',{});
+ assert.equal(notConfigured.status,503);
+ assert.equal(notConfigured.data.code,'GOOGLE_WORKSPACE_OAUTH_NOT_CONFIGURED');
+ Object.assign(process.env,{GOOGLE_CLIENT_ID:'workspace-client',GOOGLE_OAUTH_CLIENT_SECRET:'workspace-secret',CONTENT_FACTORY_GOOGLE_REDIRECT_URI:'https://syzmeku-api.onrender.com/api/content-factory/google/callback'});
+ const start=await f.request(f.founder,'/api/content-factory/workspace/connect','POST',{});
+ assert.equal(start.status,200);
+ assert.match(start.data.authorizationUrl,/accounts\.google\.com/);
+ assert.match(start.data.authorizationUrl,/drive\.file/);
+ assert.match(start.data.authorizationUrl,/access_type=offline/);
+ delete process.env.GOOGLE_CLIENT_ID;delete process.env.GOOGLE_OAUTH_CLIENT_SECRET;delete process.env.CONTENT_FACTORY_GOOGLE_REDIRECT_URI;
+});
 
 
 
