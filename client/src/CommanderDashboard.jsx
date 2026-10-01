@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import './commander.css';
 import ContentQueue from './ContentQueue';
+const getToken=()=>{try{const user=JSON.parse(localStorage.getItem('user'));return user?.token||localStorage.getItem('token')||'';}catch(_error){return localStorage.getItem('token')||'';}};
+const authConfig=()=>{const token=getToken();return {withCredentials:true,timeout:15000,headers:token?{Authorization:`Bearer ${token}`}:{}};};
 export default function CommanderDashboard(){
   const [data,setData]=useState(null),[error,setError]=useState('');
-  useEffect(()=>{let alive=true;const load=async()=>{try{const {data:result}=await axios.get('/api/enterprise/brief');if(alive){setData(result);setError('');}}catch(e){if(alive){setData(null);setError(e.response?.status===404?'Commander access unavailable.':'Could not load current business analysis.');}}};load();const timer=setInterval(load,60000);return()=>{alive=false;clearInterval(timer);};},[]);
+  useEffect(()=>{let alive=true;const load=async()=>{try{const {data:result}=await axios.get('/api/enterprise/brief',authConfig());if(alive){setData(result);setError('');}}catch(e){if(alive){setData(null);setError(e.response?.status===401?'Your session expired. Sign in again to view Commander.':e.response?.status===404?'Commander access unavailable.':'Could not load current business analysis.');}}};load();const timer=setInterval(load,60000);return()=>{alive=false;clearInterval(timer);};},[]);
   const brief=data?.brief;
   return <main className="commander"><header><p className="commander-eyebrow">T.O.I. • PRIVATE COMMANDER CENTER</p><h1>Freedom Audit launch</h1><p>Enterprise intelligence · Observation and recommendations</p><span className="commander-badge">Consequential execution disabled</span></header>
     <ContentQueue />
