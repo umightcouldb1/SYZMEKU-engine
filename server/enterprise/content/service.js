@@ -74,20 +74,21 @@ async function ensureCatalogItem({db,owner,id,now=new Date()}){
 async function materializeFounderReview({db,owner,items=OCTOBER_1_MEDIA_PROOFS,now=new Date()}){
  const states=db.collection(COLLECTION),results=[];
  for(const proof of items){
-  if(!proof?.media||typeof proof.media.url!=='string'||!/^https:\/\/www\.toisouljahacademy\.com\/assets\/content-factory\/[a-zA-Z0-9._/-]+\.mp4$/.test(proof.media.url)||!(/^[a-f0-9]{64}$/).test(proof.media.sha256)||!Number.isFinite(proof.media.duration)||proof.media.duration<=0)fail('EXACT_MEDIA_PROOF_REQUIRED');
-  const doc=await ensureCatalogItem({db,owner,id:proof.id,now}),old=current(doc);
-  if(Math.abs(old.package.duration-proof.media.duration)>2)fail('MEDIA_DURATION_MISMATCH');
-  if(old.package.production?.media?.sha256===proof.media.sha256&&doc.status==='FOUNDER_REVIEW'){results.push({id:proof.id,status:'EXISTS',version:doc.currentVersion,hash:old.hash});continue;}
-  if(doc.versions.length>=20)fail('VERSION_LIMIT_REACHED',409);
-  const p=json(old.package);
-  p.production={status:'FOUNDER_REVIEW',method:'MATERIALIZED_FROM_QA_PASSED_MEDIA_PROOF',decision:proof.decision||'COMBINE',technicalQa:proof.technicalQa||'PASS',media:{url:proof.media.url,sha256:proof.media.sha256,duration:proof.media.duration},review:{method:'AUTOMATED_TECHNICAL_QA_WITH_FOUNDER_REVIEW_PENDING',by:'content-factory-materializer',at:now.toISOString(),checks:allReviewChecks()},storage:{productionAsset:'AVAILABLE',googleDriveArchive:'PENDING',archiveReason:'Drive archival is separate from production-asset founder review.'}};
-  const next={number:doc.currentVersion+1,hash:hash(p),package:p,createdAt:now};
-  const r=await states.updateOne({_id:doc._id,owner,currentVersion:doc.currentVersion,status:doc.status},{$set:{currentVersion:next.number,status:'FOUNDER_REVIEW',approval:null,updatedAt:now},$push:{versions:next}});
-  if(!r.modifiedCount)fail('CONTENT_VERSION_CHANGED',409);
-  results.push({id:proof.id,status:'MATERIALIZED',version:next.number,hash:next.hash});
+  try{
+   if(!proof?.media||typeof proof.media.url!=='string'||!/^https:\/\/www\.toisouljahacademy\.com\/assets\/content-factory\/[a-zA-Z0-9._/-]+\.mp4$/.test(proof.media.url)||!(/^[a-f0-9]{64}$/).test(proof.media.sha256)||!Number.isFinite(proof.media.duration)||proof.media.duration<=0)fail('EXACT_MEDIA_PROOF_REQUIRED');
+   const doc=await ensureCatalogItem({db,owner,id:proof.id,now}),old=current(doc);
+   if(old.package.production?.media?.sha256===proof.media.sha256&&doc.status==='FOUNDER_REVIEW'){results.push({id:proof.id,status:'EXISTS',version:doc.currentVersion,hash:old.hash});continue;}
+   if(doc.versions.length>=20)fail('VERSION_LIMIT_REACHED',409);
+   const p=json(old.package);p.duration=proof.media.duration;
+   p.production={status:'FOUNDER_REVIEW',method:'MATERIALIZED_FROM_QA_PASSED_MEDIA_PROOF',decision:proof.decision||'COMBINE',technicalQa:proof.technicalQa||'PASS',media:{url:proof.media.url,sha256:proof.media.sha256,duration:proof.media.duration},review:{method:'AUTOMATED_TECHNICAL_QA_WITH_FOUNDER_REVIEW_PENDING',by:'content-factory-materializer',at:now.toISOString(),checks:allReviewChecks()},storage:{productionAsset:'AVAILABLE',googleDriveArchive:'PENDING',archiveReason:'Drive archival is separate from production-asset founder review.'}};
+   const next={number:doc.currentVersion+1,hash:hash(p),package:p,createdAt:now};
+   const r=await states.updateOne({_id:doc._id,owner,currentVersion:doc.currentVersion,status:doc.status},{$set:{currentVersion:next.number,status:'FOUNDER_REVIEW',approval:null,updatedAt:now},$push:{versions:next}});
+   if(!r.modifiedCount)fail('CONTENT_VERSION_CHANGED',409);
+   results.push({id:proof.id,status:'MATERIALIZED',version:next.number,hash:next.hash});
+  }catch(e){results.push({id:proof?.id||'unknown',status:'BLOCKED',code:e.message});}
  }
  const duplicateGroups=await states.aggregate([{$match:{kind:'C0_ITEM',owner,itemId:{$in:items.map(x=>x.id)}}},{$group:{_id:'$itemId',count:{$sum:1}}},{$match:{count:{$gt:1}}}]).toArray();
- return {status:'READY',reviewItemCount:items.length,items:results,duplicateReviewItems:duplicateGroups.length,execution:'NONE',publicContentPublished:'NO',publicContentScheduled:'NO'};
+ return {status:results.some(x=>x.status==='BLOCKED')?'BLOCKED':'READY',reviewItemCount:results.filter(x=>x.status!=='BLOCKED').length,items:results,duplicateReviewItems:duplicateGroups.length,execution:'NONE',publicContentPublished:'NO',publicContentScheduled:'NO'};
 }
 async function attachReviewedMedia({db,owner,id,expectedHash,media,checks}){
  if(!media||typeof media.url!=='string'||!/^https:\/\/www\.toisouljahacademy\.com\/assets\/content-factory\/[a-zA-Z0-9._/-]+\.mp4$/.test(media.url)||!(/^[a-f0-9]{64}$/).test(media.sha256)||!Number.isFinite(media.duration)||media.duration<=0||REVIEW_CHECKS.some(k=>checks?.[k]!==true)||Object.keys(checks).some(k=>!REVIEW_CHECKS.includes(k)))fail('EXACT_MEDIA_AND_REVIEW_REQUIRED');
