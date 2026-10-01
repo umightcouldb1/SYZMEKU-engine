@@ -24,7 +24,7 @@ const firstConfiguredOrigin = () => String(process.env.CLIENT_ORIGIN || '')
   .filter(Boolean)[0];
 
 const commanderReturnUrl = (params = {}) => {
-  const base = process.env.SOCIAL_COMMAND_APP_URL
+  const base = process.env.CONTENT_FACTORY_APP_URL
     || (process.env.DOMAIN ? `${process.env.DOMAIN.replace(/\/$/, '')}/app/commander` : '')
     || (firstConfiguredOrigin() ? `${firstConfiguredOrigin().replace(/\/$/, '')}/app/commander` : '')
     || 'http://localhost:5173/app/commander';
