@@ -16,11 +16,11 @@ async function prepareDaily({db,env=process.env,now=new Date()}){
  const {ObjectId}=require('mongoose').mongo;
  if(!await db.collection('users').findOne({_id:new ObjectId(owner),role:'COMMANDER_IN_CHIEF'},{projection:{_id:1}}))return {status:'OWNER_UNAVAILABLE'};
  const states=db.collection(COLLECTION),today=dayKey(now),start=env.CONTENT_FACTORY_START_DATE||today;
- const day=Math.floor((Date.parse(today)-Date.parse(start))/86400000)+1;
- if(!Number.isFinite(day)||day<1||day>30)return {status:'CALENDAR_COMPLETE_OR_NOT_STARTED'};
+ const day=Math.floor((Date.parse(today)-Date.parse(start))/86400000)+1,calendarLength=calendar().length;
+ if(!Number.isFinite(day)||day<1||day>calendarLength)return {status:'CALENDAR_COMPLETE_OR_NOT_STARTED'};
  await states.updateOne({_id:'c0:voice:'+owner},{$setOnInsert:{owner,kind:'C0_VOICE',version:1,rules:[]}},{upsert:true});
  const learned=await voiceState(db,owner);let created=0;
- const bufferDay=Math.min(day+2,7);
+ const bufferDay=Math.min(day+2,calendarLength);
  for(const item of catalog().filter(x=>x.package.day<=bufferDay)){
   const p=regenerate(item.package,learned.rules),version={number:1,hash:hash(p),package:p,createdAt:now,voiceRulesVersion:learned.version};
   try{const r=await states.updateOne({_id:key(owner,item.id)},{$setOnInsert:{kind:'C0_ITEM',owner,itemId:item.id,currentVersion:1,versions:[version],status:'DRAFT',approval:null,createdAt:now,updatedAt:now}},{upsert:true});created+=r.upsertedCount;}catch(e){if(e.code!==11000)throw e;}
