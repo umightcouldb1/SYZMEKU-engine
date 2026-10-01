@@ -33,11 +33,11 @@ const assets = [
     cta: 'Notice what keeps asking for the hour before you call yourself unfocused.',
     keywords: ['everything feels important', 'competing obligations', 'overwhelm', 'decision pressure'],
     scenes: [
-      ['Everything feels important.', 'But what keeps asking for your time?'],
-      ['Your calendar says one thing.', 'Your obligations say another.'],
-      ['Before you blame focus,', 'name what is competing.'],
-      ['One hour cannot belong to six muthafuqas.', 'Pick the actual constraint.'],
-      ['Exercise:', 'write the last priority that lost, then list what beat it.'],
+      ['Everything feels important.', 'Everything feels important when everything has permission to interrupt you.'],
+      ['Your calendar says one thing.', 'Your calendar may say one thing. Your obligations may be saying something completely different.'],
+      ['Before you blame focus,', 'Before you blame your focus, name what is competing for the same hour.'],
+      ['One hour cannot belong to six muthafuqas.', 'One hour cannot belong to six muthafuqas and still be called available. Pick the actual constraint.'],
+      ['Exercise:', 'Write the last priority that lost. Then list what beat it. That is where the useful shyt starts.'],
     ],
   },
   {
@@ -50,11 +50,11 @@ const assets = [
     cta: 'Name the missing capacity before you name another goal.',
     keywords: ['priority', 'capacity', 'usable time', 'next action'],
     scenes: [
-      ['A priority can be real', 'and still not be ready.'],
-      ['Do you have the time?', 'The material? The handoff? The quiet?'],
-      ['If the condition is missing,', 'motivation is not the first problem.'],
-      ['Make the next action small enough', 'to survive your actual day.'],
-      ['Try this:', 'I can do this when _____ is available.'],
+      ['A priority can be real', 'A priority can be real and still not be ready to move. That is not failure. That is information.'],
+      ['Do you have the time?', 'Do you have the time? The material? The handoff? The quiet? The permission to not be interrupted?'],
+      ['If the condition is missing,', 'If the condition is missing, motivation is not the first problem. Capacity is.'],
+      ['Make the next action small enough', 'Make the next action small enough to survive your actual day, not the imaginary day where nobody needs anything.'],
+      ['Try this:', 'Try this sentence: I can do this when blank is available. Then tell the truth about the blank.'],
     ],
   },
   {
@@ -67,11 +67,11 @@ const assets = [
     cta: 'Look for what repeats. Then test one explanation.',
     keywords: ['solving the wrong problem', 'pattern recognition', 'Big SYZ', 'hypothesis'],
     scenes: [
-      ['You keep fixing the symptom.', 'Dayem. Why does it keep coming back?'],
-      ['One bad day is data.', 'Repeated bad days are a question.'],
-      ['Do not invent causation.', 'Track what actually repeats.'],
-      ['Then test one possibility.', 'Not ten. One.'],
-      ['Big SYZ rule:', 'possibility first, proof after the check.'],
+      ['You keep fixing the symptom.', 'You keep fixing the symptom. Dayem. Why does it keep coming back?'],
+      ['One bad day is data.', 'One bad day is data. Repeated bad days are a question asking for better attention.'],
+      ['Do not invent causation.', 'Do not invent causation just because the pattern is loud. Track what actually repeats.'],
+      ['Then test one possibility.', 'Then test one possibility. Not ten. One. Let the outcome correct you.'],
+      ['Big SYZ rule:', 'Big SYZ rule: possibility first, proof after the check.'],
     ],
   },
   {
@@ -242,7 +242,7 @@ function makeOrganicPackage(asset) {
     aspectRatio: '9:16',
     cover: { text: asset.title, style: 'TOI_VISUAL_DNA_V1 dark/gold cinematic vertical cover, one readable idea.' },
     cost: { amount: 0, currency: 'USD', paidGeneration: false },
-    production: { status: 'PACKAGE_READY_MEDIA_PENDING', media: null, method: 'Prepared script, scene timing, platform copy, and Vids-ready visual direction; no paid generation.' },
+    production: { status: 'PACKAGE_READY_MEDIA_PENDING', media: null, method: 'Prepared script, scene timing, platform copy, and Vids-ready visual direction; no paid generation.', visualBrief: visualBrief(asset) },
     schedule: { proposedDay: asset.day, timeZone: 'America/Chicago', publicSchedulingApproved: false },
     experiment: `Organic ${asset.function}: test whether the problem/hook attracts qualified attention before judging sales conversion.`,
     evidence: ['September 30 low-distribution read', 'TOI_VOICE_V1', 'BIG_SYZ_LINEAGE', 'TOI_VISUAL_DNA_V1'],
@@ -257,6 +257,16 @@ function makeOrganicPackage(asset) {
       hypothesis: asset.payoff,
     },
   };
+}
+
+function visualBrief(asset) {
+  const briefs = {
+    discovery: 'Premium vertical short: Black-centered human in a cinematic, warm-gold environment surrounded by subtle competing signal paths. Ancestral-futuristic geometry resolves from noise into one clear constraint. Deterministic white/gold overlays only; no generated readable text in footage.',
+    teaching: 'Premium vertical short: dimensional workspace/threshold imagery with gold architectural depth, quiet iridescent system lines, and practical visual metaphors for capacity. Human presence should feel grounded, not stock. Deterministic overlays carry exact teaching lines.',
+    pattern: 'Premium vertical short: Big SYZ pattern-intelligence visual language with iridescent network geometry, one recurring signal, and a cinematic human/threshold moment. Build recognition and tension without cheap sci-fi clutter. Deterministic overlays carry exact questions.',
+    demo: 'Premium vertical short: five-domain diagnostic interface with dark/gold cinematic depth, restrained system labels, and illustrative example states. Clearly mark demonstrations as illustrative through deterministic overlays.',
+  };
+  return briefs[asset.function] || briefs.teaching;
 }
 
 module.exports = { sevenDayStrategy, assets, makeOrganicPackage, platformPackages };
