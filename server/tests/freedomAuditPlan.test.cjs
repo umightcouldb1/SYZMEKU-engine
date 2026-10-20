@@ -20,13 +20,14 @@ test('provider request has question evidence; failures and cancellations are san
  delete process.env.FREEDOM_AUDIT_AI_TEST_MODE;
  const provider=require('../services/reasoningProviderService'),original=provider.generate;
  try {
-  provider.generate=async({prompt,signal})=>{assert.match(prompt,/calendar reflects my priorities/);assert.match(prompt,/untrusted evidence/);return {text:JSON.stringify(fixture(profile())),model:'fake'};};
+  provider.generate=async({prompt,signal,responseSchema,maxOutputTokens,thinkingBudget})=>{assert.match(prompt,/calendar reflects my priorities/);assert.match(prompt,/untrusted evidence/);assert.equal(responseSchema.properties.plan.minItems,6);assert.equal(maxOutputTokens,6144);assert.equal(thinkingBudget,512);return {text:JSON.stringify(fixture(profile())),model:'fake',finishReason:'STOP'};};
   assert.equal((await generatePersonalizedPlan(profile())).providerModel,'fake');
   for(const statusCode of [429,503,504,502]){
    provider.generate=async()=>{throw Object.assign(new Error('secret private customer text'),{statusCode,retryAfterSeconds:5});};
    await assert.rejects(generatePersonalizedPlan(profile()),e=>e.statusCode===statusCode&&!e.message.includes('secret'));
   }
   provider.generate=async()=>({text:'not-json'});await assert.rejects(generatePersonalizedPlan(profile()),e=>e.statusCode===502);
+  provider.generate=async()=>({text:JSON.stringify(fixture(profile())),finishReason:'MAX_TOKENS'});await assert.rejects(generatePersonalizedPlan(profile()),e=>e.statusCode===502);
   provider.generate=async()=>({text:JSON.stringify(fixture(profile()))});const abort=new AbortController();abort.abort();
   await assert.rejects(generatePersonalizedPlan(profile(),{signal:abort.signal}),e=>e.statusCode===504);
  } finally {provider.generate=original;}

@@ -24,6 +24,14 @@ test('timeout, local-only refusal, bounded body and hidden provider thoughts',as
  global.fetch=async()=>Response.json({candidates:[{content:{parts:[{thought:true,text:'hidden scratchpad'},{text:'{}'}]}}]});assert.equal((await provider.generate({purpose:'mentor',prompt:'private'})).text,'{}');
 });
 const goal='000000000000000000000001';
+test('audit structured generation options preserve defaults for other callers',async()=>{
+ reset();process.env.GEMINI_API_KEY='fixture';const configs=[];
+ global.fetch=async(_url,options)=>{configs.push(JSON.parse(options.body).generationConfig);return Response.json({candidates:[{finishReason:'MAX_TOKENS',content:{parts:[{text:'{}'}]}}]});};
+ const schema={type:'OBJECT',properties:{plan:{type:'ARRAY',items:{type:'STRING'}}}};
+ const response=await provider.generate({purpose:'planner',prompt:'fixture',responseSchema:schema,maxOutputTokens:6144,thinkingBudget:512});
+ assert.deepEqual(configs[0],{responseMimeType:'application/json',maxOutputTokens:6144,responseSchema:schema,thinkingConfig:{thinkingBudget:512}});assert.equal(response.finishReason,'MAX_TOKENS');
+ await provider.generate({purpose:'mentor',prompt:'fixture'});assert.deepEqual(configs[1],{responseMimeType:'application/json',maxOutputTokens:4096});
+});
 function context(){return {selectedGoalIds:[goal],manifest:{['Goal:'+goal]:{kind:'goal'}},resources:[],outcomes:{actions:[]}};}
 function candidate(){return {id:'step-1',goalIds:[goal],description:'Write an outline',evidenceRefs:['Goal:'+goal],resourceRefs:[],effort:{band:'low',basis:'Estimate'},successCriteria:['Outline reviewed'],uncertainty:['Time unknown']};}
 test('strict output rejects foreign evidence, goals, cycles, hidden instructions and invented scores',()=>{

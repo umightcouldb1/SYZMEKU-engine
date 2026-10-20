@@ -29,14 +29,14 @@ async function main(){
   async function waitFor(expression){const until=Date.now()+15000;while(Date.now()<until){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}throw new Error('Browser assertion timed out: '+expression+'; body='+await evaluate('document.body.innerText'));}
 
   await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
-  await call('Page.navigate',{url:fixture.base});await waitFor("document.body.innerText.includes('Funnel and measurement coverage')");
+  await call('Page.navigate',{url:fixture.base});await waitFor("document.body?.innerText.includes('Funnel and measurement coverage')");
   assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
   assert.equal(await evaluate("document.body.innerText.includes('NOT INSTRUMENTED')"),true);
   await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:true}).then(r=>fs.writeFileSync(path.join(cache,'commander-mobile.png'),Buffer.from(r.data,'base64')));
-  await call('Page.reload');await waitFor("document.body.innerText.includes('Funnel and measurement coverage')");
+  await call('Page.reload');await waitFor("document.body?.innerText.includes('Funnel and measurement coverage')");
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:true}).then(r=>fs.writeFileSync(path.join(cache,'commander-desktop.png'),Buffer.from(r.data,'base64')));
-  await call('Page.navigate',{url:fixture.base+'/?other=1'});await waitFor("document.body.innerText.includes('Commander access unavailable')");
+  await call('Page.navigate',{url:fixture.base+'/?other=1'});await waitFor("document.body?.innerText.includes('Commander access unavailable')");
   assert.equal(await evaluate("document.body.innerText.includes('Customer sales')"),false);
   assert.equal(await fixture.mongoose.connection.db.collection('tasks').countDocuments({}),0);
   assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',checks:['390px mobile no overflow','1440px desktop','real HTTP owner isolation','reload persistence','missing telemetry honesty','no browser exceptions','zero Task effects']}));
