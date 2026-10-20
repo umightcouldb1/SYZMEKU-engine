@@ -332,6 +332,9 @@
           <div class="card">
             <h3>Your Highest-Leverage Priority</h3>
             <p id="priority"></p>
+            <p class="muted" id="analysisMethod"></p>
+            <p class="muted" id="secondaryDomain"></p>
+            <p class="muted" id="frictionPoints"></p>
           </div>
           <div class="card">
             <h3>Three Leverage Moves</h3>
@@ -710,6 +713,9 @@
       $('scoreGrid').innerHTML = Object.entries(result.domainScores || {}).map(([key, value]) => `
         <div class="card score-card"><span class="muted">${escapeHtml(key.toUpperCase())}</span><b>${Number(value) || 0}</b></div>`).join('');
       $('priority').textContent = result.highestLeveragePriority || '';
+      $('analysisMethod').textContent = result.analysisMethod || '';
+      $('secondaryDomain').textContent = result.secondaryDomain ? `Secondary focus: ${result.secondaryDomain}` : '';
+      $('frictionPoints').textContent = (result.frictionPoints || []).length ? `Lowest-rated responses: ${result.frictionPoints.map(p => `${p.domain} question ${p.question} (${p.rating}/5)`).join('; ')}` : 'No responses rated 3 or below.';
       $('moves').innerHTML = (result.leverageMoves || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
       $('deleteText').textContent = result.compression?.delete || '';
       $('automateText').textContent = result.compression?.automate || '';
