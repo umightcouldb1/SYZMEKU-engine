@@ -98,6 +98,7 @@ const memorySchema = new mongoose.Schema(
     },
     schemaVersion: { type: Number, default: 1 },
     revision: { type: Number, default: 0 },
+    guestImportIds: { type: [String], default: [] },
     conversationHistory: {
       type: [conversationTurnSchema],
       default: [],

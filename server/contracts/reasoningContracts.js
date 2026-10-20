@@ -133,13 +133,14 @@ function plan(v, context) {
   };
 }
 function output(v, context) {
-  exact(v, ['recommendations', 'plan', 'questions', 'constraintConflicts'], true);
+  exact(v, ['recommendations', 'plan', 'questions', 'constraintConflicts', 'response'], true);
   const recommendations = array(v.recommendations, 5, true).map(r => candidate(r, context));
   if (new Set(recommendations.map(r => r.id)).size !== recommendations.length) fail('Duplicate recommendation IDs.');
   const constraintConflicts = references(v.constraintConflicts || [], context);
   if (constraintConflicts.some(k => context.manifest[k].kind !== 'constraint')) fail('Invalid constraint reference.');
   return {
     recommendations,
+    ...(v.response !== undefined ? { response: string(v.response, 6000, true) } : {}),
     plan: v.plan ? plan(v.plan, context) : null,
     questions: array(v.questions || [], 5, true).map(q => string(q, 500, true)),
     constraintConflicts

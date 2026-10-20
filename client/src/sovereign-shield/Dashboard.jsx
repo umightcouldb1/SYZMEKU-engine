@@ -7,8 +7,8 @@ export default function SovereignDashboard({ user }) {
   return (
     <div className="sovereign-shield-shell">
       {user?.role === 'COMMANDER_IN_CHIEF' && <nav aria-label="Private business tools"><a href="/app/commander">Open Commander business brief</a></nav>}
-      <SovereignShieldPanel />
-      <AdminSignaturePanel />
+      {user?.role === 'COMMANDER_IN_CHIEF' && <SovereignShieldPanel />}
+      {user?.role === 'COMMANDER_IN_CHIEF' && <AdminSignaturePanel />}
       <MentorDashboard user={user} />
     </div>
   );

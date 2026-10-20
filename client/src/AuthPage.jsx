@@ -178,12 +178,12 @@ const AuthPage = ({ mode = 'login' }) => {
         <div className="iridescent-shimmer" />
         <div className="auth-panel auth-prism-panel">
           <div className="auth-heading-block">
-            <p className="auth-eyebrow">Sovereign Architecture</p>
-            <h1>{isSignup ? 'New Node' : 'Big SYZ'}</h1>
+            <p className="auth-eyebrow">T.O.I. Souljah Academy</p>
+            <h1>{isSignup ? 'Create your account' : 'Big SYZ'}</h1>
             <p className="auth-copy">
               {isSignup
-                ? '[ Initialize identity to enter the sovereign system ]'
-                : '[ Verify identity to resume measures ]'}
+                ? 'Get to know BIG SYZ and continue your conversation.'
+                : 'Welcome back. Pick up where you left off.'}
             </p>
           </div>
 
@@ -212,17 +212,17 @@ const AuthPage = ({ mode = 'login' }) => {
               </label>
             )}
             <label>
-              System Email
+              Email
               <input
                 type="email"
                 value={form.email}
                 onChange={(event) => onChange('email', event.target.value)}
-                placeholder="umightcouldb1@toisouljahacademy.com"
+                placeholder="you@example.com"
                 required
               />
             </label>
             <label>
-              Access Cipher
+              Password
               <input
                 type="password"
                 value={form.password}
@@ -232,7 +232,7 @@ const AuthPage = ({ mode = 'login' }) => {
             </label>
 
             <button type="submit" disabled={isLoading} className="entry-primary-button prism-submit-button">
-              <span>{isLoading ? 'Synchronizing...' : isSignup ? 'Initialize Node' : 'Initialize Connection'}</span>
+              <span>{isLoading ? 'Please wait…' : isSignup ? 'Create account' : 'Sign in'}</span>
             </button>
           </form>
 
@@ -240,10 +240,10 @@ const AuthPage = ({ mode = 'login' }) => {
 
           <div className="auth-footer-row">
             <p className="auth-footer-copy">
-              {isSignup ? 'Existing node?' : 'New to Big SYZ?'}{' '}
+              {isSignup ? 'Already have an account?' : 'New to Big SYZ?'}{' '}
               <Link to={isSignup ? '/login' : '/signup'}>{isSignup ? 'Log in' : 'Create account'}</Link>
             </p>
-            <span className="auth-version-chip">SYS_STATUS: ONLINE | v5.0.0-GSI</span>
+            <span className="auth-version-chip">Your personal mentor</span>
           </div>
         </div>
       </section>
