@@ -715,7 +715,7 @@
       $('priority').textContent = result.highestLeveragePriority || '';
       $('analysisMethod').textContent = result.analysisMethod || '';
       $('secondaryDomain').textContent = result.secondaryDomain ? `Secondary focus: ${result.secondaryDomain}` : '';
-      $('frictionPoints').textContent = (result.frictionPoints || []).length ? `Lowest-rated responses: ${result.frictionPoints.map(p => `${p.domain} question ${p.question} (${p.rating}/5)`).join('; ')}` : 'No responses rated 3 or below.';
+      $('frictionPoints').textContent = (result.frictionPoints || []).length ? `Lowest-rated responses: ${result.frictionPoints.map(p => `${domains[p.domain]?.[p.question - 1] || `${p.domain} question ${p.question}`} (${p.rating}/5)`).join('; ')}` : 'No responses rated 3 or below.';
       $('moves').innerHTML = (result.leverageMoves || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
       $('deleteText').textContent = result.compression?.delete || '';
       $('automateText').textContent = result.compression?.automate || '';
