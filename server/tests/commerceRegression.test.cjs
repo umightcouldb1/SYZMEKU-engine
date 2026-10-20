@@ -39,6 +39,15 @@ test('real Stripe signature verification and webhook replay preserve one paid en
 test('Freedom Audit scoring/stage and ten-result retention are unchanged',async()=>{
  const ratings=Object.fromEntries(['time','money','obligations','assets','desires'].map(k=>[k,[4,4,4,4]]));
  for(let i=0;i<11;i++){const r=await request(a,'/audit/results','POST',{ratings,win:'Publish my portfolio'});assert.equal(r.status,201);assert.equal(r.data.result.score,80);assert.equal(r.data.result.stage,'Expand');assert.equal(r.data.result.weakestDomain,'time');}
+ const personalized = Object.fromEntries(['time','money','obligations','assets','desires'].map(k=>[k,[4,4,4,4]]));
+ personalized.money=[1,2,5,5];personalized.obligations=[2,3,5,5];
+ const diagnostic=await request(a,'/audit/results','POST',{ratings:personalized,win:'Reduce administrative overload',drag:'Repeated phone calls',asset:'Existing templates'});
+ assert.equal(diagnostic.status,201);
+ assert.equal(diagnostic.data.result.weakestDomain,'money');
+ assert.equal(diagnostic.data.result.secondaryDomain,'obligations');
+ assert.deepEqual(diagnostic.data.result.frictionPoints.map(({domain,question,rating})=>[domain,question,rating]),[['money',1,1],['money',2,2],['obligations',1,2],['obligations',2,3]]);
+ assert.match(diagnostic.data.result.liberationPlan[0],/money question 1: 1\/5/);
+ assert.match(diagnostic.data.result.analysisMethod,/Rules-based/);
  assert.equal((await UserProfile.findOne({userId:a.id})).freedomAudit.results.length,10);
  ratings.time=[0,4,4,4];assert.equal((await request(a,'/audit/results','POST',{ratings})).status,400);
 });
