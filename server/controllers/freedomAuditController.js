@@ -347,6 +347,8 @@ const scoreFreedomAudit = asyncHandler(async (req, res) => {
   const stage = classifyStage(score);
   const weakestDomain = DOMAIN_KEYS.slice().sort((a, b) => domainScores[a] - domainScores[b])[0];
   const selectedGuidance = guidance[weakestDomain];
+  const frictionPoints = DOMAIN_KEYS.flatMap(domain => ratings[domain].map((rating, index) => ({domain, question: index + 1, rating}))).filter(item => item.rating <= 3).sort((a,b) => a.rating - b.rating).slice(0,5);
+  const secondaryDomain = DOMAIN_KEYS.filter(domain => domain !== weakestDomain).sort((a,b) => domainScores[a] - domainScores[b])[0];
   const win = sanitizeText(req.body?.win, 'the 30-day outcome I choose');
   const drag = sanitizeText(req.body?.drag, 'my highest-friction unfinished task');
   const asset = sanitizeText(req.body?.asset, 'my strongest underused asset');
@@ -357,10 +359,13 @@ const scoreFreedomAudit = asyncHandler(async (req, res) => {
     highestLeveragePriority: `${weakestDomain.toUpperCase()}: ${selectedGuidance.priority}`,
     domainScores,
     leverageMoves: selectedGuidance.moves,
+    frictionPoints,
+    secondaryDomain,
+    analysisMethod: 'Rules-based scoring of self-reported answers; not an AI-generated or clinical assessment.',
     compression: selectedGuidance.compression,
     liberationPlan: [
-      `Days 1-3 - CLEAR: Close or schedule the highest-consequence open loop. Define the finish line: ${win}.`,
-      `Days 4-7 - COMPRESS: Delete, automate, or delegate at least one recurring drain. Address: ${drag}.`,
+      `Days 1-3 - IDENTIFY: Review your lowest individual ratings (${frictionPoints.slice(0,3).map(p => `${p.domain} question ${p.question}: ${p.rating}/5`).join('; ') || 'none below 4/5'}). Choose a concrete constraint and set the finish line: ${win}.`,
+      `Days 4-7 - COMPRESS: Address ${drag}. Identify one task to remove, automate or delegate and review the effect on ${weakestDomain} and ${secondaryDomain}.`,
       `Days 8-14 - BUILD: Turn ${asset} into one concrete asset, offer, workflow, or system that increases future freedom.`,
       'Days 15-21 - DEPLOY: Put the asset into real use. Seek a transaction, measurable result, or external proof instead of more preparation.',
       'Days 22-27 - OPTIMIZE: Keep what produces results. Remove what creates motion without progress.',
