@@ -1,5 +1,5 @@
 const {test,before,after}=require('node:test');const assert=require('node:assert/strict');const path=require('node:path');
-Object.assign(process.env,{NODE_ENV:'test',JWT_SECRET:'synthetic-commerce-auth',CORE_CONTEXT_WRITES_ENABLED:'true',STRIPE_SECRET_KEY:'sk_test_fixture',STRIPE_WEBHOOK_SECRET:'whsec_fixture',FREEDOM_AUDIT_STRIPE_PRICE_ID:'price_fixture',FREEDOM_AUDIT_APP_URL:'https://example.test',DOMAIN:'https://example.test'});
+Object.assign(process.env,{NODE_ENV:'test',FREEDOM_AUDIT_AI_TEST_MODE:'rules',JWT_SECRET:'synthetic-commerce-auth',CORE_CONTEXT_WRITES_ENABLED:'true',STRIPE_SECRET_KEY:'sk_test_fixture',STRIPE_WEBHOOK_SECRET:'whsec_fixture',FREEDOM_AUDIT_STRIPE_PRICE_ID:'price_fixture',FREEDOM_AUDIT_APP_URL:'https://example.test',DOMAIN:'https://example.test'});
 delete process.env.MONGO_URI;process.env.MONGOMS_DOWNLOAD_DIR=path.resolve(__dirname,'../../.cache/mongodb-binaries');
 const mongoose=require('mongoose');const express=require('express');const jwt=require('jsonwebtoken');const {MongoMemoryReplSet}=require('mongodb-memory-server');
 const User=require('../models/User');const AuthSession=require('../models/AuthSession');const UserProfile=require('../models/UserProfile');const SocialCampaign=require('../models/SocialCampaign');
@@ -50,6 +50,30 @@ test('Freedom Audit scoring/stage and ten-result retention are unchanged',async(
  assert.match(diagnostic.data.result.analysisMethod,/Rules-based/);
  assert.equal((await UserProfile.findOne({userId:a.id})).freedomAudit.results.length,10);
  ratings.time=[0,4,4,4];assert.equal((await request(a,'/audit/results','POST',{ratings})).status,400);
+});
+test('Freedom Audit AI plan validates output and never stores provider failure',async()=>{
+ const provider=require('../services/reasoningProviderService');
+ const original=provider.generate;
+ const oldMode=process.env.FREEDOM_AUDIT_AI_TEST_MODE;
+ const ratings=Object.fromEntries(['time','money','obligations','assets','desires'].map(k=>[k,[2,3,4,5]]));
+ try {
+  delete process.env.FREEDOM_AUDIT_AI_TEST_MODE;
+  let captured='';
+  provider.generate=async ({prompt})=>{
+   captured=prompt;
+   return {text:JSON.stringify({priority:'Address cash-flow friction first',moves:['Review recurring expenses','Price an existing skill','Ask one prospective buyer'],compression:{delete:'Remove duplicate tools',automate:'Track recurring charges',delegate:'Routine formatting',execute:'Offer one paid service'},plan:['Days 1-3: Document three expenses','Days 4-7: Remove one expense','Days 8-14: Package the service','Days 15-21: Share the offer','Days 22-27: Collect conversion data','Days 28-30: Reassess spending']})};
+  };
+  const success=await request(a,'/audit/results','POST',{ratings,win:'Build an offer',drag:'Repeated tasks',asset:'My coaching skills'});
+  assert.equal(success.status,201);
+  assert.match(success.data.result.analysisMethod,/AI-generated/);
+  assert.equal(success.data.result.liberationPlan.length,6);
+  assert.match(captured,/coaching skills/);
+  const before=JSON.stringify((await UserProfile.findOne({userId:a.id})).freedomAudit.latestResult);
+  provider.generate=async()=>({text:JSON.stringify({priority:'Incomplete'})});
+  const failure=await request(a,'/audit/results','POST',{ratings});
+  assert.equal(failure.status,502);
+  assert.equal(JSON.stringify((await UserProfile.findOne({userId:a.id})).freedomAudit.latestResult),before);
+ } finally {provider.generate=original;process.env.FREEDOM_AUDIT_AI_TEST_MODE=oldMode;}
 });
 test('Social roles/providers and campaign ownership survive shared auth; Core deletion preserves commerce and Operations',async()=>{
  assert.equal((await request(a,'/social/providers')).status,404);
