@@ -48,3 +48,16 @@ test('email/password sign-in uses the same session completion and entitlement re
  const p=page(async(url)=>url.endsWith('/auth/login')?{status:200,body:{token:'password-session'}}:{status:200,body:{entitled:false}});p.get('email').value='fixture@example.test';p.get('password').value='fixture-only';
  await p.run('submitAuth({preventDefault(){}})');assert.equal(p.stored.get('freedomAuditToken'),'password-session');assert.equal(p.requests[1].options.headers.Authorization,'Bearer password-session');
 });
+test('generation serializes submits, preserves answers on failure, and recovers controls',async()=>{
+ let release;const p=page(()=>new Promise(r=>release=r));p.sandbox.document.querySelector=()=>({value:'3'});p.get('win').value='My saved draft';p.run("state.token='buyer'");
+ const first=p.run('submitAudit({preventDefault(){}})');await p.run('submitAudit({preventDefault(){}})');assert.equal(p.requests.length,1);assert.equal(p.get('generateButton').disabled,true);
+ release({status:503,body:{error:'No new result was saved. Please retry.'}});await first;
+ assert.equal(p.get('win').value,'My saved draft');assert.equal(p.get('generateButton').disabled,false);assert.match(p.get('auditError').innerHTML,/retry/);
+});
+test('expired generation session displays recovery in the visible sign-in panel',async()=>{
+ const p=page(async()=>({status:401,body:{error:'Session expired'}}));p.sandbox.document.querySelector=()=>({value:'3'});
+ await p.run('submitAudit({preventDefault(){}})');assert.equal(p.get('gate').classList.contains('hidden'),false);assert.match(p.get('gateMessage').innerHTML,/sign in and verify/);
+});
+test('switching identity during generation never displays the previous buyer result',async()=>{
+ let release;const p=page(()=>new Promise(r=>release=r));p.sandbox.document.querySelector=()=>({value:'3'});p.run("state.token='old'");const pending=p.run('submitAudit({preventDefault(){}})');p.run("state.token='new'");release({status:201,body:{result:{private:true}}});await pending;assert.equal(p.run('state.latestResult'),null);
+});

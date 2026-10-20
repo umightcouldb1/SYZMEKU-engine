@@ -63,7 +63,7 @@ jobs:
         run: npm run test
 
       - name: Verify Freedom Audit authentication and build
-        run: npm test --prefix freedom-audit && npm run build --prefix freedom-audit
+        run: node --test server/tests/freedomAuditPlan.test.cjs && npm test --prefix freedom-audit && npm run freedom-audit:browser && npm run build --prefix freedom-audit
 
       - name: Trigger Render deployment
         if: github.event_name == 'workflow_dispatch'

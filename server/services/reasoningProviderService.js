@@ -25,7 +25,10 @@ async function generate({
   prompt,
   media,
   provider = 'gemini',
-  signal
+  signal,
+  responseSchema,
+  maxOutputTokens = 4096,
+  thinkingBudget
 }) {
   if (!['gemini', 'ollama'].includes(provider)) throw error('MODEL_NOT_CONFIGURED', 'Unknown model provider.', 503);
   const c = configuration(purpose, provider);
@@ -55,7 +58,9 @@ async function generate({
         }],
         generationConfig: {
           responseMimeType: 'application/json',
-          maxOutputTokens: 4096
+          maxOutputTokens,
+          ...(responseSchema ? {responseSchema} : {}),
+          ...(thinkingBudget !== undefined ? {thinkingConfig:{thinkingBudget}} : {})
         }
       } : {
         model: c.model,
@@ -107,7 +112,8 @@ async function generate({
   return {
     text: provider === 'gemini' ? data.candidates?.[0]?.content?.parts?.filter(p => !p.thought).map(p => p.text || '').join('') : data.response,
     provider,
-    model: c.model
+    model: c.model,
+    finishReason: provider === 'gemini' ? data.candidates?.[0]?.finishReason : undefined
   };
 }
 module.exports = {

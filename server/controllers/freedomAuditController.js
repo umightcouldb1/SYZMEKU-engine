@@ -1,6 +1,9 @@
 const asyncHandler = require('express-async-handler');
 const Stripe = require('stripe');
 const UserProfile = require('../models/UserProfile');
+const { randomUUID } = require('node:crypto');
+const { generatePersonalizedPlan } = require('../services/freedomAuditPlan');
+const { ensureProfile, recordPurchase } = require('../services/freedomAuditPurchase');
 
 const FREEDOM_AUDIT_PRODUCT_SLUG = 'freedom-audit';
 const FREEDOM_AUDIT_TIER = 'freedom_audit';
@@ -59,19 +62,11 @@ const assertFreedomAuditPrice = async (stripe, priceId) => {
   return { price, product };
 };
 
-const getOrCreateProfile = async (userId) => {
-  let profile = await UserProfile.findOne({ userId });
-  if (!profile) {
-    profile = await UserProfile.create({ userId });
-  }
-  return profile;
-};
-
-const normalize = (value = '') => String(value || '').trim().toLowerCase();
+const getOrCreateProfile = ensureProfile;
 
 const isFreedomAuditPurchase = (product = {}) => {
   const configuredPriceId = getFreedomAuditPriceId();
-  return normalize(product.priceId) === normalize(configuredPriceId);
+  return product.priceId === configuredPriceId;
 };
 
 const hasFreedomAuditEntitlement = (profile) =>
@@ -82,7 +77,7 @@ const hasFreedomAuditEntitlement = (profile) =>
 const buildEntitlementResponse = (profile) => ({
   entitled: hasFreedomAuditEntitlement(profile),
   product: FREEDOM_AUDIT_PRODUCT_SLUG,
-  latestResult: profile?.freedomAudit?.latestResult || null,
+  latestResult: hasFreedomAuditEntitlement(profile) ? profile?.freedomAudit?.latestResult || null : null,
 });
 
 const recordFreedomAuditPurchaseFromSession = async (session, userId) => {
@@ -101,7 +96,6 @@ const recordFreedomAuditPurchaseFromSession = async (session, userId) => {
   const product = matchingItem.price?.product && typeof matchingItem.price.product === 'object'
     ? matchingItem.price.product
     : {};
-  const profile = await getOrCreateProfile(userId);
   const purchase = {
     productId: product.id || session.metadata?.productId || FREEDOM_AUDIT_PRODUCT_SLUG,
     priceId,
@@ -114,18 +108,8 @@ const recordFreedomAuditPurchaseFromSession = async (session, userId) => {
     status: 'paid',
   };
 
-  const existingIndex = profile.purchasedProducts.findIndex(
-    (item) => item.checkoutSessionId === purchase.checkoutSessionId && item.priceId === purchase.priceId
-  );
-
-  if (existingIndex >= 0) {
-    profile.purchasedProducts[existingIndex] = purchase;
-  } else {
-    profile.purchasedProducts.push(purchase);
-  }
-
-  await profile.save();
-  return profile;
+  await recordPurchase(userId, purchase);
+  return UserProfile.findOne({userId});
 };
 
 const createFreedomAuditCheckout = asyncHandler(async (req, res) => {
@@ -273,12 +257,12 @@ const guidance = {
   },
 };
 
-const sanitizeText = (value, fallback) =>
-  String(value || fallback)
-    .replace(/[\u0000-\u001F\u007F]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, MAX_TEXT_LENGTH);
+const sanitizeText = (value, fallback) => {
+  if (value !== undefined && (typeof value !== 'string' || value.length > MAX_TEXT_LENGTH)) {
+    throw Object.assign(new Error('Assessment text must be a string of at most 1000 characters.'), { statusCode: 400 });
+  }
+  return (value || fallback).replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim() || fallback;
+};
 
 const validateRatings = (ratings = {}) => {
   const cleanRatings = {};
@@ -291,7 +275,7 @@ const validateRatings = (ratings = {}) => {
     }
 
     cleanRatings[domain] = values.map((value) => {
-      const numeric = Number(value);
+      const numeric = value;
       if (!Number.isInteger(numeric) || numeric < 1 || numeric > 5) {
         const error = new Error('All audit ratings must be integers from 1 through 5.');
         error.statusCode = 400;
@@ -347,20 +331,26 @@ const scoreFreedomAudit = asyncHandler(async (req, res) => {
   const stage = classifyStage(score);
   const weakestDomain = DOMAIN_KEYS.slice().sort((a, b) => domainScores[a] - domainScores[b])[0];
   const selectedGuidance = guidance[weakestDomain];
+  const frictionPoints = DOMAIN_KEYS.flatMap(domain => ratings[domain].map((rating, index) => ({domain, question: index + 1, rating}))).filter(item => item.rating <= 3).sort((a,b) => a.rating - b.rating).slice(0,5);
+  const secondaryDomain = DOMAIN_KEYS.filter(domain => domain !== weakestDomain).sort((a,b) => domainScores[a] - domainScores[b])[0];
   const win = sanitizeText(req.body?.win, 'the 30-day outcome I choose');
   const drag = sanitizeText(req.body?.drag, 'my highest-friction unfinished task');
   const asset = sanitizeText(req.body?.asset, 'my strongest underused asset');
   const result = {
+    id: randomUUID(),
     score,
     stage,
     weakestDomain,
     highestLeveragePriority: `${weakestDomain.toUpperCase()}: ${selectedGuidance.priority}`,
     domainScores,
     leverageMoves: selectedGuidance.moves,
+    frictionPoints,
+    secondaryDomain,
+    analysisMethod: 'Rules-based scoring of self-reported answers; not an AI-generated or clinical assessment.',
     compression: selectedGuidance.compression,
     liberationPlan: [
-      `Days 1-3 - CLEAR: Close or schedule the highest-consequence open loop. Define the finish line: ${win}.`,
-      `Days 4-7 - COMPRESS: Delete, automate, or delegate at least one recurring drain. Address: ${drag}.`,
+      `Days 1-3 - IDENTIFY: Review your lowest individual ratings (${frictionPoints.slice(0,3).map(p => `${p.domain} question ${p.question}: ${p.rating}/5`).join('; ') || 'none below 4/5'}). Choose a concrete constraint and set the finish line: ${win}.`,
+      `Days 4-7 - COMPRESS: Address ${drag}. Identify one task to remove, automate or delegate and review the effect on ${weakestDomain} and ${secondaryDomain}.`,
       `Days 8-14 - BUILD: Turn ${asset} into one concrete asset, offer, workflow, or system that increases future freedom.`,
       'Days 15-21 - DEPLOY: Put the asset into real use. Seek a transaction, measurable result, or external proof instead of more preparation.',
       'Days 22-27 - OPTIMIZE: Keep what produces results. Remove what creates motion without progress.',
@@ -369,17 +359,49 @@ const scoreFreedomAudit = asyncHandler(async (req, res) => {
     inputs: { ratings, win, drag, asset },
     completedAt: new Date(),
   };
-  result.bigSyzPrompt = buildBigSyzPrompt({ ...result, win, drag, asset });
+  const lease = randomUUID();
+  const locked = await UserProfile.findOneAndUpdate({ userId: req.user._id,
+    $or: [{ 'freedomAudit.generationExpiresAt': { $lte: new Date() } }, { 'freedomAudit.generationExpiresAt': null }]
+  }, { $set: { 'freedomAudit.generationLease': lease, 'freedomAudit.generationExpiresAt': new Date(Date.now() + 60000) } });
+  if (!locked) return res.status(409).json({error:'A plan is already being generated. Please wait before retrying.'});
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), 45000);
+  const disconnect = () => { if (!res.writableEnded) abort.abort(); };
+  res.on('close', disconnect);
+  try {
+    const personalized = await generatePersonalizedPlan({ratings,domainScores,score,stage,weakestDomain,secondaryDomain,frictionPoints,win,drag,asset}, {signal:abort.signal});
+    if (abort.signal.aborted) throw Object.assign(new Error('Generation timed out or was canceled. Please retry; no new result was saved.'), {statusCode:504});
+    if (personalized) {
+      result.highestLeveragePriority = personalized.priority;
+      result.leverageMoves = personalized.moves;
+      result.compression = personalized.compression;
+      result.liberationPlan = personalized.plan;
+      result.analysisMethod = personalized.analysisMethod;
+      result.planEvidence = personalized.planEvidence;
+      result.providerModel = personalized.providerModel;
+    }
+    result.bigSyzPrompt = buildBigSyzPrompt({ ...result, win, drag, asset });
 
-  profile.freedomAudit = profile.freedomAudit || {};
-  profile.freedomAudit.latestResult = result;
-  profile.freedomAudit.results = [...(profile.freedomAudit.results || []), result].slice(-MAX_RESULT_HISTORY);
-  await profile.save();
+    const saved = await UserProfile.findOneAndUpdate({ userId: req.user._id, 'freedomAudit.generationLease': lease,
+      purchasedProducts: { $elemMatch: {priceId:getFreedomAuditPriceId(), status:'paid'} }
+    }, { $set: {'freedomAudit.latestResult':result}, $push: {'freedomAudit.results': {$each:[result], $slice:-MAX_RESULT_HISTORY}} }, {new:true, runValidators:true});
+    if (!saved) return res.status(409).json({error:'Access changed while generating. No result was saved. Please refresh your access.'});
+    return res.status(201).json({ result });
+  } finally {
+    clearTimeout(timer);
+    res.off('close', disconnect);
+    await UserProfile.updateOne({userId:req.user._id, 'freedomAudit.generationLease':lease}, {$unset:{'freedomAudit.generationLease':1,'freedomAudit.generationExpiresAt':1}});
+  }
+});
 
-  return res.status(201).json({ result });
+const getFreedomAuditResults = asyncHandler(async (req, res) => {
+  const profile = await getOrCreateProfile(req.user._id);
+  if (!hasFreedomAuditEntitlement(profile)) return res.status(403).json({error:'A paid Freedom Audit entitlement is required.'});
+  return res.json({results: [...(profile.freedomAudit?.results || [])].reverse()});
 });
 
 module.exports = {
+  getFreedomAuditResults,
   createFreedomAuditCheckout,
   getFreedomAuditEntitlement,
   verifyFreedomAuditSession,

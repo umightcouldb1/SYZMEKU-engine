@@ -1,0 +1,33 @@
+const fs=require('fs'),path=require('path'),crypto=require('crypto');
+const root=path.resolve(__dirname,'../..');
+const output=path.join(root,'.cache','freedom-audit-live');fs.mkdirSync(output,{recursive:true});
+async function main(){
+ if(!process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_'))throw Error('Test-mode Stripe key required');
+ const stripe=require('stripe')(process.env.STRIPE_SECRET_KEY);
+ if(!process.env.GEMINI_API_KEY||!process.env.GOOGLE_CLIENT_ID||!process.env.FREEDOM_AUDIT_STRIPE_PRICE_ID)throw Error('GEMINI_API_KEY, GOOGLE_CLIENT_ID and a test-mode FREEDOM_AUDIT_STRIPE_PRICE_ID are required');
+ const account=await stripe.accounts.retrieve();
+ const price=await stripe.prices.retrieve(process.env.FREEDOM_AUDIT_STRIPE_PRICE_ID);
+ if(price.livemode||price.unit_amount!==3700||price.currency!=='usd'||price.recurring||!price.active)throw Error('Active one-time USD $37 test price required');
+ Object.assign(process.env,{NODE_ENV:'development',JWT_SECRET:crypto.randomBytes(32).toString('hex'),FREEDOM_AUDIT_APP_URL:'http://localhost:5173'}); delete process.env.MONGO_URI;delete process.env.FREEDOM_AUDIT_AI_TEST_MODE;
+ const {execFileSync,spawn}=require('child_process');
+ const cli=process.env.STRIPE_CLI_PATH||'stripe';
+ const cliEnv={...process.env,STRIPE_API_KEY:process.env.STRIPE_SECRET_KEY};
+ const secret=execFileSync(cli,['listen','--print-secret'],{env:cliEnv,windowsHide:true,encoding:'utf8',timeout:20000}).trim();
+ if(!/^whsec_[a-zA-Z0-9]+$/.test(secret))throw Error('Missing test webhook signing secret');
+ process.env.STRIPE_WEBHOOK_SECRET=secret;
+ const mongoose=require('mongoose'),express=require('express'),{MongoMemoryReplSet}=require('mongodb-memory-server');
+ const db=await MongoMemoryReplSet.create({replSet:{count:1,dbName:'isolated_freedom_audit'}});await mongoose.connect(db.getUri());
+ const app=express();
+ app.use('/api/webhooks',require(path.join(root,'server/routes/webhook')));app.use(express.json());
+ app.use((req,res,next)=>{const requestPath=req.path;res.on('finish',()=>{if(requestPath.startsWith('/api/'))console.log(JSON.stringify({path:requestPath,status:res.statusCode}));});next();});
+ app.use('/api/auth',require(path.join(root,'server/routes/authRoutes')));app.use('/api/freedom-audit',require(path.join(root,'server/routes/freedomAuditRoutes')));
+ app.use((e,req,res,next)=>res.status(e.statusCode||500).json({error:e.message}));
+ app.get('/business-telemetry.js',(req,res)=>res.type('js').send(''));
+ app.get('/',(req,res)=>res.type('html').send(fs.readFileSync(path.join(root,'freedom-audit/index.html'),'utf8').replaceAll('__FREEDOM_AUDIT_API_BASE__','http://localhost:5173/api').replaceAll('__FREEDOM_AUDIT_GOOGLE_CLIENT_ID__',process.env.GOOGLE_CLIENT_ID)));
+ const server=app.listen(5173,'127.0.0.1',()=>console.log(JSON.stringify({ready:true,url:'http://localhost:5173',stripeAccount:account.id,price:price.id,livemode:false,database:'disposable local MongoDB'})));
+ const listener=spawn(cli,['listen','--events','checkout.session.completed','--forward-to','http://localhost:5173/api/webhooks/stripe'],{env:cliEnv,windowsHide:true,stdio:['ignore','pipe','pipe']});
+ for(const stream of [listener.stdout,listener.stderr])stream.on('data',b=>console.log(String(b).replace(/whsec_[A-Za-z0-9]+/g,'[redacted signing secret]').trim()));
+ const interval=setInterval(async()=>{const profiles=await require(path.join(root,'server/models/UserProfile')).find({}).lean();fs.writeFileSync(path.join(output,'journey-evidence.json'),JSON.stringify({checkedAt:new Date().toISOString(),productionChanged:false,profiles:profiles.map(p=>({userId:p.userId,purchases:p.purchasedProducts,results:p.freedomAudit?.results}))},null,2));},5000);
+ process.on('SIGINT',async()=>{listener.kill();clearInterval(interval);server.close();await mongoose.disconnect();await db.stop();process.exit();});
+}
+main().catch(e=>{console.error(e.message);process.exitCode=1;});
