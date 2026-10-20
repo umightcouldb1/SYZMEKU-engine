@@ -56,6 +56,9 @@ const freedomAuditResultSchema = new mongoose.Schema(
       desires: { type: Number, min: 0, max: 100, required: true },
     },
     leverageMoves: { type: [String], default: [] },
+    secondaryDomain: { type: String, default: '' },
+    analysisMethod: { type: String, default: '' },
+    frictionPoints: { type: [{ domain: String, question: Number, rating: Number, _id: false }], default: [] },
     compression: {
       delete: { type: String, default: '' },
       automate: { type: String, default: '' },
