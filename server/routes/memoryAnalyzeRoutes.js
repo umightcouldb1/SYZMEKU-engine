@@ -25,22 +25,16 @@ const parseModelAnalysis = (modelText = '') => {
     return REQUIRED_KEYS.reduce((acc, key) => {
       acc[key] = normalizeArray(parsed?.[key]);
       return acc;
-    }, {});
+    }, { response: typeof parsed.response === 'string' ? parsed.response.trim() : '' });
   } catch (_error) {
-    return {
-      objectives: ['Keep the current request grounded in the active lineage context.'],
-      constraints: ['The model returned text that could not be parsed as JSON.'],
-      risks: [],
-      leverage: [String(modelText || '').slice(0, 500)].filter(Boolean),
-      next_actions: ['Ask one clearer follow-up question or simplify the prompt.'],
-    };
+    throw Object.assign(new Error('BIG SYZ could not finish a complete reply. Please try again.'), { statusCode: 502 });
   }
 };
 
 const toConversationLines = (history = []) =>
   history
     .slice(-12)
-    .map((turn, index) => `${index + 1}. ${turn.role}: ${String(turn.text || '').slice(0, 700)}`)
+    .map((turn, index) => `${index + 1}. ${turn.role}: ${String(turn.text || '')}`)
     .join('\n');
 
 const cleanString = (value, maxLength = 500) => String(value || '').trim().slice(0, maxLength);
@@ -121,7 +115,8 @@ const buildBiometricSummary = (metadata = {}) => JSON.stringify({
 }).slice(0, 2500);
 
 const buildLineagePrompt = ({ text, context = {}, sovereignContext = {}, history = [], biometricMetadata = {} }) => `
-[TOP STACK DIRECTIVE: TRAUMA-AWARE VETERAN MENTORSHIP]
+${require('../services/mentorVoice')}
+[SUPPORTIVE MENTORSHIP]
 This directive outranks raw telemetry, alert urgency, optimization pressure, and task throughput.
 If stress is high, coherence is Support Needed/Strained, or Gentle_Reset_Mode is active:
 - prioritize Griot narrative memory and lived context before sensor-fusion alerts.
@@ -139,8 +134,8 @@ Use the real-time coherence vector to adjust tone, pacing, and strategic load:
 - If coherence is Support Needed, reduce complexity, emphasize grounding, and avoid overwhelming action lists.
 Do not diagnose, do not imitate therapy, and do not make unsafe promises.
 Return ONLY valid JSON with this exact shape:
-{"objectives":[],"constraints":[],"risks":[],"leverage":[],"next_actions":[]}
-Each field must be an array of concise strings.
+{"response":"Your complete conversational reply", "objectives":[],"constraints":[],"risks":[],"leverage":[],"next_actions":[]}
+The response is the substantive personal reply, at most 6000 characters. Other fields are arrays of concise strings and may be empty. Do not force a plan or curriculum.
 
 Sovereign Matrix Note:
 ${sovereignContext.sovereignMatrixNote || '(none saved)'}
@@ -165,6 +160,7 @@ ${JSON.stringify({
   traumaAwareStack: context.traumaAwareStack || {},
   telemetryPolicy: context.telemetryPolicy || {},
   preferredName: context.preferredName || '',
+  mentorStyle: context.mentorStyle || '',
   lifeStage: context.lifeStage || '',
   supportAreas: context.supportAreas || [],
   goals: context.goals || [],
@@ -181,7 +177,7 @@ const getModelText = (modelResult = {}) =>
 
 router.post('/', protect, async (req, res) => {
   const text = String(req.body?.text || '').trim();
-  if (!text) return res.status(400).json({ message: 'Command text is required.' });
+  if (!text || text.length > 6000) return res.status(400).json({ message: 'Please send a message of up to 6,000 characters.' });
 
   try {
     const userId = req.user.id || req.user._id;
@@ -191,7 +187,7 @@ router.post('/', protect, async (req, res) => {
     const prompt = buildLineagePrompt({
       text,
       context: {
-        goals:humanContext.goals || [], preferredName:humanContext.preferredName, lifeStage:humanContext.lifeStage,
+        mentorStyle:humanContext.mentorStyle, goals:humanContext.goals || [], preferredName:humanContext.preferredName, lifeStage:humanContext.lifeStage,
         supportAreas:humanContext.supportAreas || [], constraints:humanContext.constraints || [], resources:humanContext.resources || [],
         obligations:humanContext.obligations || [], relationships:humanContext.relationships || [],
         durableMemory:(durableMemory || []).slice(0,20).map(({content,source,confirmed})=>({content,source,confirmed})) },
@@ -205,17 +201,16 @@ router.post('/', protect, async (req, res) => {
 
     if (modelResult?.providerError) {
       return res.status(502).json({
-        message: 'Gemini request failed.',
-        details: modelResult.providerError.message,
-        model: modelResult.providerError.model,
+        message: 'BIG SYZ is unavailable right now. Your saved conversation is safe; please try again.',
       });
     }
 
-    if (modelResult?.error) return res.json(modelResult.error);
+    if (modelResult?.error) return res.status(503).json({ message: 'BIG SYZ is temporarily unavailable. Please try again later.' });
 
     const rawModelText = getModelText(modelResult);
     const parsed = parseModelAnalysis(rawModelText);
-    const modelSummary = parsed.objectives[0] || parsed.next_actions[0] || rawModelText || 'Big SYZ reviewed the request through the active lineage context.';
+    const modelSummary = parsed.response || REQUIRED_KEYS.flatMap(key => parsed[key]).join('\n\n');
+    if (!modelSummary || modelSummary.length > 6000) return res.status(502).json({ message: 'BIG SYZ could not finish a complete reply. Please try again.' });
     const now = new Date();
     const turns = [
       { role: 'user', text, timestamp: now, biometricMetadata },
@@ -243,7 +238,7 @@ router.post('/', protect, async (req, res) => {
     });
   } catch (error) {
     return res.status(error.statusCode || 500).json({
-      message: 'Lineage memory analysis failed.',
+      message: 'BIG SYZ could not save a reply. Please try again.',
       details: String(error?.message || error).slice(0, 500),
     });
   }

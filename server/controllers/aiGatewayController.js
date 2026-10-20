@@ -115,7 +115,8 @@ const processIntelligencePrompt = asyncHandler(async (req, res) => {
       return res.status(failure.status).json(failure.body);
     }
   }
-  const prompt = getPromptFromRequest(req);
+  const guestMentor = !req.user && req.body?.guestMentor === true;
+  const prompt = guestMentor ? require('../services/guestConversationService').prompt(req.body) : getPromptFromRequest(req);
   if (!prompt) {
     return res.status(400).json({ message: 'Prompt is required.' });
   }
@@ -124,7 +125,11 @@ const processIntelligencePrompt = asyncHandler(async (req, res) => {
   const isCommander = role === MASTER_ROLE;
 
   try {
-    const result = isCommander
+    const guestResult = guestMentor ? await require('../services/modelRouter').requestModelText({ mode: 'mentor', prompt }) : null;
+    if (guestMentor && (guestResult?.providerError || !guestResult?.text)) {
+      return res.status(502).json({ success: false, message: 'BIG SYZ is unavailable right now. Please try again.' });
+    }
+    const result = guestMentor ? { provider: 'gemini', model: guestResult.model, response: guestResult.text } : isCommander
       ? await processWithOllama(prompt)
       : await processWithGemini(prompt);
 
@@ -135,10 +140,14 @@ const processIntelligencePrompt = asyncHandler(async (req, res) => {
       details: { model: result.model, rolePath: isCommander ? 'local_commander' : 'cloud_user' },
     });
 
+    if (guestMentor && (!result.response?.trim() || result.response.length > 6000)) {
+      return res.status(502).json({ success: false, message: 'BIG SYZ could not finish that reply. Please try again.' });
+    }
     return res.status(200).json({
       success: true,
       rolePath: isCommander ? 'local_commander' : 'cloud_user',
       ...result,
+      ...(guestMentor ? { guestTurn: require('../services/guestConversationService').sign(req.body.prompt.trim(), result.response) } : {}),
     });
   } catch (error) {
     const provider = isCommander ? 'ollama' : 'gemini';

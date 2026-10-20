@@ -39,10 +39,10 @@ test('execution stays gated; M3 flag and allowlist fail closed',async()=>{
  process.env.CORE_CONTEXT_WRITES_ENABLED='false';assert.equal((await f.request(f.founder,'/api/core/mentor','POST',body())).status,200);assert.equal((await f.request(f.founder,'/api/core/reasoning/records','POST',{purpose:'mentor',...body(),requestKey:'paused-save-1'})).status,503);process.env.CORE_CONTEXT_WRITES_ENABLED='true';
  process.env.CORE_REASONING_USER_IDS='*';assert.equal((await f.request(f.founder,'/api/core/agent/plan','POST',body())).status,404);process.env.CORE_REASONING_USER_IDS=f.founder.id;
 });
-test('chat appends only public summaries with a separate postcommit stamp; gateway and vision preserve authority',async()=>{
+test('chat appends substantive public guidance with a separate postcommit stamp; gateway and vision preserve authority',async()=>{
  const pre=await f.scope(f.founder,()=>require('../services/reasoningContextService').assemble({purpose:'analyze',...body()}));
  const chat=await f.request(f.founder,'/api/core/analyze','POST',body());assert.equal(chat.status,200,JSON.stringify(chat));assert.equal(chat.data.context.digest,pre.digest);assert.notEqual(chat.data.context.validationDigest,pre.digest);
- const memory=await f.scope(f.founder,()=>require('../models/Memory').findOne().lean());assert.equal(memory.conversationHistory.at(-1).text,chat.data.summary);assert(memory.conversationHistory.at(-1).reasoningRefs.length);
+ const memory=await f.scope(f.founder,()=>require('../models/Memory').findOne().lean());assert.equal(memory.conversationHistory.at(-1).text,chat.data.response || chat.data.summary);assert(memory.conversationHistory.at(-1).reasoningRefs.length);
  const gateway=await f.request(f.founder,'/api/ai/intelligence','POST',{prompt:body().text,context:{fake:'CLIENT-FAKE-FACT'}});assert.equal(gateway.status,200,JSON.stringify(gateway));assert(!prompts.at(-1).includes('CLIENT-FAKE-FACT'));
  const vision=await f.request(f.founder,'/api/vision/analyze','POST',{...body(),media:{mimeType:'image/png',data:'AAAA'},context:{fake:'CLIENT-FAKE-FACT'}});assert.equal(vision.status,200,JSON.stringify(vision));assert.equal(vision.data.context.digest,gateway.data.context.digest);assert(!prompts.at(-1).includes('CLIENT-FAKE-FACT'));
  const n=calls,reflection=await f.request(f.founder,'/api/onboarding','POST',{typedText:'I want time for writing'});assert.equal(reflection.status,200);assert.equal(reflection.data.kind,'user-input-reflection');assert.equal(calls,n);assert.deepEqual(reflection.data.patternContext.patterns,[]);

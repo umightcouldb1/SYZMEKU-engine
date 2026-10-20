@@ -1,3 +1,4 @@
+import GuestConversationImport from './components/GuestConversationImport';
 import ReasoningPanel from './components/ReasoningPanel';
 import ReasoningResult from './components/ReasoningResult';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -130,7 +131,7 @@ const buildConversation = ({ user, summary, chatMemory, loading, matrixNote, dis
       speaker: 'syz',
       label: 'Big SYZ',
       text: matrixNote
-        ? `${DAILY_GREETING()}, ${userName}. Your Matrix Note is active, so I will keep guidance anchored to that profile while we choose the next grounded move.`
+        ? `${DAILY_GREETING()}, ${userName}. I remember what you shared. What would you like to talk about today?`
         : `${DAILY_GREETING()}, ${userName}. I am here to help you slow the noise down, name what matters, and choose the next grounded move. Start with how you feel, what you are carrying, or what decision needs clarity today.`,
     },
   ];
@@ -168,7 +169,7 @@ const Dashboard = ({ user }) => {
   const [humanContext, setHumanContext] = useState({});
   const [chatInput, setChatInput] = useState('');
   const [chatMemory, setChatMemory] = useState([]);
-  const [lineageStatus, setLineageStatus] = useState('Lineage Sync Pending');
+  const [lineageStatus, setLineageStatus] = useState('Loading conversation…');
   const [telemetrySync, setTelemetrySync] = useState(null);
   const [sovereignContext, setSovereignContext] = useState(null);
   const [listening, setListening] = useState(false);
@@ -249,7 +250,9 @@ const Dashboard = ({ user }) => {
       setHumanContext(memoryRes.data.context || {});
       setChatMemory(mapPersistentHistoryToChatMemory(memoryRes.data.conversationHistory || []));
       setSovereignContext(memoryRes.data.sovereignContext || null);
-      setLineageStatus(memoryRes.data.status || 'Lineage Sync Established');
+      setLineageStatus('Conversation saved');
+    } else {
+      setLineageStatus('Saved conversation is unavailable. Refresh to try again.');
     }
 
     const latestSignal = signalsRes.data?.entries?.[0];
@@ -466,13 +469,13 @@ const Dashboard = ({ user }) => {
       <header className="mentor-header mentor-home-header">
         <div className="mentor-header-copy">
           <p className="mentor-eyebrow">Big SYZ Home</p>
-          <h1>Mentor first. Dashboard second.</h1>
-          <p className="mentor-subtitle">Emotionally intelligent support anchored in your real signals.</p>
+          <h1>Let’s talk.</h1>
+          <p className="mentor-subtitle">Support shaped around what matters to you.</p>
           <p className="mentor-warmth">{DAILY_GREETING()}, {displayName}. Bring the honest version of today and let Big SYZ help you find the next clear move.</p>
-          <p className="mentor-muted">Powered by the SYZMEKU Engine.</p>
+
         </div>
 
-        <aside className="mentor-operator-entry mentor-card">
+        {canAccessOperatorMode && <aside className="mentor-operator-entry mentor-card">
           <p className="mentor-section-label">Operator Access</p>
           {canAccessOperatorMode ? (
             <>
@@ -500,9 +503,10 @@ const Dashboard = ({ user }) => {
               </div>
             </>
           )}
-        </aside>
+        </aside>}
       </header>
 
+      <GuestConversationImport key={user?._id || user?.id} user={user} onSaved={refreshMentorData} />
       <main className="mentor-home-layout">
         <section className="mentor-chat-panel mentor-card">
           <div className="mentor-chat-intro">
@@ -520,23 +524,23 @@ const Dashboard = ({ user }) => {
             {conversation.map((entry) => (
               <article key={entry.id} className={`mentor-message mentor-message-${entry.speaker}${entry.pending ? ' is-pending' : ''}`}>
                 <p className="mentor-message-label">{entry.label}</p>
-                <p>{entry.text}</p>
+                <p style={{ whiteSpace: 'pre-wrap' }}>{entry.text}</p>
                 {entry.detail && <p className="mentor-message-detail">{entry.detail}</p>}
               </article>
             ))}
           </div>
 
           <div className="mentor-memory-status">
-            <span className="mentor-pill success">{lineageStatus}</span>
-            <span className="mentor-pill">{chatMemory.length} persistent turns held</span>
-            <span className="mentor-pill">Coherence: {coherenceVector.coherenceLabel}</span>
-            {gentleResetActive && <span className="mentor-pill success">Gentle Reset active</span>}
+            <span className="mentor-pill success">{loading ? 'Reply in progress…' : lineageStatus}</span>
+            <span className="mentor-pill">{chatMemory.length} saved messages</span>
+
+            {canAccessOperatorMode && gentleResetActive && <span className="mentor-pill success">Gentle Reset active</span>}
             <button type="button" className="mentor-link" onClick={clearLineageMemory} disabled={loading || chatMemory.length === 0}>
-              Clear lineage memory
+              Clear saved conversation
             </button>
           </div>
 
-          <div className="mentor-voice-row">
+          {canAccessOperatorMode && <div className="mentor-voice-row">
             <button type="button" className="mentor-voice-button" onClick={startAcousticStream}>
               Start acoustic coherence
             </button>
@@ -545,7 +549,7 @@ const Dashboard = ({ user }) => {
             </button>
             <span className="mentor-pill">Typing: {coherenceVector.kinetic?.label || 'Pending'}</span>
             <span className="mentor-pill">Check-in: {coherenceVector.contextual?.label || 'Pending'}</span>
-          </div>
+          </div>}
 
           <div className="mentor-example-prompt-block">
             <p className="mentor-section-label">Example prompts</p>
@@ -615,10 +619,10 @@ const Dashboard = ({ user }) => {
           <div className="mentor-support-grid mentor-grid">
             {matrixNote && (
               <section className="mentor-card mentor-matrix-note-card">
-                <p className="mentor-section-label">Sovereign Matrix Note</p>
-                <h2>Active operating context</h2>
+                <p className="mentor-section-label">What you shared</p>
+                <h2>What I remember</h2>
                 <p>{matrixNote}</p>
-                <p className="mentor-muted">This note now travels with mentor prompts so Big SYZ keeps the same onboarding signal active.</p>
+                <p className="mentor-muted">You can update what you have shared as things change.</p>
               </section>
             )}
 
@@ -648,7 +652,7 @@ const Dashboard = ({ user }) => {
               </div>
             </section>
 
-            <section className="mentor-card">
+            {canAccessOperatorMode && <section className="mentor-card">
               <p className="mentor-section-label">Live Telemetry Sync</p>
               <h2>{telemetrySync?.status || 'Telemetry pending'}</h2>
               <p className="mentor-muted">
@@ -665,9 +669,9 @@ const Dashboard = ({ user }) => {
                   <span key={feed} className={`mentor-pill${status === 'ACTIVE' ? ' success' : ''}`}>{feed}: {status}</span>
                 ))}
               </div>
-            </section>
+            </section>}
 
-            <section className="mentor-card">
+            {canAccessOperatorMode && <section className="mentor-card">
               <p className="mentor-section-label">Progress Path</p>
               <h2>Where this can grow</h2>
               <ul className="mentor-path-list">
@@ -675,7 +679,7 @@ const Dashboard = ({ user }) => {
                   <li key={path.name}><strong>{path.name}:</strong> {path.detail}</li>
                 ))}
               </ul>
-            </section>
+            </section>}
 
             <section className="mentor-card">
               <p className="mentor-section-label">Focus for Today</p>
@@ -694,7 +698,7 @@ const Dashboard = ({ user }) => {
               )) : <p>No active alerts.</p>}
             </section>
 
-            <section className="mentor-card">
+            {canAccessOperatorMode && <section className="mentor-card">
               <p className="mentor-section-label">Action Kernel summary</p>
               <h2>Latest execution context</h2>
               {(summary?.latest_actions || []).length ? (
@@ -709,7 +713,7 @@ const Dashboard = ({ user }) => {
                 <p>No actions executed yet.</p>
               )}
               <p className="mentor-muted">Last execution: {summary?.latest_actions?.[0]?.error || 'No errors reported.'}</p>
-            </section>
+            </section>}
           </div>
         </section>
       </main>
