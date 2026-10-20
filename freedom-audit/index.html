@@ -256,7 +256,7 @@
           <div>
             <div class="eyebrow">Access Gate</div>
             <h2>Sign in, then unlock the audit.</h2>
-            <p class="muted">Payment is checked through the SYZMEKU backend. If checkout succeeds but the webhook is still catching up, the session verifier can confirm the paid Stripe session server-side.</p>
+            <p class="muted">Your $37 purchase unlocks your assessment, saved results and retakes. If payment confirmation is delayed, use Verify Payment to check again.</p>
           </div>
           <div id="gateMessage"></div>
           <button id="checkoutButton">Buy The Freedom Audit - $37</button>
@@ -315,7 +315,7 @@
             <label for="asset">What asset, skill, knowledge, audience, tool, or resource are you underusing?</label>
             <textarea id="asset" rows="3" maxlength="1000"></textarea>
           </div>
-          <button type="submit" form="auditForm">Generate My Liberation Plan</button>
+          <button id="generateButton" type="submit" form="auditForm">Generate My Liberation Plan</button>
         </div>
       </section>
 
@@ -364,6 +364,7 @@
             <button id="copyPrompt" type="button">Copy Prompt</button>
             <button id="openBigSyz" class="ghost" type="button">Continue in Big SYZ</button>
             <button class="ghost" type="button" onclick="window.print()">Print Plan</button>
+            <label for="resultHistory">Saved assessments</label><select id="resultHistory"><option value="">Choose a saved assessment</option></select>
             <button id="retake" class="ghost" type="button">Retake Audit</button>
           </div>
         </div>
@@ -419,7 +420,9 @@
       authMode: 'login',
       entitled: false,
       latestResult: null,
-      authBusy: false
+      authBusy: false,
+      auditBusy: false,
+      results: []
     };
 
     const $ = (id) => document.getElementById(id);
@@ -462,7 +465,7 @@
       }
       if (['/auth/google', '/auth/login', '/auth/register'].includes(path)) window.freedomBusinessEvent?.('sign_in_success');
       if (path === '/freedom-audit/checkout/session') window.freedomBusinessEvent?.('checkout_start');
-      if (path === '/freedom-audit/score') window.freedomBusinessEvent?.('product_complete');
+      if (path === '/freedom-audit/results' && options.method === 'POST') window.freedomBusinessEvent?.('product_complete');
       return payload;
     }
 
@@ -508,6 +511,7 @@
     async function refreshEntitlement() {
       state.entitled = false;
       state.latestResult = null;
+      state.results = [];
       const requestedToken = state.token;
       if (!state.token) {
         setStatus('Sign in to check paid access');
@@ -533,15 +537,17 @@
 
     async function verifyCheckout() {
       if (!sessionId) {
-        message($('gateMessage'), 'No checkout session was found in the URL. Return here from Stripe Checkout or purchase again.');
+        message($('gateMessage'), 'No checkout session was found in the URL. Use your original Stripe return link or check saved access before making another purchase.');
         return;
       }
       try {
         $('verifyButton').disabled = true;
+        const requestedToken = state.token;
         const data = await api('/freedom-audit/checkout/verify', {
           method: 'POST',
           body: JSON.stringify({ sessionId })
         });
+        if (state.token !== requestedToken) return;
         state.entitled = Boolean(data.entitled);
         state.latestResult = data.latestResult || null;
         message($('gateMessage'), 'Payment verified. Your audit is unlocked.', 'success');
@@ -599,6 +605,7 @@
       state.token = data.token;
       state.entitled = false;
       state.latestResult = null;
+      state.results = [];
       localStorage.setItem('freedomAuditToken', state.token);
       message($('gateMessage'), 'Signed in. Checking your Freedom Audit access now.', 'success');
       const entitled = await refreshEntitlement();
@@ -676,12 +683,17 @@
 
     async function submitAudit(event) {
       event.preventDefault();
+      if (state.auditBusy) return;
       message($('auditError'), '');
       const ratings = collectRatings();
       if (!ratings) {
         message($('auditError'), 'Complete all 20 ratings before generating your plan.');
         return;
       }
+      const requestedToken = state.token;
+      state.auditBusy = true;
+      $('generateButton').disabled = true;
+      $('generateButton').textContent = 'Generating your plan (up to 45 seconds)…';
       try {
         const data = await api('/freedom-audit/results', {
           method: 'POST',
@@ -692,11 +704,19 @@
             asset: $('asset').value
           })
         });
+        if (state.token !== requestedToken) return;
         state.latestResult = data.result;
         renderResult(data.result);
       } catch (error) {
-        if (error.status === 403) show('gate');
-        message($('auditError'), error.message || 'Unable to generate your audit result.');
+        if (state.token !== requestedToken) return;
+        if ([401,403].includes(error.status)) {
+          show('gate');
+          message($('gateMessage'), 'Please sign in and verify access. Your answers are still on this page.');
+        } else message($('auditError'), error.message || 'Unable to generate your audit result. Your answers remain on this page; please retry.');
+      } finally {
+        state.auditBusy = false;
+        $('generateButton').disabled = false;
+        $('generateButton').textContent = 'Generate My Liberation Plan';
       }
     }
 
@@ -724,6 +744,17 @@
       $('plan').innerHTML = (result.liberationPlan || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
       $('prompt').value = result.bigSyzPrompt || '';
       show('result');
+      loadResultHistory();
+    }
+
+    async function loadResultHistory() {
+      const requestedToken = state.token;
+      try {
+        const data = await api('/freedom-audit/results');
+        if (state.token !== requestedToken) return;
+        state.results = data.results || [];
+        $('resultHistory').innerHTML = '<option value="">Choose a saved assessment</option>' + state.results.map((r,i) => `<option value="${i}">${escapeHtml(r.completedAt || 'Saved assessment')} — ${Number(r.score)}/100</option>`).join('');
+      } catch { if (state.token !== requestedToken) return; $('resultHistory').innerHTML = '<option value="">History unavailable. Reopen saved results to retry.</option>'; }
     }
 
     function setAuthMode(mode) {
@@ -753,6 +784,9 @@
       setTimeout(() => { $('copyPrompt').textContent = 'Copy Prompt'; }, 1400);
     });
     $('openBigSyz').addEventListener('click', () => window.open(CONFIG.bigSyzUrl, '_blank', 'noopener'));
+    $('resultHistory').addEventListener('change', () => {
+      if ($('resultHistory').value !== '') renderResult(state.results[Number($('resultHistory').value)]);
+    });
     $('retake').addEventListener('click', () => show('audit'));
 
     buildAuditForm();

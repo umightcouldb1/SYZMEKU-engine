@@ -169,3 +169,21 @@ If the webhook arrives before the redirect verifier, entitlement is available im
 - Canceled checkout returns gracefully without granting access.
 - Big SYZ continuation opens `https://www.toisouljahacademy.com`.
 - Existing SYZMEKU catalog, checkout, profile, and webhook behavior still works for non-Freedom-Audit products.
+
+## Freedom Audit verification and release gate (2026-10-20)
+
+The AI path sends the 20 question texts, ratings and customer priorities to Gemini through the existing provider adapter. It accepts only six ordered phases with bounded actions, checkpoints and exact evidence quotations. The scoring remains deterministic. Evidence quotations establish traceability; they do not prove that every inference is correct or that every unsafe instruction can be detected. Real Gemini output quality still requires acceptance testing.
+
+Generation has a 45-second abort deadline, a database-backed per-user generation lease, a 30-request/hour per-process limit and the existing 4096-token provider output limit. Provider errors do not save a partial plan. The latest ten results and evidence are stored atomically and retrieved only for the authenticated entitled account. Concurrent Freedom Audit checkout verification/webhook replay appends one purchase and does not reactivate an already revoked purchase.
+
+Verification commands (reuse installed dependencies):
+
+```bash
+npm run freedom-audit:test
+npm run freedom-audit:browser
+npm run build --prefix freedom-audit
+```
+
+The browser harness uses a disposable MongoDB replica set, real Express routes and password authentication, and explicitly fake Stripe/Gemini transport. It checks signup, unpaid access, checkout return, 20 ratings, six-phase results, desktop/mobile rendering, reload retrieval, provider failure, retry, retakes and returning login. It never uses a live payment key or production database. Screenshots are written to `.cache/audit-browser`. On Windows, if MongoDB cannot rename files in the sandbox temporary directory, set `TMP` and `TEMP` to a writable workspace directory. `MONGOMS_DOWNLOAD_DIR` can point to an existing binary cache.
+
+Release is BLOCKED until an isolated backend using this branch is available with a disposable database, a usable Gemini credential, Stripe **test-mode** secret/price/webhook credentials, and an authorized frontend origin. Verify real Google sign-in against the shared identity service, a successful Stripe test Checkout and signed webhook, and at least two real Gemini profiles through that deployment. No real provider or test-mode payment success is claimed by the fake-provider suite. A frontend preview that still targets the unchanged production backend cannot establish this branch's end-to-end behavior. Production deployment requires separate authorization.

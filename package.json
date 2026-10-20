@@ -28,7 +28,9 @@
     "m3:browser": "node server/tests/reasoningBrowser.cjs",
     "m3:index-plan": "node server/scripts/provisionReasoningIndexes.cjs",
     "c0:test": "node --test server/tests/contentFactory.test.cjs",
-    "c0:browser": "node server/tests/contentFactoryBrowser.cjs"
+    "c0:browser": "node server/tests/contentFactoryBrowser.cjs",
+    "freedom-audit:test": "node --test server/tests/commerceRegression.test.cjs server/tests/freedomAuditPlan.test.cjs freedom-audit/tests/auth.test.cjs",
+    "freedom-audit:browser": "node server/tests/freedomAuditBrowser.cjs"
   },
   "keywords": [
     "SYZMEKU",

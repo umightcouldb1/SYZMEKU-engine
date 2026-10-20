@@ -1,6 +1,6 @@
 const {test,before,after}=require('node:test');const assert=require('node:assert/strict');const path=require('node:path');
 Object.assign(process.env,{NODE_ENV:'test',FREEDOM_AUDIT_AI_TEST_MODE:'rules',JWT_SECRET:'synthetic-commerce-auth',CORE_CONTEXT_WRITES_ENABLED:'true',STRIPE_SECRET_KEY:'sk_test_fixture',STRIPE_WEBHOOK_SECRET:'whsec_fixture',FREEDOM_AUDIT_STRIPE_PRICE_ID:'price_fixture',FREEDOM_AUDIT_APP_URL:'https://example.test',DOMAIN:'https://example.test'});
-delete process.env.MONGO_URI;process.env.MONGOMS_DOWNLOAD_DIR=path.resolve(__dirname,'../../.cache/mongodb-binaries');
+delete process.env.MONGO_URI;process.env.MONGOMS_DOWNLOAD_DIR ||= path.resolve(__dirname,'../../.cache/mongodb-binaries');
 const mongoose=require('mongoose');const express=require('express');const jwt=require('jsonwebtoken');const {MongoMemoryReplSet}=require('mongodb-memory-server');
 const User=require('../models/User');const AuthSession=require('../models/AuthSession');const UserProfile=require('../models/UserProfile');const SocialCampaign=require('../models/SocialCampaign');
 const realStripe=require('stripe')('sk_test_fixture');let session,checkoutInput,priceAmount=3700;
@@ -61,11 +61,12 @@ test('Freedom Audit AI plan validates output and never stores provider failure',
   let captured='';
   provider.generate=async ({prompt})=>{
    captured=prompt;
-   return {text:JSON.stringify({priority:'Address cash-flow friction first',moves:['Review recurring expenses','Price an existing skill','Ask one prospective buyer'],compression:{delete:'Remove duplicate tools',automate:'Track recurring charges',delegate:'Routine formatting',execute:'Offer one paid service'},plan:['Days 1-3: Document three expenses','Days 4-7: Remove one expense','Days 8-14: Package the service','Days 15-21: Share the offer','Days 22-27: Collect conversion data','Days 28-30: Reassess spending']})};
+   const a=JSON.parse(prompt.split('ASSESSMENT DATA: ')[1].split('\nEVIDENCE MAP:')[0]);
+   return {text:JSON.stringify(require('./freedomAuditPlanFixture.cjs')(a)),model:'fake-gemini'};
   };
   const success=await request(a,'/audit/results','POST',{ratings,win:'Build an offer',drag:'Repeated tasks',asset:'My coaching skills'});
   assert.equal(success.status,201);
-  assert.match(success.data.result.analysisMethod,/AI-generated/);
+  assert.match(success.data.result.analysisMethod,/Gemini-generated/);
   assert.equal(success.data.result.liberationPlan.length,6);
   assert.match(captured,/coaching skills/);
   const before=JSON.stringify((await UserProfile.findOne({userId:a.id})).freedomAudit.latestResult);
@@ -93,4 +94,31 @@ test('Social roles/providers and campaign ownership survive shared auth; Core de
    assert.equal((await request(b,'/social/campaigns')).status,200);
   }
  } finally {process.env.CORE_CONTEXT_WRITES_ENABLED='true';process.env.CORE_CONTEXT_WRITE_USER_IDS=[a.id,b.id].join(',');}
+});
+test('Freedom Audit concurrent fulfillment, generation lease, history isolation and revoked replay',async()=>{
+ const paid=await request(a,'/audit/checkout/verify','POST',{sessionId:'cs_fixture'});assert.equal(paid.status,200);
+ await Promise.all(Array.from({length:5},()=>request(a,'/audit/checkout/verify','POST',{sessionId:'cs_fixture'})));
+ assert.equal((await UserProfile.findOne({userId:a.id})).purchasedProducts.length,1);
+ assert.equal((await request(null,'/audit/results')).status,401);
+ assert.equal((await request(b,'/audit/results?userId='+a.id)).status,403);
+ const provider=require('../services/reasoningProviderService'),original=provider.generate,oldMode=process.env.FREEDOM_AUDIT_AI_TEST_MODE;
+ delete process.env.FREEDOM_AUDIT_AI_TEST_MODE;
+ let release,entered;const enteredPromise=new Promise(r=>entered=r),pending=new Promise(r=>release=r);
+ provider.generate=async({prompt})=>{entered();await pending;return {text:JSON.stringify(require('./freedomAuditPlanFixture.cjs')(JSON.parse(prompt.split('ASSESSMENT DATA: ')[1].split('\nEVIDENCE MAP:')[0])))};};
+ const ratings=Object.fromEntries(['time','money','obligations','assets','desires'].map(k=>[k,[2,3,4,5]]));
+ try {
+  const first=request(a,'/audit/results','POST',{ratings,win:'Finish a design portfolio'});await enteredPromise;
+  assert.equal((await request(a,'/audit/results','POST',{ratings})).status,409);release();assert.equal((await first).status,201);
+  const history=await request(a,'/audit/results');assert.equal(history.status,200);assert.match(history.data.results[0].inputs.win,/design portfolio/);assert.equal(history.data.results[0].planEvidence.length,6);
+  const before=JSON.stringify(history.data.results);
+  provider.generate=async()=>{throw Object.assign(new Error('private'),{statusCode:429,retryAfterSeconds:10})};
+  assert.equal((await request(a,'/audit/results','POST',{ratings})).status,429);
+  assert.equal(JSON.stringify((await request(a,'/audit/results')).data.results),before);
+  for(const bad of [true,'3',null]){const invalid={...ratings,time:[bad,3,4,5]};assert.equal((await request(a,'/audit/results','POST',{ratings:invalid})).status,400);}
+  assert.equal((await request(a,'/audit/results','POST',{ratings,win:{bad:true}})).status,400);
+  await UserProfile.updateOne({userId:a.id},{$set:{'purchasedProducts.0.status':'refunded'}});
+  assert.equal((await request(a,'/audit/checkout/verify','POST',{sessionId:'cs_fixture'})).status,403);
+  assert.equal((await request(a,'/audit/entitlement')).data.latestResult,null);
+  assert.equal((await request(a,'/audit/results')).status,403);
+ } finally {release();provider.generate=original;process.env.FREEDOM_AUDIT_AI_TEST_MODE=oldMode;}
 });

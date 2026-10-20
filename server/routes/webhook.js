@@ -95,6 +95,12 @@ const fulfillCheckoutSession = async (session) => {
     throw new Error(`Checkout session ${session.id} has no line items.`);
   }
 
+  const auditPurchases = purchases.filter(p => p.priceId === getFreedomAuditPriceId());
+  if (auditPurchases.length === purchases.length) {
+    for (const purchase of auditPurchases) await require('../services/freedomAuditPurchase').recordPurchase(userId, purchase);
+    const profile = await UserProfile.findOne({userId});
+    return {userId, purchases:purchases.length, tier:profile.tier};
+  }
   let profile = await UserProfile.findOne({ userId });
   if (!profile) {
     profile = await UserProfile.create({ userId });
