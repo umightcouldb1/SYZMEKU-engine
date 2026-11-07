@@ -107,6 +107,7 @@ export default function SocialCommandDashboard() {
     setProviders(providerData.providers || []);
     setConnections(connectionData.connections || []);
     setCampaigns(campaignData.campaigns || []);
+    if (campaignData.storageError) setError(campaignData.storageError);
     if (!activeCampaign && campaignData.campaigns?.[0]) {
       const latestCampaign = campaignData.campaigns[0];
       setActiveCampaign({ campaign: latestCampaign, summary: latestCampaign.summary });
@@ -174,7 +175,7 @@ export default function SocialCommandDashboard() {
       const data = await api('put', `/api/social-command/campaigns/${activeCampaign.campaign._id}`, activeCampaign.campaign);
       setActiveCampaign(data);
       await loadAll();
-      setMessage('Campaign edits saved.');
+      setMessage('Review version saved only in Google Drive. Approve this version before publishing.');
     } catch (saveError) {
       setError(saveError?.response?.data?.error || 'Could not save campaign edits.');
     } finally {
@@ -183,6 +184,7 @@ export default function SocialCommandDashboard() {
   };
 
   const activateSchedule = async () => {
+    if (activeCampaign?.dirty) { setError('Save and approve your edited version before scheduling.'); return; }
     if (!activeCampaign?.campaign?._id) return;
     setLoading(true);
     setError('');
@@ -202,16 +204,17 @@ export default function SocialCommandDashboard() {
   };
 
   const approveCampaign = async () => {
+    if (activeCampaign?.dirty) { setError('Save your edits to Drive, then review and approve that version.'); return; }
     if (!activeCampaign?.campaign?._id) return;
     setLoading(true);
     setError('');
     try {
-      const data = await api('post', `/api/social-command/campaigns/${activeCampaign.campaign._id}/approve`, {});
+      const data = await api('post', `/api/social-command/campaigns/${activeCampaign.campaign._id}/approve`, { expectedHash: activeCampaign.campaign.receiptSync?.status === 'pending' ? activeCampaign.campaign.receiptSync.hash : activeCampaign.campaign.metadata?.driveApproval?.hash || activeCampaign.campaign.expectedHash, expectedRevision: activeCampaign.campaign.expectedRevision });
       setActiveCampaign(data);
       await loadAll();
-      setMessage(data.campaign?.status === 'scheduled'
-        ? 'Campaign approved and schedule activated.'
-        : 'Campaign approved. Publishing is now available for connected accounts.');
+      setMessage(data.campaign?.receiptSync?.status === 'pending'
+        ? 'Campaign approved. Its Drive receipt is still syncing. Retry receipt sync without approving or publishing again.'
+        : 'Campaign approved and Drive receipt confirmed. Scheduling and publishing remain separate actions.');
     } catch (approveError) {
       setError(approveError?.response?.data?.error || 'Could not approve campaign.');
     } finally {
@@ -239,7 +242,7 @@ export default function SocialCommandDashboard() {
       const campaign = { ...(current?.campaign || {}) };
       campaign.posts = [...(campaign.posts || [])];
       campaign.posts[postIndex] = { ...campaign.posts[postIndex], ...patch };
-      return { ...(current || {}), campaign };
+      return { ...(current || {}), campaign, dirty: true };
     });
   };
 
@@ -258,15 +261,15 @@ export default function SocialCommandDashboard() {
         }]
         : [];
       campaign.posts[postIndex] = post;
-      return { ...(current || {}), campaign };
+      return { ...(current || {}), campaign, dirty: true };
     });
   };
 
   const campaign = activeCampaign?.campaign || null;
   const plannedScheduleAvailable = hasPlannedSchedule(campaign);
-  const approvalActionLabel = campaign?.status === 'approved' && plannedScheduleAvailable ? 'Activate Schedule' : 'Approve Campaign';
-  const approvalAction = campaign?.status === 'approved' && plannedScheduleAvailable ? activateSchedule : approveCampaign;
-  const approvalActionDisabled = loading || campaign?.status === 'scheduled' || campaign?.status === 'published';
+  const approvalActionLabel = campaign?.receiptSync?.status === 'pending' ? 'Retry Drive Receipt Sync' : campaign?.status === 'approved' && plannedScheduleAvailable ? 'Activate Schedule' : 'Approve Campaign';
+  const approvalAction = campaign?.receiptSync?.status !== 'pending' && campaign?.status === 'approved' && plannedScheduleAvailable ? activateSchedule : approveCampaign;
+  const approvalActionDisabled = loading || activeCampaign?.dirty || (campaign?.receiptSync?.status !== 'pending' && ['scheduled','published'].includes(campaign?.status));
 
   return (
     <main className="social-command" aria-label="SYZMEKU Social Command">
@@ -340,7 +343,7 @@ export default function SocialCommandDashboard() {
                 Campaign objective
                 <textarea
                   value={campaign.objective || ''}
-                  onChange={(event) => setActiveCampaign((current) => ({ ...current, campaign: { ...current.campaign, objective: event.target.value } }))}
+                  onChange={(event) => setActiveCampaign((current) => ({ ...current, dirty: true, campaign: { ...current.campaign, objective: event.target.value } }))}
                 />
               </label>
 

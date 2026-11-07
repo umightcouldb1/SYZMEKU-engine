@@ -47,6 +47,15 @@ jobs:
       - name: Verify C0 content versions, approvals, voice and browser
         run: npm run c0:test && npm run c0:browser
 
+      - name: Retain synthetic C0 browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: c0-browser-review
+          path: .cache/content-factory-browser/*.png
+          if-no-files-found: ignore
+          retention-days: 3
+
       - name: Verify E0 business isolation, monitoring and event fixtures
         run: npm run e0:test && npm run e0:browser
 

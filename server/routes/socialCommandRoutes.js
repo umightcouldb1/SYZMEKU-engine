@@ -24,6 +24,7 @@ const {
 router.get('/oauth/:provider/callback', handleOAuthCallback);
 
 router.use(protect, authorizeRoles(User.ROLES.COMMANDER_IN_CHIEF));
+router.use((_req,res,next)=>{res.set('Cache-Control','private, no-store');next();});
 router.get('/providers', listSocialProviders);
 router.post('/connections/:provider/authorize', beginAuthorization);
 router.get('/connections', listConnections);

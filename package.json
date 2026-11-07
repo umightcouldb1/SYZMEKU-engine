@@ -27,7 +27,7 @@
     "m3:test": "node --test server/tests/reasoningIntegration.test.cjs server/tests/reasoningProvider.test.cjs server/tests/reasoningPatterns.test.cjs",
     "m3:browser": "node server/tests/reasoningBrowser.cjs",
     "m3:index-plan": "node server/scripts/provisionReasoningIndexes.cjs",
-    "c0:test": "node --test server/tests/contentFactory.test.cjs",
+    "c0:test": "node --test server/tests/contentFactory.test.cjs server/tests/driveDraftStore.test.cjs server/tests/socialDriveDrafts.test.cjs server/tests/approvedSlides.test.cjs",
     "c0:browser": "node server/tests/contentFactoryBrowser.cjs",
     "freedom-audit:test": "node --test server/tests/commerceRegression.test.cjs server/tests/freedomAuditPlan.test.cjs freedom-audit/tests/auth.test.cjs",
     "freedom-audit:browser": "node server/tests/freedomAuditBrowser.cjs"
@@ -55,6 +55,7 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.4.4",
+    "pptxgenjs": "4.0.1",
     "stripe": "^14.0.0"
   },
   "devDependencies": {
