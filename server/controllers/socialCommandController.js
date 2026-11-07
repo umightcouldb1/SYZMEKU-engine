@@ -332,6 +332,11 @@ const uploadTikTokDraft = asyncHandler(async (req, res) => {
     return res.status(404).json({ error: 'TikTok post not found.' });
   }
 
+  // Content Factory TikTok handoffs approve local drafts only, not transfer to a provider.
+  if (campaign.metadata?.c0) {
+    return res.status(409).json({ code: 'C0_PLATFORM_DRAFT_ONLY', error: 'This Content Factory draft is local review only; TikTok upload is not approved.' });
+  }
+
   const connection = post.connectedAccountId
     ? await SocialConnection.findOne({
       _id: post.connectedAccountId,

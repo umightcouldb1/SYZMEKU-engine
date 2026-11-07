@@ -12,6 +12,8 @@ before(async () => {
   f = await require('./patternFixture.cjs')(); db = f.mongoose.connection.db; owner = f.founder.id; client = f.mongoose.connection.getClient();
   Object.assign(process.env, { ENTERPRISE_INTELLIGENCE_ENABLED: 'true', ENTERPRISE_OWNER_USER_ID: owner, CONTENT_FACTORY_ENABLED: 'true' });
   f.app.use('/api/content-factory', require('../routes/contentFactoryRoutes'));
+  f.app.use('/api/social-command', require('../routes/socialCommandRoutes'));
+  f.app.use((error, _req, res, _next) => res.status(error.statusCode || (res.statusCode >= 400 ? res.statusCode : 500)).json({ code: error.message }));
 });
 after(async () => { await f?.close(); });
 beforeEach(async () => { for (const name of ['enterprisestates', 'socialcampaigns', 'socialconnections']) await db.collection(name).deleteMany({}); });
@@ -183,4 +185,13 @@ test('platform destinations must be reviewed and unique tracking preserves query
 test('legacy single-platform approval directs organic packages to the explicit four-platform workflow', async () => {
   const args = await seed();
   await assert.rejects(service.approveMany({ db, client, owner, items: [{ id: args.id, version: args.version, hash: args.expectedHash }] }), /ORGANIC_PLATFORM_HANDOFF_REQUIRED/);
+});
+
+
+test('TikTok local draft cannot bypass its restriction through the separate upload endpoint', async () => {
+  const args = await seed(); args.targets = await connections(); await service.handoffOrganic(args);
+  const campaign = (await readDrafts()).find(c => c.metadata.c0.platform === 'tiktok');
+  const response = await f.request(f.founder, `/api/social-command/campaigns/${campaign._id}/posts/${campaign.posts[0]._id}/tiktok/draft-upload`, 'POST', {});
+  assert.equal(response.status, 409); assert.equal(response.data.code, 'C0_PLATFORM_DRAFT_ONLY');
+  assert.deepEqual(await db.collection('socialcampaigns').findOne({ _id: campaign._id }), campaign);
 });

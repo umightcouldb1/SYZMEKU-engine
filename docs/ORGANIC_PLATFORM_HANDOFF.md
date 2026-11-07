@@ -8,7 +8,7 @@ An organic package is a parent asset, not a social provider. Its exact reviewed 
 2. Review all platform-native titles, captions, descriptions, CTAs and destinations shown on the parent.
 3. Choose **Review four-platform draft handoff**. Select the exact owned account for each platform or explicitly leave it unassigned.
 4. Confirm **Approve four platform drafts**. This creates draft campaigns only. No provider API is called, no date is scheduled, and no money is spent.
-5. Account-bound Facebook/Instagram/YouTube drafts still require the existing separate Social Command approval before publication. TikTok and unassigned drafts remain blocked from publication. To change a target, HOLD the parent and review a fresh handoff. Older receipts remain invalid.
+5. Account-bound Facebook/Instagram/YouTube drafts still require the existing separate Social Command approval before publication. TikTok and unassigned drafts remain blocked from publication. Content Factory TikTok drafts also cannot use the separate upload-to-TikTok endpoint. To change a target, HOLD the parent and review a fresh handoff. Older receipts remain invalid.
 
 For a platform-specific offer URL, the parent destination must explicitly contain the same verified URL before handoff. The server does not infer verification from a parent with no destination.
 
