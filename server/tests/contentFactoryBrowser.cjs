@@ -9,6 +9,11 @@ async function main(){
   fixture=await require('./patternFixture.cjs')();const {founder,other}=fixture;
   process.env.ENTERPRISE_INTELLIGENCE_ENABLED='true';process.env.ENTERPRISE_OWNER_USER_ID=founder.id;
   fixture.app.use('/api/content-factory',require('../routes/contentFactoryRoutes'));process.env.CONTENT_FACTORY_ENABLED='true';process.env.CONTENT_FACTORY_START_DATE=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());await require('../enterprise/content/service').prepareDaily({db:fixture.mongoose.connection.db});
+  const organicService=require('../enterprise/content/service'),organicDb=fixture.mongoose.connection.db,organicId='organic-d01-teaching-capacity';
+  const organicItem=(await organicService.list(organicDb,founder.id)).items.find(item=>item.id===organicId);
+  await organicService.attachReviewedMedia({db:organicDb,owner:founder.id,id:organicId,expectedHash:organicItem.hash,media:{url:'https://www.toisouljahacademy.com/assets/content-factory/synthetic.mp4',sha256:'a'.repeat(64),duration:organicItem.package.duration},checks:Object.fromEntries(organicService.REVIEW_CHECKS.map(name=>[name,true]))});
+  const facebookId=new fixture.mongoose.Types.ObjectId();
+  await organicDb.collection('socialconnections').insertOne({_id:facebookId,userId:new fixture.mongoose.Types.ObjectId(founder.id),provider:'meta',accountType:'facebook_page',accountName:'Synthetic Facebook Page',active:true});
   const brief=require('../enterprise/analysis').analyze({window:{start:'2026-09-09T05:00:00Z',end:new Date().toISOString()},social:{posts:[],connections:[],measurements:[],coverage:'synthetic receipts'},commerce:{ok:true,customerSessions:0,founderSessions:3,sales:0,revenue:0,attempts:0},product:{entitlements:0,completions:0},telemetry:{counts:[],since:null},auth:[],health:{api:{status:200,latencyMs:10}},personalExecution:'DISABLED',m3:'OFF'});
   await fixture.mongoose.connection.db.collection('enterprisestates').insertOne({_id:'freedom-audit:'+founder.id,owner:founder.id,brief,lastSuccessAt:new Date()});
   const {build}=await import(pathToFileURL(path.join(root,'client/node_modules/vite/dist/node/index.js'))),config=(await import(pathToFileURL(path.join(root,'client/vite.config.js')))).default;
@@ -45,13 +50,32 @@ async function main(){
   for(let tries=0;tries<30;tries++){const d=await fixture.mongoose.connection.db.collection('enterprisestates').findOne({itemId:'variant-b-facebook'});if(d.status==='HOLD')break;await new Promise(r=>setTimeout(r,50));}
   assert.equal((await fixture.mongoose.connection.db.collection('enterprisestates').findOne({itemId:'variant-b-facebook'})).status,'HOLD');
   assert.equal(await fixture.mongoose.connection.db.collection('socialcampaigns').countDocuments({}),0);
+  const organicSelector='[data-content-id='+organicId+']';
+  const clickOrganic=text=>evaluate(`[...document.querySelector(${JSON.stringify(organicSelector)}).querySelectorAll('button')].find(b=>b.textContent===${JSON.stringify(text)}).click()`);
+  await clickOrganic('Review four-platform draft handoff');
+  await waitFor("document.body.innerText.includes('Approve four platform drafts')");
+  assert.equal(await evaluate("[...document.querySelectorAll('button')].find(b=>b.textContent==='Approve four platform drafts').disabled"),true);
+  assert.equal(await evaluate("document.querySelector('[aria-label=\"Organic platform draft handoff\"] select').options.length"),2);
+  assert.equal(await evaluate("[...document.querySelectorAll('[aria-label=\"Organic platform draft handoff\"] select')].slice(1).every(s=>s.options.length===1)"),true);
+  await clickOrganic('Cancel handoff');
+  assert.equal(await organicDb.collection('socialcampaigns').countDocuments({}),0);
+  await clickOrganic('Review four-platform draft handoff');
+  await evaluate("document.querySelector('[aria-label=\"Organic platform draft handoff\"] input[type=checkbox]').click()");
+  await clickOrganic('Approve four platform drafts');
+  await waitFor("document.body.innerText.includes('Four-platform approval recorded')");
+  const platformDrafts=await organicDb.collection('socialcampaigns').find({}).toArray();
+  assert.equal(platformDrafts.length,4);
+  assert(platformDrafts.every(c=>c.status==='draft'&&c.posts[0].publishStatus==='draft'&&c.posts[0].scheduledTime===null));
+  assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
   await call('Page.reload');await waitFor("document.body.innerText.includes('PACKAGE_READY_MEDIA_PENDING')");
+  await waitFor("document.body.innerText.includes('Four-platform approval recorded')");
+  assert.equal(await organicDb.collection('socialcampaigns').countDocuments({}),4);
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false}).then(r=>fs.writeFileSync(path.join(cache,'content-desktop.png'),Buffer.from(r.data,'base64')));
   await call('Page.navigate',{url:fixture.base+'/?other=1'});await waitFor("document.body.innerText.includes('Content Factory is not enabled for this account.')");
   assert.equal(await evaluate("document.body.innerText.includes('What Keeps Getting in the Way')"),false);
   assert.equal(await fixture.mongoose.connection.db.collection('tasks').countDocuments({}),0);
-  assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',checks:['390px mobile no overflow','1440px desktop','real HTTP owner isolation','reload persistence','blocked unfinished-media approval', 'hold persistence', 'zero Social drafts/publishing','no browser exceptions','zero Task effects']}));
+  assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',checks:['390px mobile no overflow','1440px desktop','real HTTP owner isolation','reload persistence','blocked unfinished-media approval', 'hold persistence', 'four exact unscheduled Social drafts after explicit approval', 'cancel handoff has zero effects', 'unassigned draft-only targets', 'draft receipt reload persistence','no browser exceptions','zero Task effects']}));
  }finally{if(fs.existsSync(html))fs.unlinkSync(html);if(socket)socket.close();if(browser)browser.kill();if(fixture)await fixture.close();}
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
