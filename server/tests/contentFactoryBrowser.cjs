@@ -34,7 +34,7 @@ async function main(){
   async function waitFor(expression){const until=Date.now()+15000;while(Date.now()<until){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}throw new Error('Browser assertion timed out: '+expression+'; body='+await evaluate('document.body.innerText'));}
 
   await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
-  await call('Page.navigate',{url:fixture.base});await waitFor("document.body.innerText.includes('PACKAGE_READY_MEDIA_PENDING')");
+  await call('Page.navigate',{url:fixture.base});await waitFor("document.querySelector('[data-content-id=variant-b-facebook]')?.textContent.includes('PACKAGE_READY_MEDIA_PENDING')");
   assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
   assert.equal(await evaluate("document.body.innerText.includes('TOI_VOICE_V1')"),true);
   await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false}).then(r=>fs.writeFileSync(path.join(cache,'content-mobile.png'),Buffer.from(r.data,'base64')));
@@ -51,9 +51,9 @@ async function main(){
   assert.equal((await fixture.mongoose.connection.db.collection('enterprisestates').findOne({itemId:'variant-b-facebook'})).status,'HOLD');
   assert.equal(await fixture.mongoose.connection.db.collection('socialcampaigns').countDocuments({}),0);
   const organicSelector='[data-content-id='+organicId+']';
-  const clickOrganic=text=>evaluate(`[...document.querySelector(${JSON.stringify(organicSelector)}).querySelectorAll('button')].find(b=>b.textContent===${JSON.stringify(text)}).click()`);
+  const clickOrganic=text=>evaluate(`(()=>{const button=[...document.querySelector(${JSON.stringify(organicSelector)}).querySelectorAll('button')].find(b=>b.textContent===${JSON.stringify(text)});button.scrollIntoView();button.click();})()`);
   await clickOrganic('Review four-platform draft handoff');
-  await waitFor("document.body.innerText.includes('Approve four platform drafts')");
+  await waitFor("document.querySelector('[data-content-id=organic-d01-teaching-capacity]')?.textContent.includes('Approve four platform drafts')");
   assert.equal(await evaluate("[...document.querySelectorAll('button')].find(b=>b.textContent==='Approve four platform drafts').disabled"),true);
   assert.equal(await evaluate("document.querySelector('[aria-label=\"Organic platform draft handoff\"] select').options.length"),2);
   assert.equal(await evaluate("[...document.querySelectorAll('[aria-label=\"Organic platform draft handoff\"] select')].slice(1).every(s=>s.options.length===1)"),true);
@@ -62,13 +62,13 @@ async function main(){
   await clickOrganic('Review four-platform draft handoff');
   await evaluate("document.querySelector('[aria-label=\"Organic platform draft handoff\"] input[type=checkbox]').click()");
   await clickOrganic('Approve four platform drafts');
-  await waitFor("document.body.innerText.includes('Four-platform approval recorded')");
+  await waitFor("document.querySelector('[data-content-id=organic-d01-teaching-capacity]')?.textContent.includes('Four-platform approval recorded')");
   const platformDrafts=await organicDb.collection('socialcampaigns').find({}).toArray();
   assert.equal(platformDrafts.length,4);
   assert(platformDrafts.every(c=>c.status==='draft'&&c.posts[0].publishStatus==='draft'&&c.posts[0].scheduledTime===null));
   assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
-  await call('Page.reload');await waitFor("document.body.innerText.includes('PACKAGE_READY_MEDIA_PENDING')");
-  await waitFor("document.body.innerText.includes('Four-platform approval recorded')");
+  await call('Page.reload');await waitFor("document.querySelector('[data-content-id=variant-b-facebook]')?.textContent.includes('PACKAGE_READY_MEDIA_PENDING')");
+  await waitFor("document.querySelector('[data-content-id=organic-d01-teaching-capacity]')?.textContent.includes('Four-platform approval recorded')");
   assert.equal(await organicDb.collection('socialcampaigns').countDocuments({}),4);
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false}).then(r=>fs.writeFileSync(path.join(cache,'content-desktop.png'),Buffer.from(r.data,'base64')));

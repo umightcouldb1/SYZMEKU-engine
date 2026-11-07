@@ -37,7 +37,7 @@ export default function OrganicPlatformHandoff({ item, connections, onHandoff })
               .map(c => <option key={c._id} value={c._id}>{c.accountName} · {c.accountType}</option>)}
           </select>
         </label>)}
-        <p>TikTok stays draft-only. Unassigned drafts cannot publish. Connecting or changing a target requires another Content Factory review. Public scheduling or publishing requires separate approval in Social Command.</p>
+        <p>TikTok stays draft-only. Unassigned drafts cannot publish. Connecting or changing a target requires another Content Factory review. Connected Facebook, Instagram and YouTube drafts need separate approval for immediate publication in Social Command. Scheduling changes invalidate this handoff and are not supported by this workflow.</p>
         <label className="content-check"><input type="checkbox" checked={confirmed} disabled={pending}
           onChange={event => setConfirmed(event.target.checked)} />I reviewed this exact media, platform titles, captions, descriptions, destinations and selected accounts. Approve drafts only.</label>
         <div className="content-controls">
