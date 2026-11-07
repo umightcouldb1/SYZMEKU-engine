@@ -40,14 +40,14 @@ async function main(){
 
   const card="document.querySelector('[data-content-id=variant-b-facebook]')";
   const button=text=>`[...${card}.querySelectorAll('button')].find(b=>b.textContent===${JSON.stringify(text)})`;
-  const click=async text=>evaluate(`${button(text)}.click()`);
+  const click=async text=>{const target=button(text);await evaluate(`(async()=>{${target}.scrollIntoView({block:'center'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));})()`);const box=await evaluate(`(()=>{const r=${target}.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);await call('Input.dispatchMouseEvent',{type:'mousePressed',...box,button:'left',clickCount:1});await call('Input.dispatchMouseEvent',{type:'mouseReleased',...box,button:'left',clickCount:1});};
   const setValue=async(expression,value)=>evaluate(`(()=>{const e=${expression};Object.getOwnPropertyDescriptor(Object.getPrototypeOf(e),'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   const snapshot=async name=>{const r=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(cache,name),Buffer.from(r.data,'base64'));};
   const readItem=async()=> (await service.list(db,founder.id)).items.find(i=>i.id==='variant-b-facebook');
   await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
-  await call('Page.navigate',{url:fixture.base});await waitFor("document.body.innerText.includes('IMAGE_SELECTION_REQUIRED')");
+  await call('Page.navigate',{url:fixture.base});await waitFor("document.body?.innerText.includes('IMAGE_SELECTION_REQUIRED')");
   assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
-  assert.equal(await evaluate("document.body.innerText.includes('Drafts only in Google Drive.')"),true);
+  assert.equal(await evaluate("document.body?.innerText.includes('Drafts only in Google Drive.')"),true);
   assert.equal(await evaluate(`${button('APPROVE')}.disabled`),true);
   await snapshot('content-mobile.png');
   const first=await readItem();
@@ -58,7 +58,7 @@ async function main(){
   assert.equal(await evaluate(`${card}.querySelector('h3').textContent`),first.package.title);
   await click('EDIT');assert.equal(await evaluate(`${card}.querySelector('input[maxlength="160"]').value`),first.package.title);await click('Cancel');
   // Refresh also proves cancellation never reached durable storage.
-  await call('Page.reload');await waitFor("document.body.innerText.includes('IMAGE_SELECTION_REQUIRED')");
+  await call('Page.reload');await waitFor("document.body?.innerText.includes('IMAGE_SELECTION_REQUIRED')");
   await click('EDIT');await setValue(`${card}.querySelector('input[maxlength="160"]')`,'What will you choose next?');
   await click('Save revision to Drive');
   await waitFor(`${card}.querySelector('h3').textContent==='What will you choose next?'`);
@@ -75,7 +75,7 @@ async function main(){
   await evaluate(`${card}.querySelectorAll('details')[1].querySelector('input[type=checkbox]').click()`);
   await waitFor(`${button('Approve selected images')}.disabled===false`);
   await click('Approve selected images');
-  await waitFor(`${card}.innerText.includes('VIDEO_PRODUCTION_READY')`);
+  await waitFor(`${card}.textContent.includes('VIDEO_PRODUCTION_READY')`);
   const selected=await readItem();assert(selected.package.production.imageApproval.selectionHash);
   assert.equal(selected.package.production.media,null);
   assert.equal(await evaluate(`${button('APPROVE')}.disabled`),true);
@@ -83,7 +83,7 @@ async function main(){
   assert.equal(await evaluate(`${button('Record my finished-video review')}.disabled`),true);
   await setValue(`${card}.querySelectorAll('details')[2].querySelector('input:not([type])')`,'review_video_123456');
   await click('Load exact video for review');
-  await waitFor(`${card}.innerText.includes('Open this exact video in Drive before checking the review boxes')`);
+  await waitFor(`${card}.textContent.includes('Open this exact video in Drive before checking the review boxes')`);
   assert.equal(await evaluate(`${card}.querySelectorAll('details')[2].querySelector('form').checkValidity()`),false);
   // No review is recorded without the explicit complete manual checklist.
   assert.equal((await readItem()).package.production.media,null);
@@ -96,7 +96,7 @@ async function main(){
   assert.equal(await evaluate(`${button('APPROVE')}.disabled`),true);
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);await snapshot('content-desktop.png');
-  await call('Page.navigate',{url:fixture.base+'/?other=1'});await waitFor("document.body.innerText.includes('Content Factory is not enabled for this account.')");
+  await call('Page.navigate',{url:fixture.base+'/?other=1'});await waitFor("document.body?.innerText.includes('Content Factory is not enabled for this account.')");
   assert.equal(await evaluate("document.querySelectorAll('[data-content-id]').length"),0);
   assert.equal((await fixture.request(other,'/api/content-factory/workspace/media/source_image_123456?kind=image')).status,404);
   assert.deepEqual(await db.collection('enterprisestates').find({kind:'C0_ITEM'}).toArray(),beforeLegacy);
