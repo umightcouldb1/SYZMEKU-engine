@@ -36,6 +36,38 @@ test('real Stripe signature verification and webhook replay preserve one paid en
  assert.equal((await request(b,'/audit/entitlement')).data.entitled,false);
  assert.equal((await request(a,'/audit/checkout/verify','POST',{sessionId:'cs_fixture'})).status,200);
 });
+test('Freedom Audit delayed payment webhooks defer access and fulfill signed success exactly once',async()=>{
+ const buyer=await makeUser('asyncbuyer','USER');
+ const delayed={id:'cs_async_fixture',client_reference_id:buyer.id,mode:'payment',status:'complete',payment_status:'unpaid'};
+ const send=async(type,object,validSignature=true)=>{
+  const body=JSON.stringify({id:'evt_'+type.replaceAll('.','_'),type,data:{object}});
+  const signature=validSignature?realStripe.webhooks.generateTestHeaderString({payload:body,secret:process.env.STRIPE_WEBHOOK_SECRET}):'invalid';
+  return fetch(base+'/webhook/stripe',{method:'POST',headers:{'Content-Type':'application/json','stripe-signature':signature},body});
+ };
+ assert.equal((await send('checkout.session.completed',delayed)).status,200);
+ assert.equal((await request(buyer,'/audit/entitlement')).data.entitled,false);
+ assert.equal((await send('checkout.session.async_payment_failed',delayed)).status,200);
+ assert.equal((await request(buyer,'/audit/entitlement')).data.entitled,false);
+ const paid={...delayed,payment_status:'paid'};
+ assert.equal((await send('checkout.session.async_payment_succeeded',paid,false)).status,400);
+ assert.equal((await request(buyer,'/audit/entitlement')).data.entitled,false);
+ const results=await Promise.all(Array.from({length:3},()=>send('checkout.session.async_payment_succeeded',paid)));
+ assert(results.every(r=>r.status===200));
+ assert.equal((await request(buyer,'/audit/entitlement')).data.entitled,true);
+ assert.equal((await send('checkout.session.completed',delayed)).status,200);
+ assert.equal((await send('checkout.session.completed',paid)).status,200);
+ assert.equal((await send('checkout.session.async_payment_failed',delayed)).status,200);
+ let profile=await UserProfile.findOne({userId:buyer.id});
+ assert.equal(profile.purchasedProducts.length,1);
+ assert.equal(profile.purchasedProducts[0].checkoutSessionId,delayed.id);
+ assert.equal(profile.purchasedProducts[0].status,'paid');
+ await UserProfile.updateOne({userId:buyer.id},{$set:{'purchasedProducts.0.status':'refunded'}});
+ assert.equal((await send('checkout.session.async_payment_succeeded',paid)).status,200);
+ profile=await UserProfile.findOne({userId:buyer.id});
+ assert.equal(profile.purchasedProducts.length,1);
+ assert.equal(profile.purchasedProducts[0].status,'refunded');
+ assert.equal((await request(buyer,'/audit/entitlement')).data.entitled,false);
+});
 test('Freedom Audit scoring/stage and ten-result retention are unchanged',async()=>{
  const ratings=Object.fromEntries(['time','money','obligations','assets','desires'].map(k=>[k,[4,4,4,4]]));
  for(let i=0;i<11;i++){const r=await request(a,'/audit/results','POST',{ratings,win:'Publish my portfolio'});assert.equal(r.status,201);assert.equal(r.data.result.score,80);assert.equal(r.data.result.stage,'Expand');assert.equal(r.data.result.weakestDomain,'time');}

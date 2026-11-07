@@ -140,9 +140,20 @@ const handleStripeWebhook = async (req, res) => {
   }
 
   try {
-    if (event.type === 'checkout.session.completed') {
-      await fulfillCheckoutSession(event.data.object);
+    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
+      const session = event.data.object;
+      // Delayed payment methods complete Checkout before funds settle. Acknowledge
+      // that event without access; the signed async success event fulfills later.
+      if (event.type === 'checkout.session.completed'
+        && session.mode === 'payment' && session.status === 'complete'
+        && session.payment_status === 'unpaid') {
+        return res.json({ received: true });
+      }
+      await fulfillCheckoutSession(session);
     }
+
+    // async_payment_failed grants nothing. Do not revoke another successful
+    // purchase or change entitlements when a failed/delayed event is replayed.
 
     return res.json({ received: true });
   } catch (error) {

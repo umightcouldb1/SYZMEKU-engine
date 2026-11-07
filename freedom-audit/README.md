@@ -44,6 +44,15 @@ The Freedom Audit reuses the existing SYZMEKU Stripe stack:
 - existing `/api/webhooks/stripe` or `/webhook/stripe` webhook handling
 - existing `UserProfile.purchasedProducts` entitlement model
 
+The Stripe webhook endpoint must subscribe to `checkout.session.completed`,
+`checkout.session.async_payment_succeeded`, and `checkout.session.async_payment_failed`.
+An unpaid completed Checkout is acknowledged without granting access. A signed
+async success grants the same idempotent paid entitlement as an immediate payment;
+an async failure grants nothing. Checkout's existing dynamic payment-method settings
+are unchanged. Deploying this handler does not update Stripe's event subscriptions:
+verify the endpoint configuration separately before treating delayed-payment
+fulfillment as operational.
+
 Create one Stripe product named `The Freedom Audit` with a one-time USD price of `3700` cents. Set the backend environment variable `FREEDOM_AUDIT_STRIPE_PRICE_ID` to that exact Stripe price id. Freedom Audit entitlement is tied to this configured price id, not to product name matching.
 
 Production Stripe configuration:
