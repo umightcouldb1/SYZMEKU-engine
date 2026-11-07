@@ -24,6 +24,8 @@ Three collections store only E0 operational data: `enterprisestates` (latest der
 
 Browser events contain a session-scoped random visit ID, random event ID, event name, allowlisted platform/campaign and optional checkout return state. No URLs, arbitrary UTM strings, referrers, names, email, IP, credentials, answers or private context are stored. Global Privacy Control and Do Not Track disable browser telemetry. Browser events are unverified and can be blocked or spoofed; no conversion denominator treats them as verified people. No telemetry request consumes the existing buyer API limiter allowance; it has a separate limiter. Telemetry failures never gate purchase/auth/results.
 
+Content attribution accepts both legacy `fa_launch_*` and Content Factory `fa_c0_*` identifiers, with a 1–90 character alphanumeric/underscore suffix. Browser and server enforce the same allowlist. A valid new identifier replaces earlier session content attribution and persists across untagged navigation. This records only newly observed business events; it does not recover missing historical attribution or establish verified purchases.
+
 Response observers inspect only route, HTTP status, origin and whether the authenticated ID matches the configured founder. They do not inspect request/response bodies. They record operational successes/failures without changing the response. Webhook response health is platform operational evidence, not proof of fulfillment. Browser `product_complete` is separate from retained server completion records. Purchase remains a Stripe query, never a client event.
 
 E0 polls every 15 minutes and once shortly after boot. Database leases deduplicate replicas/restarts. Event receipts arrive immediately, but aggregate dashboard refresh is bounded to the polling cadence. No outbound notifications are sent. Stale briefs are visibly labeled after 35 minutes; failures preserve the last successful brief and an explicit failure marker. This observes uptime; it is not an uptime SLA. A sleeping/unavailable Render instance cannot run an in-process monitor; the stale indicator exposes that limitation.
@@ -42,6 +44,8 @@ The dashboard shows revenue, every funnel stage, coverage, channel state, servic
 ## Verification and rollback
 
 `npm run e0:test` covers owner/role/gate denial, customer isolation, private-field rejection, event deduplication, wrong origin, monitoring lease/restart, outcome suppression, zero-write GET, foreign-ledger denial, deterministic synthesis, source firewall, read-only Stripe/Social integration, founder exclusion, missing metric semantics, response observation and browser privacy/failure isolation.
+
+The dependency-free attribution regression can also run alone with `node --test server/tests/enterpriseAttribution.test.cjs`. It checks all current Content Factory identifiers through both parsers, legacy compatibility, same-session replacement/persistence, malformed token rejection, unchanged campaign/payload restrictions and telemetry privacy/failure isolation.
 
 `npm run e0:browser` exercises actual HTTP+MongoDB with desktop and 390px mobile rendering, reload, unauthorized state clearing and no Task effects. Existing M1, M2, M3, Social, commerce/auth and production builds remain required. New production telemetry cannot be presented as historical coverage.
 

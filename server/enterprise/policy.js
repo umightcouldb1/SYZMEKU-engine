@@ -24,7 +24,7 @@ function parseEvent(body) {
     source: SOURCES.includes(body.source) ? body.source : 'unattributed',
     medium: safeToken(body.medium, /^[a-z0-9_-]{1,40}$/i),
     campaign: safeToken(body.campaign, /^(freedom_audit_launch|fa_launch_[a-z0-9_]{1,90})$/i),
-    content: safeToken(body.content, /^fa_launch_[a-z0-9_]{1,90}$/i),
+    content: safeToken(body.content, /^fa_(?:launch|c0)_[a-z0-9_]{1,90}$/i),
     returnState: ['success', 'canceled'].includes(body.returnState) ? body.returnState : null,
     authority: 'unverified_browser_event' };
 }
