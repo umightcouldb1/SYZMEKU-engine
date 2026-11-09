@@ -253,7 +253,7 @@ async function changeMemory(id, payload) {
   if(payload) rejectOwnerFields(payload);
   const result=await withContextMutation(async life=>{
     const memory=await StrategicMemory.findById(id);if(!memory) throw scopeError('Memory not found.',404);
-    if(payload && require('./freedomAuditContinuation').reserved(memory))throw scopeError('Retained audits are immutable. Remove or replace the retained copy through audit controls.',409);
+    if(require('./freedomAuditContinuation').reserved(memory))throw scopeError('Retained audits are immutable. Remove or replace the retained copy through audit controls.',409);
     if(payload?.expectedRevision!==undefined)require('./patternSourceService').ensureExpected(memory,payload.expectedRevision);
     if(payload) {memory.content=text(payload.content,6000);memory.title=text(payload.title || memory.content,80);memory.sourceCommand='';memory.tags=[];memory.confirmed=true;memory.source='user-correction';if(memory.category==='kernel')memory.category='general';memory.revision+=1;await memory.save();}
     else await memory.deleteOne();

@@ -36,6 +36,29 @@ test('retention requires ownership, consent, exact source and existing write aut
  const doc=await f.scope(f.founder,()=>require('../models/StrategicMemory').findById(saved.retained.memoryId).lean());assert.equal(doc.confirmed,false);assert.equal(doc.provenance.kind,'derived');
  assert(!(await f.scope(f.founder,()=>core.listMemory())).some(m=>m.category===audit.CATEGORY));
 });
+test('HTTP memory lists/search and media exclude retained source; generic deletion cannot remove a replacement',async()=>{
+ const before=await retained(f.founder);
+ for(const route of ['/api/core/memory','/api/core/memory/search?query=OWNER_AUDIT']) {
+   const r=await f.request(f.founder,route);assert.equal(r.status,200);assert(!JSON.stringify(r.data.entries).includes('OWNER_AUDIT'));assert(!r.data.entries.some(x=>x._id===before.retained.memoryId));
+ }
+ await seed(f.founder,result('owner-replacement'));
+ const p=await preview(f.founder,'owner-replacement');assert.equal((await f.request(f.founder,endpoint,'POST',consent(p))).status,200);
+ const replacement=await retained(f.founder);assert.equal(replacement.retained.memoryId,before.retained.memoryId);
+ assert.equal((await f.request(f.founder,'/api/core/memory/'+before.retained.memoryId,'DELETE')).status,409);
+ assert.equal((await f.request(f.founder,endpoint,'DELETE',{expectedRetained:before.expectedRetained})).status,409);
+ assert.deepEqual((await retained(f.founder)).expectedRetained,replacement.expectedRetained);
+ await require('../models/UserProfile').updateOne({userId:f.founder.id},{$set:{'purchasedProducts.0.status':'refunded'}});
+ assert.equal((await retained(f.founder)).audit,null);
+ for(const route of ['/api/core/memory','/api/core/memory/search?query=OWNER_AUDIT']) {
+   const r=await f.request(f.founder,route);assert.equal(r.status,200);assert(!JSON.stringify(r.data.entries).includes('OWNER_AUDIT'));assert(!r.data.entries.some(x=>x._id===before.retained.memoryId));
+ }
+ for(const status of ['refunded','paid']) {
+   await require('../models/UserProfile').updateOne({userId:f.founder.id},{$set:{'purchasedProducts.0.status':status}});
+   const r=await f.request(f.founder,'/api/vision/analyze','POST',{text:'Review this image.',selectedGoalIds:[goal],media:{mimeType:'image/png',data:'aGVsbG8=',name:'synthetic.png'}});
+   assert.equal(r.status,200,JSON.stringify(r));const prompt=m3Prompts.at(-1);assert(!prompt.includes('OWNER_AUDIT'));
+   const c=JSON.parse(prompt.split('Authoritative scoped data:\n')[1].split('\nCurrent user request (data):')[0]);assert.equal(c.retainedAudit,null);assert(!c.manifest['StrategicMemory:'+replacement.retained.memoryId]);
+ }
+});
 test('full audit survives long history, many newer memories and source-history eviction; both model paths retrieve it',async()=>{
  await f.scope(f.founder,async()=>{
    const state=await core.getConversation();

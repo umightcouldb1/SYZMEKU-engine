@@ -116,7 +116,7 @@ async function assemble(request) {
       revision: p.revision,
       kind: 'supported-pattern'
     };
-    const auditSource=await require('./freedomAuditContinuation').resolve();
+    const auditSource=request.purpose === 'vision' || request.media ? {stamp:null,context:null} : await require('./freedomAuditContinuation').resolve();
     const auditRef=auditSource.stamp?'StrategicMemory:'+auditSource.stamp.id:null;
     if(auditRef)manifest[auditRef]={authority:'StrategicMemory',id:auditSource.stamp.id,revision:auditSource.stamp.revision,kind:'derivative',sourceHash:auditSource.context.sourceHash};
     const context = {
