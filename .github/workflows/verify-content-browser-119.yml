@@ -1,0 +1,39 @@
+name: Verify existing content pipeline
+on:
+  push:
+    branches: [verify/content-browser-119-20261109]
+    paths: [.github/workflows/verify-content-browser-119.yml]
+permissions:
+  contents: read
+jobs:
+  content-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 1c598884d157dd9fb79ca28d8f44c4f0c5f16201
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.16.0
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            client/package-lock.json
+      - name: Install locked existing dependencies
+        run: |
+          npm ci
+          npm ci --prefix server
+          npm ci --prefix client
+      - name: Verify only the synthetic content browser journey
+        run: npm run c0:browser
+      - name: Retain synthetic review screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: content-browser-pr119-1c598884
+          path: .cache/content-factory-browser/*.png
+          if-no-files-found: ignore
+          retention-days: 3
