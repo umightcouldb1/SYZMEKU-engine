@@ -96,31 +96,9 @@ const createFreshAdmin = async (adminEmail, initialPassword) => {
     email: adminEmail,
     password: hashedPassword,
     role: User.ROLES.COMMANDER_IN_CHIEF,
+    identity: { version: 1, passwordEnabled: true },
     isVerified: true,
   });
-};
-
-const applyAdminPasswordReset = async (adminEmail, initialPassword) => {
-  let admin = await findAdminByEmail(adminEmail);
-
-  if (!admin) {
-    admin = await createFreshAdmin(adminEmail, initialPassword);
-    console.log(`[SYS-INIT] Admin identity created with username: ${admin.username}.`);
-    return admin;
-  }
-
-  admin.email = adminEmail;
-  admin.username = admin.username || await resolveUniqueUsername(
-    process.env.ADMIN_USERNAME || deriveUsernameFromEmail(adminEmail),
-    admin._id,
-  );
-  admin.password = await bcrypt.hash(initialPassword, 10);
-  if (admin.isVerified !== undefined) admin.isVerified = true;
-
-  await admin.save();
-  admin = await setCommanderRole(admin);
-  console.log(`[SYS-INIT] Admin credentials refreshed in place for username: ${admin.username}.`);
-  return admin;
 };
 
 const initializeAdminSystem = async () => {
@@ -134,15 +112,7 @@ const initializeAdminSystem = async () => {
 
   try {
     if (process.env.RESET_ADMIN_PASSWORD === 'true') {
-      if (!initialPassword) {
-        console.warn('[SYS-INIT] RESET_ADMIN_PASSWORD is true, but INITIAL_ADMIN_PASSWORD is not configured.');
-        return;
-      }
-
-      console.log(`[SYS-INIT] Password reset flag detected for: ${adminEmail}`);
-      await applyAdminPasswordReset(adminEmail, initialPassword);
-      console.log('[SYS-INIT] Admin reset completed without deleting the user record. Clear RESET_ADMIN_PASSWORD after successful login.');
-      return;
+      console.warn('[SYS-INIT] RESET_ADMIN_PASSWORD is ignored; existing credentials are never changed during startup.');
     }
 
     let admin = await findAdminByEmail(adminEmail);

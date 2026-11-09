@@ -269,6 +269,7 @@
             <div id="googleSignIn" aria-label="Sign in with Google"></div>
             <p id="googleStatus" class="muted" role="status" aria-live="polite">Loading Google sign-in…</p>
             <button id="googleRetry" type="button" class="ghost hidden">Retry Google sign-in</button>
+            <button id="googleLinkCancel" type="button" class="ghost hidden">Cancel Google linking</button>
             <p class="muted">or use email and password</p>
           </div>
           <div class="auth-tabs">
@@ -422,6 +423,7 @@
       latestResult: null,
       authBusy: false,
       auditBusy: false,
+      googleLinkRequired: false,
       results: []
     };
 
@@ -461,6 +463,7 @@
       if (!response.ok) {
         const error = new Error(payload.error || payload.message || 'The Freedom Audit API request failed.');
         error.status = response.status;
+        error.code = payload.code || '';
         throw error;
       }
       if (['/auth/google', '/auth/login', '/auth/register'].includes(path)) window.freedomBusinessEvent?.('sign_in_success');
@@ -606,6 +609,9 @@
       state.entitled = false;
       state.latestResult = null;
       state.results = [];
+      state.googleLinkRequired = false;
+      $('googleLinkCancel').classList.add('hidden');
+      $('password').value = '';
       localStorage.setItem('freedomAuditToken', state.token);
       message($('gateMessage'), 'Signed in. Checking your Freedom Audit access now.', 'success');
       const entitled = await refreshEntitlement();
@@ -621,14 +627,30 @@
       }
       try {
         setAuthBusy(true);
-        const data = await api('/auth/google', { method: 'POST', body: JSON.stringify({ credential: response.credential }) });
+        const data = await api('/auth/google', { method: 'POST', body: JSON.stringify({
+          credential: response.credential,
+          ...(state.googleLinkRequired ? { password: $('password').value } : {})
+        }) });
         await completeSignIn(data);
       } catch (error) {
+        if (error.code === 'GOOGLE_ACCOUNT_LINK_REQUIRED') {
+          state.googleLinkRequired = true;
+          $('googleLinkCancel').classList.remove('hidden');
+        }
         message($('gateMessage'), error.message || 'Unable to sign in with Google. Please try again.');
       } finally {
         setAuthBusy(false);
       }
     }
+
+    function cancelGoogleLinking() {
+      if (state.authBusy) return;
+      state.googleLinkRequired = false;
+      $('password').value = '';
+      $('googleLinkCancel').classList.add('hidden');
+      message($('gateMessage'), 'Google linking canceled. You can still sign in with your password.', 'success');
+    }
+    $('googleLinkCancel').addEventListener('click', cancelGoogleLinking);
 
     let googleReady = false;
     let googleLoading = false;

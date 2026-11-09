@@ -26,6 +26,12 @@ const connectDB = async () => {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('[SYS_LOG] Mongo connected');
     await initializeAdminSystem();
+    try {
+      await require('./utils/identityIndex').ensureIdentityIndex();
+      console.log('[AUTH_SECURITY] Google subject unique index verified.');
+    } catch (_error) {
+      console.error('[AUTH_SECURITY] Google subject index verification failed; new identity enrollment remains blocked.');
+    }
   } catch (err) {
     console.error(`[SYS_ERR] Database connection failed: ${err.message}`);
   }
@@ -92,7 +98,7 @@ app.use(helmet({
       formAction: ["'self'"],
       frameAncestors: ["'self'"],
       frameSrc: ["'self'", 'https://accounts.google.com', 'https://*.google.com'],
-      imgSrc: ["'self'", 'data:', 'https:'],
+      imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
       objectSrc: ["'none'"],
       scriptSrc: ["'self'", 'https://accounts.google.com', 'https://apis.google.com'],
       scriptSrcAttr: ["'none'"],

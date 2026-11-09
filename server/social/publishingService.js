@@ -85,7 +85,7 @@ const publishPost = async ({ userId, campaignId, postId }) => {
   // C0 approval binds the exact prepared version and publishing payload.
   // Ordinary existing campaigns retain their existing authorization path.
   await require('../enterprise/content/service').assertPublication({ db: SocialCampaign.db.db, campaign, post });
-  if (campaign.metadata?.c0) {
+  if (campaign.metadata?.c0 && campaign.metadata.c0.storage !== 'GOOGLE_DRIVE') {
     await require('../enterprise/content/mediaIntegrity').verifyMediaBytes({ url: post.mediaAssets?.[0]?.url, sha256: post.metadata?.c0MediaSha256 });
   }
 
@@ -100,6 +100,12 @@ const publishPost = async ({ userId, campaignId, postId }) => {
     const error = new Error('A connected social account is required before publishing.');
     error.statusCode = 409;
     throw error;
+  }
+
+  if (campaign.metadata?.c0?.storage === 'GOOGLE_DRIVE') {
+    const provider = getProvider('youtube');
+    const accessToken = await getFreshAccessToken({ connection, provider });
+    return require('../enterprise/content/approvedRelease').publishReleasedPost({db:SocialCampaign.db.db,campaign,post,connection,provider,accessToken});
   }
 
   post.idempotencyKey = post.idempotencyKey || buildIdempotencyKey({ campaignId: campaign._id, postId: post._id });

@@ -193,6 +193,8 @@ The scheduler endpoint is restricted to the authenticated `COMMANDER_IN_CHIEF` r
 - PKCE is used for YouTube and TikTok.
 - Provider access and refresh tokens are encrypted with AES-256-GCM before database storage and never returned to the client.
 - Media asset URLs are validated before storage. They must be public HTTPS URLs, cannot target localhost or private/reserved IP ranges, and can be constrained further with `SOCIAL_MEDIA_ALLOWED_ASSET_HOSTS`.
+- Server-side YouTube downloads recheck every resolved IP address and pin the connection to a validated address while preserving TLS hostname verification. Redirects, URL credentials, custom ports, and HTTP-compressed responses are rejected. Use a direct, uncompressed asset URL.
+- Downloads enforce a 60-second total deadline (including DNS and body transfer) and a streaming byte limit. `YOUTUBE_MAX_UPLOAD_BYTES` defaults to 75 MiB and must be a positive integer no larger than 256 MiB. Missing or incorrect Content-Length headers cannot bypass the limit. IPv6 assets must use global unicast addresses; mapped/transition and reserved ranges are rejected.
 - Campaigns, connections, analytics snapshots, and publishing operations are scoped by `userId`.
 - Audit log category `social-command` records account connection, disconnect, token refresh, campaign creation, approval, scheduling, publish success, and publish/schedule failure.
 

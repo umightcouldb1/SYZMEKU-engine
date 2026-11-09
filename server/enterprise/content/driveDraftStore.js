@@ -1,6 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const { hash } = require('./qa');
+const { readPrivateConfig } = require('./privateConfig');
 const KIND = 'C0_DRIVE_DRAFT_POINTER';
 const MAX_BYTES = 4 * 1024 * 1024;
 const API = 'https://www.googleapis.com/drive/v3/files/';
@@ -41,11 +42,12 @@ function createStore({ db, owner, workspace, fetchImpl = fetch }) {
     if (meta.trashed !== false || meta.mimeType !== mimeType || meta.owners?.length !== 1 || meta.owners[0].me !== true || meta.owners[0].emailAddress?.toLowerCase() !== accountEmail.toLowerCase() || !Array.isArray(meta.permissions) || !meta.permissions.length || meta.permissions.some(p => p.type !== 'user' || p.role !== 'owner' || p.emailAddress?.toLowerCase() !== accountEmail.toLowerCase()) || meta.capabilities?.canEdit !== true) fail('DRIVE_DRAFT_PRIVATE_OWNER_REQUIRED');
   }
   async function context() {
+    const { BUSINESS_ACCOUNT } = readPrivateConfig();
     let fresh;
     try { fresh = await (workspace || require('./workspaceConnection')).getFreshAccessToken({ owner }); } catch { fail('DRIVE_DRAFT_AUTH_REQUIRED'); }
     const { connection, accessToken } = fresh || {};
     if (!accessToken || String(connection?.userId) !== owner || !connection?.accountEmail || connection.status !== 'connected' || !connection.scopes?.includes('https://www.googleapis.com/auth/drive.file')) fail('DRIVE_DRAFT_AUTH_REQUIRED');
-    if (connection.accountEmail.toLowerCase() !== 'umightcouldb1@toisouljahacademy.com') fail('GOOGLE_WORKSPACE_ACCOUNT_MISMATCH');
+    if (connection.accountEmail.toLowerCase() !== BUSINESS_ACCOUNT) fail('GOOGLE_WORKSPACE_ACCOUNT_MISMATCH');
     const canonical = connection.metadata?.canonicalStorage;
     const folderId = canonical?.folders?.Organic, factoryId = canonical?.contentFactoryFolderId;
     if (canonical?.provider !== 'GOOGLE_DRIVE' || !validId(folderId) || !validId(factoryId)) fail('DRIVE_DRAFT_FOLDER_REQUIRED');

@@ -1,3 +1,4 @@
+require('./contentPrivateConfigFixture.cjs').configure();
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createStore, KIND, MAX_BYTES } = require('../enterprise/content/driveDraftStore');
@@ -5,7 +6,7 @@ const { hash } = require('../enterprise/content/qa');
 const clone = value => structuredClone(value);
 function fixture() {
   const docs = new Map(), files = new Map(), writes = [], requests = [];
-  const email = 'umightcouldb1@toisouljahacademy.com';
+  const email = require('./contentPrivateConfigFixture.cjs').BUSINESS_ACCOUNT;
   const meta = (id, mimeType, parents) => ({ id, mimeType, parents, trashed: false, owners: [{ me: true, emailAddress: email }], permissions: [{ type: 'user', role: 'owner', emailAddress: email }], capabilities: { canEdit: true } });
   files.set('organic', { meta: meta('organic','application/vnd.google-apps.folder',['factory']) });
   function matches(doc, query) { return doc && Object.entries(query).every(([k,v]) => v && typeof v === 'object' && '$exists' in v ? (doc[k] !== undefined) === v.$exists : doc[k] === v); }

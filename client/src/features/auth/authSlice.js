@@ -145,7 +145,10 @@ export const googleLogin = createAsyncThunk(
         try {
             return await authService.googleLogin(credential);
         } catch (error) {
-            return thunkAPI.rejectWithValue(getAuthErrorMessage(error));
+            return thunkAPI.rejectWithValue({
+                message: getAuthErrorMessage(error),
+                code: error?.response?.data?.code || '',
+            });
         }
     }
 );
@@ -219,7 +222,7 @@ export const authSlice = createSlice({
             .addCase(googleLogin.rejected, (state, action) => {
                 state.isLoading = false;
                 state.isError = true;
-                state.message = action.payload;
+                state.message = action.payload?.message || action.payload;
                 state.user = null;
                 setAuthHeader(null);
             })

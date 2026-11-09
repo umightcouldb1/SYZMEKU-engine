@@ -1,9 +1,9 @@
 const crypto=require('node:crypto');
 const {hash}=require('../enterprise/content/qa');
-const {ORIGINAL_LOGO_FILE_ID}=require('../enterprise/content/driveMedia');
+const {ORIGINAL_LOGO_FILE_ID,BUSINESS_ACCOUNT}=require('./contentPrivateConfigFixture.cjs');
 const digest=b=>crypto.createHash('sha256').update(b).digest('hex');
 function fakeGoogle(owner){
- const account='umightcouldb1@toisouljahacademy.com',files=new Map(),calls=[];let sequence=0;
+ const account=BUSINESS_ACCOUNT,files=new Map(),calls=[];let sequence=0;
  const privateMeta=(id,mimeType)=>({id,mimeType,trashed:false,owners:[{me:true,emailAddress:account}],permissions:[{type:'user',role:'owner',emailAddress:account}],capabilities:{canEdit:true,canDownload:true}});
  const folder='draft_folder_123456',factory='factory_folder_123456';files.set(folder,{meta:{...privateMeta(folder,'application/vnd.google-apps.folder'),parents:[factory]}});
  function asset(id,mimeType,body){const bytes=Buffer.from(body);files.set(id,{meta:{...privateMeta(id,mimeType),name:id,size:String(bytes.length),sha256Checksum:digest(bytes)},bytes});}

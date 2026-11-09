@@ -1,3 +1,4 @@
+require('./contentPrivateConfigFixture.cjs').configure();
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict');
 const {hash,qa}=require('../enterprise/content/qa'),catalog=require('../enterprise/content/catalog'),{voiceCheck}=require('../enterprise/content/voice');
 const service=require('../enterprise/content/service'),{createStore}=require('../enterprise/content/driveDraftStore'),{createMediaReader}=require('../enterprise/content/driveMedia');
@@ -35,7 +36,7 @@ test('legacy record edits fork Drive without mutation; stale revisions are rejec
 test('image selection precedes video review; checksums and original reference are bound',async()=>{
  const item=await get('variant-b-facebook');const checks=Object.fromEntries(service.REVIEW_CHECKS.map(k=>[k,true]));
  await assert.rejects(service.attachReviewedMedia({db,owner:f.founder.id,id:item.id,expectedHash:item.hash,expectedRevision:item.revision,media:{fileId:'review_video_123456',sha256:google.files.get('review_video_123456').meta.sha256Checksum,duration:24},checks,store,mediaReader:reader}),/FOUNDER_IMAGE_APPROVAL_REQUIRED/);
- await service.approveImages({db,owner:f.founder.id,id:item.id,expectedHash:item.hash,expectedRevision:item.revision,images:item.package.scenes.map((_,sceneIndex)=>({sceneIndex,fileId:'source_image_123456',sha256:google.files.get('source_image_123456').meta.sha256Checksum})),referenceSha256:google.files.get(require('../enterprise/content/driveMedia').ORIGINAL_LOGO_FILE_ID).meta.sha256Checksum,store,mediaReader:reader});
+ await service.approveImages({db,owner:f.founder.id,id:item.id,expectedHash:item.hash,expectedRevision:item.revision,images:item.package.scenes.map((_,sceneIndex)=>({sceneIndex,fileId:'source_image_123456',sha256:google.files.get('source_image_123456').meta.sha256Checksum})),referenceSha256:google.files.get(require('./contentPrivateConfigFixture.cjs').ORIGINAL_LOGO_FILE_ID).meta.sha256Checksum,store,mediaReader:reader});
  const selected=await get(item.id);assert(selected.package.production.imageApproval.selectionHash);assert.equal(selected.package.production.media,null);assert.equal(selected.package.visual.version,'FOUNDER_REFERENCE_IMAGES_V1');
  google.asset('source_image_123456','image/png','changed-image');
  await assert.rejects(service.attachReviewedMedia({db,owner:f.founder.id,id:selected.id,expectedHash:selected.hash,expectedRevision:selected.revision,media:{fileId:'review_video_123456',sha256:google.files.get('review_video_123456').meta.sha256Checksum,duration:24},checks,store,mediaReader:reader}),/APPROVED_IMAGE_CHANGED/);
@@ -43,7 +44,7 @@ test('image selection precedes video review; checksums and original reference ar
 });
 test('exact finished-video approval remains Drive-only and never makes a Social draft',async()=>{
  let item=await get('first-longform');
- await service.approveImages({db,owner:f.founder.id,id:item.id,expectedHash:item.hash,expectedRevision:item.revision,images:item.package.scenes.map((_,sceneIndex)=>({sceneIndex,fileId:'source_image_123456',sha256:google.files.get('source_image_123456').meta.sha256Checksum})),referenceSha256:google.files.get(require('../enterprise/content/driveMedia').ORIGINAL_LOGO_FILE_ID).meta.sha256Checksum,store,mediaReader:reader});
+ await service.approveImages({db,owner:f.founder.id,id:item.id,expectedHash:item.hash,expectedRevision:item.revision,images:item.package.scenes.map((_,sceneIndex)=>({sceneIndex,fileId:'source_image_123456',sha256:google.files.get('source_image_123456').meta.sha256Checksum})),referenceSha256:google.files.get(require('./contentPrivateConfigFixture.cjs').ORIGINAL_LOGO_FILE_ID).meta.sha256Checksum,store,mediaReader:reader});
  item=await get(item.id);await service.attachReviewedMedia({db,owner:f.founder.id,id:item.id,expectedHash:item.hash,expectedRevision:item.revision,media:{fileId:'review_video_123456',sha256:google.files.get('review_video_123456').meta.sha256Checksum,duration:item.package.duration},checks:Object.fromEntries(service.REVIEW_CHECKS.map(k=>[k,true])),store,mediaReader:reader});
  item=await get(item.id);assert.equal(item.qa.canApprove,true);await service.approveMany({db,owner:f.founder.id,items:[{id:item.id,hash:item.hash,version:item.version,revision:item.revision}],store,mediaReader:reader});
  assert.equal((await get(item.id)).status,'APPROVED');assert.equal(await db.collection('socialcampaigns').countDocuments({}),0);
@@ -67,7 +68,7 @@ test('new feedback is saved in Drive and included in future voice rules',async()
 });
 test('ordinary final Social campaigns retain their publication boundary',async()=>{await service.assertPublication({db,campaign:{metadata:{},userId:'any'},post:{}});});
 test('expected media snapshots and private ownership cannot be bypassed',async()=>{
- const item=await get('variant-b-instagram'),referenceSha256=google.files.get(require('../enterprise/content/driveMedia').ORIGINAL_LOGO_FILE_ID).meta.sha256Checksum;
+ const item=await get('variant-b-instagram'),referenceSha256=google.files.get(require('./contentPrivateConfigFixture.cjs').ORIGINAL_LOGO_FILE_ID).meta.sha256Checksum;
  const images=item.package.scenes.map((_,sceneIndex)=>({sceneIndex,fileId:'source_image_123456',sha256:'0'.repeat(64)}));
  await assert.rejects(service.approveImages({db,owner:f.founder.id,id:item.id,expectedHash:item.hash,expectedRevision:item.revision,images,referenceSha256,store,mediaReader:reader}),/APPROVED_IMAGE_CHANGED/);
  const asset=google.files.get('source_image_123456'),saved=asset.meta.permissions;
@@ -98,4 +99,21 @@ test('a founder hold during Slides assembly cannot be overwritten by completion'
  let item=await get('slides-assembly-fixture');
  const assembler=async input=>{const currentItem=await get(item.id);await service.change({db,owner:f.founder.id,id:item.id,expectedHash:currentItem.hash,expectedRevision:currentItem.revision,action:'HOLD',store});return {presentationId:'synthetic_slides_123'};};
  await assert.rejects(service.assembleApprovedImages({db,owner:f.founder.id,id:item.id,expectedHash:item.hash,expectedRevision:item.revision,store,mediaReader:reader,assembler}),/CONTENT_VERSION_CHANGED/);assert.equal((await get(item.id)).status,'HOLD');
+});
+
+test('existing Drive access route is explicit, founder-only and accepts no caller-selected scope',async()=>{
+ const access=require('../enterprise/content/driveAccessCheck'),workspace=require('../enterprise/content/workspaceConnection');
+ const old=access.checkExistingDriveAccess,oldStatus=workspace.getStatus;const calls=[];
+ access.checkExistingDriveAccess=async args=>{calls.push(args);return {status:'PASS',ready:true,productionReady:false,checks:[]};};
+ workspace.getStatus=async args=>{assert.equal(args.verify,false);return {connected:true};};
+ try{
+  assert.equal((await f.request(f.other,'/api/content-factory/workspace/drive-access-check','POST',{})).status,404);
+  assert.equal((await f.request(f.founder,'/api/content-factory/workspace/drive-access-check','POST',{scopes:['extra']})).status,400);
+  assert.equal((await f.request(f.founder,'/api/content-factory/workspace/drive-access-check?owner=other','POST',{})).status,400);
+  assert.equal(calls.length,0);
+  const result=await f.request(f.founder,'/api/content-factory/workspace/drive-access-check','POST',{});
+  assert.equal(result.status,200);assert.deepEqual(calls,[{owner:String(f.founder.id)}]);
+  assert.equal(result.data.productionReady,false);
+  assert.equal((await f.request(f.founder,'/api/content-factory/workspace/status?verify=true')).status,200);
+ }finally{access.checkExistingDriveAccess=old;workspace.getStatus=oldStatus;}
 });

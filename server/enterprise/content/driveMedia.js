@@ -1,12 +1,13 @@
 const crypto = require('node:crypto');
 const workspace = require('./workspaceConnection');
 const FILE_ID = /^[a-zA-Z0-9_-]{10,150}$/;
-const BUSINESS_ACCOUNT = 'umightcouldb1@toisouljahacademy.com';
-const ORIGINAL_LOGO_FILE_ID = '1hqmbmeslPMilCjwT8cBrdCUkkuEAz2qH';
+const { readPrivateConfig } = require('./privateConfig');
 const fail = (code, statusCode = 409) => { throw Object.assign(new Error(code), { statusCode }); };
 const validId = id => typeof id === 'string' && FILE_ID.test(id);
 async function createMediaReader({owner, workspaceImpl = workspace, fetchImpl = fetch}) {
+  const { BUSINESS_ACCOUNT, ORIGINAL_LOGO_FILE_ID } = readPrivateConfig();
   const {connection, accessToken} = await workspaceImpl.getFreshAccessToken({owner});
+  if (!accessToken || String(connection?.userId) !== String(owner) || connection?.status !== 'connected' || !connection?.scopes?.includes('https://www.googleapis.com/auth/drive.file')) fail('DRIVE_DRAFT_AUTH_REQUIRED');
   if (connection?.accountEmail?.toLowerCase() !== BUSINESS_ACCOUNT) fail('GOOGLE_WORKSPACE_ACCOUNT_MISMATCH');
   const request = async (path, accept = 'application/json') => {
     const response = await fetchImpl(`https://www.googleapis.com/drive/v3/${path}`, {
@@ -37,13 +38,33 @@ async function createMediaReader({owner, workspaceImpl = workspace, fetchImpl = 
       if (bytes !== Number(metadata.size)) fail('GOOGLE_DRIVE_MEDIA_CHANGED');
       sha256 = digest.digest('hex');
     }
-    return {fileId, sha256, mimeType: metadata.mimeType, name: String(metadata.name || '').slice(0,200), url: `https://drive.google.com/file/d/${fileId}/view`};
+    return {fileId, sha256, size: Number(metadata.size), mimeType: metadata.mimeType, name: String(metadata.name || '').slice(0,200), url: `https://drive.google.com/file/d/${fileId}/view`};
+  }
+  // Verify the complete bounded bytes BEFORE they can leave Drive for a publisher.
+  // No public URL, filesystem staging, credential forwarding or streaming unchecked bytes.
+  async function readExactVideo({fileId, sha256, maxBytes = 75 * 1024 * 1024}) {
+    if (!/^[a-f0-9]{64}$/.test(sha256 || '') || !Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 256 * 1024 * 1024) fail('C0_MEDIA_LIMIT_INVALID');
+    const before = await inspect(fileId, 'video');
+    if (before.mimeType !== 'video/mp4' || before.sha256 !== sha256) fail('C0_MEDIA_CHANGED');
+    if (before.size > maxBytes) fail('C0_RELEASE_MEDIA_TOO_LARGE');
+    const response = await request(`files/${fileId}?alt=media`, 'video/mp4');
+    if (!response.body) fail('GOOGLE_DRIVE_MEDIA_UNAVAILABLE');
+    const chunks = [], digest = crypto.createHash('sha256'); let size = 0;
+    for await (const chunk of response.body) {
+      size += chunk.length;
+      if (size > maxBytes || size > before.size) fail('C0_RELEASE_MEDIA_TOO_LARGE');
+      digest.update(chunk); chunks.push(Buffer.from(chunk));
+    }
+    if (size !== before.size || digest.digest('hex') !== sha256) fail('C0_MEDIA_CHANGED');
+    const after = await inspect(fileId, 'video');
+    if (after.sha256 !== sha256 || after.size !== size || after.mimeType !== before.mimeType) fail('C0_MEDIA_CHANGED');
+    return {buffer: Buffer.concat(chunks, size), mimeType: 'video/mp4', sha256, size};
   }
   async function listImages() {
     const q = encodeURIComponent("trashed=false and (mimeType='image/png' or mimeType='image/jpeg' or mimeType='image/webp')");
     const result = await (await request(`files?q=${q}&pageSize=100&fields=files(id,name,mimeType,webViewLink,sha256Checksum),nextPageToken`)).json();
     return {assets: (result.files || []).filter(f=>validId(f.id)).map(f=>({fileId:f.id,name:f.name,mimeType:f.mimeType,sha256:f.sha256Checksum||null,url:`https://drive.google.com/file/d/${f.id}/view`})), partial:!!result.nextPageToken, originalLogo:await inspect(ORIGINAL_LOGO_FILE_ID,'image'),originalLogoFileId:ORIGINAL_LOGO_FILE_ID};
   }
-  return {inspect, listImages};
+  return {inspect, listImages, readExactVideo};
 }
-module.exports = {createMediaReader, ORIGINAL_LOGO_FILE_ID, BUSINESS_ACCOUNT, validId};
+module.exports = {createMediaReader, validId};

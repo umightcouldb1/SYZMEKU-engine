@@ -42,6 +42,9 @@ const AuthPage = ({ mode = 'login' }) => {
   const { isLoading, message } = useSelector((state) => state.auth || {});
   const googleButtonRef = useRef(null);
   const googleRenderFrameRef = useRef(null);
+  const passwordRef = useRef('');
+  const googleLinkRequiredRef = useRef(false);
+  const [googleLinkRequired, setGoogleLinkRequired] = useState(false);
   const googleClientId = getGoogleClientId();
   const hasGoogleClientId = Boolean(googleClientId);
 
@@ -62,6 +65,7 @@ const AuthPage = ({ mode = 'login' }) => {
   }, [location.state]);
 
   const onChange = (field, value) => {
+    if (field === 'password') passwordRef.current = value;
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -73,14 +77,25 @@ const AuthPage = ({ mode = 'login' }) => {
       return;
     }
 
-    const result = await dispatch(googleLogin({ credential: credentialResponse.credential }));
+    const result = await dispatch(googleLogin({
+      credential: credentialResponse.credential,
+      ...(googleLinkRequiredRef.current ? { password: passwordRef.current } : {}),
+    }));
 
     if (result.meta.requestStatus !== 'fulfilled') {
-      setError(result.payload || 'Google authentication failed.');
+      if (result.payload?.code === 'GOOGLE_ACCOUNT_LINK_REQUIRED') {
+        googleLinkRequiredRef.current = true;
+        setGoogleLinkRequired(true);
+      }
+      setError(result.payload?.message || result.payload || 'Google authentication failed.');
       dispatch(reset());
       return;
     }
 
+    passwordRef.current = '';
+    googleLinkRequiredRef.current = false;
+    setGoogleLinkRequired(false);
+    setForm((prev) => ({ ...prev, password: '' }));
     const completed = Boolean(result.payload?.onboarding?.completed);
     navigate(completed ? getPostAuthRoute('/app') : '/onboarding', { replace: true });
   }, [dispatch, getPostAuthRoute, navigate]);
@@ -196,6 +211,19 @@ const AuthPage = ({ mode = 'login' }) => {
               <p className="google-auth-unavailable">Google sign-in requires VITE_GOOGLE_CLIENT_ID in the frontend build.</p>
             )}
           </div>
+
+          {googleLinkRequired && <div role="status">
+            <p>Enter your existing account password below, then choose Google again to link both sign-in methods. Password sign-in is still available.</p>
+            <button type="button" disabled={isLoading} onClick={() => {
+              if (isLoading) return;
+              passwordRef.current = '';
+              googleLinkRequiredRef.current = false;
+              setGoogleLinkRequired(false);
+              setForm((prev) => ({ ...prev, password: '' }));
+              setError('');
+              dispatch(reset());
+            }}>Cancel Google linking</button>
+          </div>}
 
           {hasGoogleClientId && <div className="auth-divider"><span>or</span></div>}
 

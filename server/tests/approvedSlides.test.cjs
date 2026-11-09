@@ -1,4 +1,5 @@
 'use strict';
+require('./contentPrivateConfigFixture.cjs').configure();
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
@@ -7,7 +8,7 @@ const { createRequire } = require('node:module');
 const JSZip = createRequire(require.resolve('pptxgenjs'))('jszip');
 const { hash } = require('../enterprise/content/qa');
 const { selectionHash, VERSION } = require('../enterprise/content/driveVisual');
-const { BUSINESS_ACCOUNT, ORIGINAL_LOGO_FILE_ID } = require('../enterprise/content/driveMedia');
+const { BUSINESS_ACCOUNT, ORIGINAL_LOGO_FILE_ID } = require('./contentPrivateConfigFixture.cjs');
 const { createApprovedSlides, KIND, PRESENTATION_MIME, PPTX_MIME, MAX_IMAGE_BYTES, MAX_UPLOAD_BYTES } = require('../enterprise/content/approvedSlides');
 
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -308,6 +309,39 @@ test('structural readback rejects changed count, ratio, image geometry, copy and
     const f = fixture(); f.options.alterSlides = alter;
     await assert.rejects(createApprovedSlides(f.args()), e => e.outcomeUnknown === true && /GOOGLE_SLIDES_/.test(e.message));
     assert.equal(f.uploads.length, 1);
+  }
+});
+
+test('Google soft line breaks preserve equivalent screen copy and exact narration', async () => {
+  const f = fixture();
+  f.p.scenes[0].narration = 'Synthetic test only. No creative approval or publication.\n\nExact narration paragraph.  ';
+  f.options.alterSlides = presentation => {
+    const slide = presentation.slides[0];
+    slide.pageElements[1].shape.text.textElements[0].textRun.content = `${f.p.scenes[0].screen.replace(/\n/g, '\u000b')}\n`;
+    slide.slideProperties.notesPage.pageElements[0].shape.text.textElements[0].textRun.content = `${f.p.scenes[0].narration.replace(/\n/g, '\u000b')}\n`;
+  };
+  const result = await createApprovedSlides(f.args());
+  assert.equal(result.structuralQA, 'PASS'); assert.equal(result.visualQA, 'PENDING');
+});
+
+test('Google soft line breaks do not hide changed break counts, whitespace or words', async () => {
+  const changes = [
+    text => text.replace('\u000b\u000b', '\u000b'),
+    text => text.replace('\u000b\u000b', '\u000b\u000b\u000b'),
+    text => text.replace('  \n', ' \n'),
+    text => text.replace('  \n', '   \n'),
+    text => text.replace('Exact narration', 'Exact  narration'),
+    text => text.replace('Exact narration', 'Changed narration'),
+    text => `${text}\n`,
+  ];
+  for (const change of changes) {
+    const f = fixture();
+    f.p.scenes[0].narration = 'Synthetic test only. No creative approval or publication.\n\nExact narration paragraph.  ';
+    f.options.alterSlides = presentation => {
+      presentation.slides[0].slideProperties.notesPage.pageElements[0].shape.text.textElements[0].textRun.content =
+        change(`${f.p.scenes[0].narration.replace(/\n/g, '\u000b')}\n`);
+    };
+    await assert.rejects(createApprovedSlides(f.args()), /GOOGLE_SLIDES_NOTES_MISMATCH/);
   }
 });
 

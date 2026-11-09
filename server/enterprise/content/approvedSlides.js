@@ -4,7 +4,8 @@ const crypto = require('node:crypto');
 const PptxGenJS = require('pptxgenjs');
 const { hash } = require('./qa');
 const { selectionHash, VERSION } = require('./driveVisual');
-const { BUSINESS_ACCOUNT, ORIGINAL_LOGO_FILE_ID, validId } = require('./driveMedia');
+const { validId } = require('./driveMedia');
+const { readPrivateConfig } = require('./privateConfig');
 
 const KIND = 'C0_APPROVED_IMAGE_SLIDES_V1';
 const PRESENTATION_MIME = 'application/vnd.google-apps.presentation';
@@ -17,11 +18,11 @@ const DRIVE = 'https://www.googleapis.com/drive/v3';
 const SHA256 = /^[a-f0-9]{64}$/;
 const fail = (code, statusCode = 409, extra = {}) => { throw Object.assign(new Error(code), { statusCode, ...extra }); };
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
-const sameEmail = value => typeof value === 'string' && value.toLowerCase() === BUSINESS_ACCOUNT;
+const sameEmail = (value, BUSINESS_ACCOUNT) => typeof value === 'string' && value.toLowerCase() === BUSINESS_ACCOUNT;
 const validKey = value => typeof value === 'string' && /^[a-zA-Z0-9_:-]{1,96}$/.test(value);
 const validText = (value, max) => typeof value === 'string' && value.length <= max && !/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(value);
 
-function snapshotPackage(input, owner, expectedHash) {
+function snapshotPackage(input, owner, expectedHash, ORIGINAL_LOGO_FILE_ID) {
   let p;
   try {
     const serialized = JSON.stringify(input);
@@ -47,11 +48,11 @@ function snapshotPackage(input, owner, expectedHash) {
   return p;
 }
 
-function assertPrivate(meta, mimeType, editable = false) {
+function assertPrivate(meta, mimeType, editable, BUSINESS_ACCOUNT) {
   if (meta?.trashed !== false || meta.mimeType !== mimeType || meta.owners?.length !== 1 ||
-      meta.owners[0].me !== true || !sameEmail(meta.owners[0].emailAddress) ||
+      meta.owners[0].me !== true || !sameEmail(meta.owners[0].emailAddress, BUSINESS_ACCOUNT) ||
       !Array.isArray(meta.permissions) || !meta.permissions.length ||
-      meta.permissions.some(p => p.type !== 'user' || p.role !== 'owner' || !sameEmail(p.emailAddress)) ||
+      meta.permissions.some(p => p.type !== 'user' || p.role !== 'owner' || !sameEmail(p.emailAddress, BUSINESS_ACCOUNT)) ||
       (editable && meta.capabilities?.canEdit !== true)) fail('GOOGLE_SLIDES_PRIVATE_OWNER_REQUIRED');
 }
 
@@ -117,7 +118,9 @@ async function buildPptx(p, images) {
 const points = dimension => dimension?.unit === 'PT' ? dimension.magnitude : dimension?.unit === 'EMU' ? dimension.magnitude / 12700 : NaN;
 const textOf = element => (element?.shape?.text?.textElements || []).map(run => run.textRun?.content || '').join('');
 const exactText = (actual, expected) => {
-  const a = actual.replace(/\r\n/g, '\n'), e = expected.replace(/\r\n/g, '\n');
+  // Google import represents soft line breaks as U+000B. Normalize each returned
+  // break without changing their count; source text still disallows U+000B.
+  const a = actual.replace(/\r\n/g, '\n').replace(/\u000b/g, '\n'), e = expected.replace(/\r\n/g, '\n');
   // Google Shapes include a required final paragraph newline. Do not trim spaces
   // or otherwise normalize content: that could conceal a changed narration.
   return a === e || a === `${e}\n`;
@@ -157,14 +160,15 @@ function verifyPresentation(presentation, id, p, images) {
 async function assembleApprovedSlides({ owner, itemId, package: input, expectedHash, operationId,
   workspaceImpl, mediaReader, fetchImpl = fetch, allowCreate = false }) {
   if (!validKey(owner) || !validKey(itemId) || !validKey(operationId) || typeof allowCreate !== 'boolean') fail('GOOGLE_SLIDES_OPERATION_INVALID', 400);
-  const p = snapshotPackage(input, owner, expectedHash), approval = p.production.imageApproval;
+  const { BUSINESS_ACCOUNT, ORIGINAL_LOGO_FILE_ID } = readPrivateConfig();
+  const p = snapshotPackage(input, owner, expectedHash, ORIGINAL_LOGO_FILE_ID), approval = p.production.imageApproval;
   let fresh;
   try { fresh = await (workspaceImpl || require('./workspaceConnection')).getFreshAccessToken({ owner }); }
   catch { fail('GOOGLE_SLIDES_AUTH_REQUIRED'); }
   const { connection, accessToken } = fresh || {};
   if (String(connection?.userId) !== owner || connection?.status !== 'connected' || !accessToken ||
       !['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/presentations'].every(s => connection.scopes?.includes(s))) fail('GOOGLE_SLIDES_AUTH_REQUIRED');
-  if (!sameEmail(connection.accountEmail)) fail('GOOGLE_WORKSPACE_ACCOUNT_MISMATCH');
+  if (!sameEmail(connection.accountEmail, BUSINESS_ACCOUNT)) fail('GOOGLE_WORKSPACE_ACCOUNT_MISMATCH');
 
   async function read(url, { limit = MAX_JSON_BYTES, ...options } = {}) {
     let response;
@@ -195,12 +199,12 @@ async function assembleApprovedSlides({ owner, itemId, package: input, expectedH
   if (canonical?.provider !== 'GOOGLE_DRIVE' || !validId(folderId) || !validId(factoryId)) fail('GOOGLE_SLIDES_FOLDER_REQUIRED');
   async function verifyFolder() {
     const folder = await metadata(folderId);
-    assertPrivate(folder, 'application/vnd.google-apps.folder', true);
+    assertPrivate(folder, 'application/vnd.google-apps.folder', true, BUSINESS_ACCOUNT);
     if (folder.id !== folderId || folder.name !== 'Organic' || folder.parents?.length !== 1 || folder.parents[0] !== factoryId) fail('GOOGLE_SLIDES_FOLDER_REQUIRED');
   }
   await verifyFolder();
   const about = await json(`${DRIVE}/about?fields=${encodeURIComponent('user(emailAddress,me),importFormats')}`);
-  if (!sameEmail(about.user?.emailAddress) || about.user.me !== true) fail('GOOGLE_WORKSPACE_ACCOUNT_MISMATCH');
+  if (!sameEmail(about.user?.emailAddress, BUSINESS_ACCOUNT) || about.user.me !== true) fail('GOOGLE_WORKSPACE_ACCOUNT_MISMATCH');
   if (!about.importFormats?.[PPTX_MIME]?.includes(PRESENTATION_MIME)) fail('GOOGLE_SLIDES_IMPORT_UNSUPPORTED');
 
   const properties = { kind: KIND, owner, itemId, sourceHash: expectedHash, selectionHash: approval.selectionHash, operationId };
@@ -210,7 +214,7 @@ async function assembleApprovedSlides({ owner, itemId, package: input, expectedH
       (lookup.files.length === 1 && !validId(lookup.files[0]?.id))) fail('GOOGLE_SLIDES_OPERATION_AMBIGUOUS', 409, { outcomeUnknown: true, operationId });
   let outputId = lookup.files[0]?.id;
   function verifyOutput(meta) {
-    assertPrivate(meta, PRESENTATION_MIME, true);
+    assertPrivate(meta, PRESENTATION_MIME, true, BUSINESS_ACCOUNT);
     if (!validId(meta.id) || meta.id !== outputId || meta.parents?.length !== 1 || meta.parents[0] !== folderId ||
         Object.entries(properties).some(([key, value]) => meta.appProperties?.[key] !== value)) fail('GOOGLE_SLIDES_OPERATION_MISMATCH');
   }
@@ -229,7 +233,7 @@ async function assembleApprovedSlides({ owner, itemId, package: input, expectedH
       }
       const meta = await metadata(approved.fileId);
       if (!['image/png', 'image/jpeg'].includes(meta.mimeType)) fail('GOOGLE_SLIDES_PNG_JPEG_REQUIRED', 400);
-      assertPrivate(meta, meta.mimeType);
+      assertPrivate(meta, meta.mimeType, false, BUSINESS_ACCOUNT);
       if (meta.id !== approved.fileId || meta.capabilities?.canDownload !== true ||
           (approved.mimeType && approved.mimeType !== meta.mimeType)) fail('GOOGLE_SLIDES_IMAGE_METADATA_MISMATCH');
       const size = Number(meta.size);

@@ -111,17 +111,9 @@ router.post('/genesis-lock', async (req, res) => {
       });
     }
 
-    const existingPatron = await GenesisPatron.findOne({
-      patronIdentifier,
-      status: { $in: PAID_GENESIS_STATUSES },
-    }).lean();
-
-    if (existingPatron) {
-      return res.json(buildSeatPayload(existingPatron, {
-        duplicate: true,
-        message: 'Genesis seat already issued for this paid patron identifier.',
-      }));
-    }
+    // This public readiness endpoint must not disclose whether an identifier
+    // has paid, its seat, or its payment reference. Only the authenticated
+    // payment-confirmation path may read and return an individual allocation.
 
     const claimedSeats = await getPaidSeatCount();
     const remainingSeats = Math.max(GENESIS_SEAT_LIMIT - claimedSeats, 0);
