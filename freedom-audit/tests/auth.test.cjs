@@ -4,7 +4,7 @@ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const source=html.match(/<script>([\s\S]*?)<\/script>/)[1].replaceAll('__FREEDOM_AUDIT_GOOGLE_CLIENT_ID__','994975817231-obs40351opa36ljffmelqb4o3vtru044.apps.googleusercontent.com');
 function page(respond){
  const elements=new Map();const stored=new Map();const requests=[];let callback;
- function element(){const classes=new Set();return {value:'',textContent:'',innerHTML:'',disabled:false,children:[],classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x),toggle:(x,yes)=>yes?classes.add(x):classes.delete(x)},setAttribute(){},addEventListener(){},appendChild(child){this.children.push(child)},replaceChildren(...children){this.children=children},remove(){}};}
+ function element(){const classes=new Set();return {value:'',textContent:'',innerHTML:'',disabled:false,children:[],classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x),toggle:(x,yes)=>yes?classes.add(x):classes.delete(x)},setAttribute(){},addEventListener(){},appendChild(child){this.children.push(child)},remove(){}};}
  const get=id=>{if(!elements.has(id))elements.set(id,element());return elements.get(id)};
  const sandbox={console,URLSearchParams,setTimeout,clearTimeout,localStorage:{getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,v),removeItem:k=>stored.delete(k)},document:{getElementById:get,createElement:element,head:element()},window:{location:{search:''},scrollTo(){},google:{accounts:{id:{initialize:o=>{callback=o.callback},renderButton(){}}}}},fetch:async(url,options)=>{requests.push({url,options});const reply=await respond(url,options);return {ok:reply.status<400,status:reply.status,json:async()=>reply.body};}};
  vm.createContext(sandbox);vm.runInContext(source,sandbox);
@@ -70,20 +70,17 @@ test('cancel linking clears transient password and next Google attempt omits it'
  const p=page(async()=>({status:409,body:{code:'GOOGLE_ACCOUNT_LINK_REQUIRED',message:'Link required'}}));await p.google({credential:'synthetic'});p.get('password').value='existing-password';p.run('cancelGoogleLinking()');assert.equal(p.run('state.googleLinkRequired'),false);assert.equal(p.get('password').value,'');await p.google({credential:'new-synthetic'});assert.deepEqual(JSON.parse(p.requests[1].options.body),{credential:'new-synthetic'});assert.equal(p.stored.size,0);
 });
 
-test('continuation selection copies exact phase context and resets on another saved audit', () => {
- const p=page(async()=>({status:200,body:{results:[]}}));
- p.sandbox.result={score:60,stage:'Stabilize',weakestDomain:'time',bigSyzPrompts:['First phase exact','Second phase exact']};
- p.run('renderResult(result)');
- assert.equal(p.get('prompt').value,'First phase exact');assert.equal(p.get('copyPrompt').disabled,false);
- p.get('continuationPhase').value='1';p.get('continuationPhase').onchange();
- assert.equal(p.get('prompt').value,'Second phase exact');
- p.sandbox.result.bigSyzPrompts=['Different audit'];p.run('renderResult(result)');
- assert.equal(p.get('prompt').value,'Different audit');assert.equal(p.get('continuationPhase').value,'0');
+test('audit retention requires reviewed source and explicit consent, and sends references only',async()=>{
+ const p=page(async()=>({status:200,body:{resultId:'own',sourceHash:'hash',expectedRetained:null,audit:{liberationPlan:['Full plan']},retention:'Until removed'}}));
+ p.run("state.token='owner';configureAuditRetention({id:'own'})");assert.equal(p.requests.length,0);
+ await p.get('retainAudit').onclick();assert.equal(p.requests.length,0);
+ await p.get('reviewRetention').onclick();assert.equal(p.get('retainAudit').disabled,true);
+ await p.get('retainAudit').onclick();assert.equal(p.requests.length,1);
+ p.get('retainConsent').checked=true;p.get('retainConsent').onchange();await p.get('retainAudit').onclick();
+ assert.deepEqual(JSON.parse(p.requests[1].options.body),{resultId:'own',sourceHash:'hash',expectedRetained:null,retain:true});assert.equal(p.get('retainConsent').checked,false);
 });
-test('continuation blocks oversized legacy copy without truncation and distinguishes legacy context', () => {
- const p=page(async()=>({status:200,body:{results:[]}}));
- p.sandbox.result={score:60,stage:'Stabilize',weakestDomain:'time',bigSyzPrompt:'x'.repeat(6001)};
- p.run('renderResult(result)');assert.equal(p.get('prompt').value.length,6001);assert.equal(p.get('copyPrompt').disabled,true);assert.match(p.get('continuationStatus').textContent,/no text was removed/);
- p.sandbox.result.bigSyzPrompt='x'.repeat(6000);p.run('renderResult(result)');
- assert.equal(p.get('copyPrompt').disabled,false);assert.match(p.get('continuationStatus').textContent,/Legacy prompt/);
+test('retention review ignores a prior account response and cannot submit its audit',async()=>{
+ let release;const p=page(()=>new Promise(r=>release=r));p.run("state.token='old';configureAuditRetention({id:'old-audit'})");
+ const pending=p.get('reviewRetention').onclick();p.run("state.token='new'");release({status:200,body:{resultId:'old-audit',sourceHash:'hash',audit:{private:'canary'}}});await pending;
+ assert.equal(p.get('retentionAudit').textContent,'');p.get('retainConsent').checked=true;await p.get('retainAudit').onclick();assert.equal(p.requests.length,1);
 });

@@ -68,7 +68,7 @@ async function assemble(request) {
         ref: ref(name, d, typeof kind === 'function' ? kind(d) : kind)
       }));
     }
-    const facts = await rows('StrategicMemory', {}, {
+    const facts = await rows('StrategicMemory', {category:{$ne:require('./freedomAuditContinuation').CATEGORY}}, {
         updatedAt: -1,
         _id: 1
       }, 50, ['_id', 'content', 'confirmed', 'source', 'category', 'revision', 'updatedAt', 'provenance', 'sourceId'], d => d.confirmed && d.category !== 'kernel' && d.provenance?.kind !== 'derived' && !(d.derivedFromPatternIds || []).length ? 'fact' : 'hypothesis'),
@@ -116,7 +116,11 @@ async function assemble(request) {
       revision: p.revision,
       kind: 'supported-pattern'
     };
+    const auditSource=await require('./freedomAuditContinuation').resolve();
+    const auditRef=auditSource.stamp?'StrategicMemory:'+auditSource.stamp.id:null;
+    if(auditRef)manifest[auditRef]={authority:'StrategicMemory',id:auditSource.stamp.id,revision:auditSource.stamp.revision,kind:'derivative',sourceHash:auditSource.context.sourceHash};
     const context = {
+      retainedAudit:auditSource.context?{...auditSource.context,ref:auditRef}:null,
       version: 'reasoning-context-v1',
       policyVersion: 'reasoning-policy-v1',
       runtime: {

@@ -53,9 +53,11 @@ async function generate(body, {
   for (let attempt = 0; attempt < 2; attempt++) {
     if (combined.aborted) throw cap.error('MODEL_TIMEOUT', 'Model request timed out.', 504);
     try {
+      const prompt=policy.prompt(snapshot, request) + (attempt ? '\nThe previous response did not match the schema. Return only the exact required fields and valid references.' : '');
+      if(snapshot.retainedAudit)require('./freedomAuditContinuation').assertPromptBudget(prompt);
       model = await require('./modelRouter').generateStructured({
         purpose,
-        prompt: policy.prompt(snapshot, request) + (attempt ? '\nThe previous response did not match the schema. Return only the exact required fields and valid references.' : ''),
+        prompt,
         media: request.media,
         provider,
         signal: combined
@@ -77,7 +79,8 @@ async function generate(body, {
   }
   let result = {
     ...policy.present(output, snapshot, request),
-    requestId
+    requestId,
+    auditContinuation:snapshot.retainedAudit?{sourceHash:snapshot.retainedAudit.sourceHash,...snapshot.retainedAudit.coverage}:null
   };
   await context.assertFresh(snapshot, request);
   if (combined.aborted) throw cap.error('MODEL_TIMEOUT', 'Model request timed out.', 504);
