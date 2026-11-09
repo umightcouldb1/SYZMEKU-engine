@@ -3,7 +3,7 @@ const Stripe = require('stripe');
 const UserProfile = require('../models/UserProfile');
 const { randomUUID } = require('node:crypto');
 const { generatePersonalizedPlan } = require('../services/freedomAuditPlan');
-const { buildBigSyzPrompt } = require('../services/freedomAuditContinuation');
+const { buildBigSyzPrompts } = require('../services/freedomAuditContinuation');
 const { ensureProfile, recordPurchase } = require('../services/freedomAuditPurchase');
 
 const FREEDOM_AUDIT_PRODUCT_SLUG = 'freedom-audit';
@@ -363,7 +363,8 @@ const scoreFreedomAudit = asyncHandler(async (req, res) => {
       result.planEvidence = personalized.planEvidence;
       result.providerModel = personalized.providerModel;
     }
-    result.bigSyzPrompt = buildBigSyzPrompt({ ...result, win, drag, asset });
+    result.bigSyzPrompts = buildBigSyzPrompts({ ...result, win, drag, asset });
+    result.bigSyzPrompt = result.bigSyzPrompts[0];
 
     const saved = await UserProfile.findOneAndUpdate({ userId: req.user._id, 'freedomAudit.generationLease': lease,
       purchasedProducts: { $elemMatch: {priceId:getFreedomAuditPriceId(), status:'paid'} }

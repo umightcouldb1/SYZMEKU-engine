@@ -39,29 +39,48 @@ test('missing Gemini configuration fails closed without an outbound request',asy
 });
 
 
-test('continuation preserves each received plan instead of restarting from scores alone', () => {
- const { buildBigSyzPrompt } = require('../services/freedomAuditContinuation');
- const prompts = [];
- for (const inputs of [profile(), profile({weakestDomain:'money',win:'Track monthly spending',drag:'Scattered receipts',asset:'A spreadsheet'})]) {
-  const validated = validatePlan(fixture(inputs), inputs);
-  const received = {highestLeveragePriority:validated.priority,leverageMoves:validated.moves,compression:validated.compression,liberationPlan:validated.plan,analysisMethod:validated.analysisMethod};
-  const result = {...inputs,score:60,stage:'Stabilize',domainScores:Object.fromEntries(Object.keys(QUESTIONS).map(k=>[k,60])),...received,checkoutSessionId:'PRIVATE_PAYMENT',userId:'PRIVATE_ACCOUNT',providerModel:'PRIVATE_PROVIDER',planEvidence:[{private:'PRIVATE_METADATA'}]};
-  const prompt = buildBigSyzPrompt(result);
-  const copied = JSON.parse(prompt.split('SAVED AUDIT PLAN (JSON):\n')[1]);
-  assert.deepEqual(copied, received);
-  assert.match(prompt, /Preserve its sequence/);
-  assert(prompt.includes(inputs.win) && prompt.includes(inputs.drag) && prompt.includes(inputs.asset));
-  assert.doesNotMatch(prompt, /PRIVATE_/);
-  prompts.push(prompt);
- }
- assert.notEqual(prompts[0], prompts[1]);
+test('continuation preserves exact selected phases within both receiving limits at maximum valid lengths', () => {
+ const {buildBigSyzPrompts, CONTINUATION_LIMIT} = require('../services/freedomAuditContinuation');
+ const inputs = profile({win:'w'.repeat(1000),drag:'d'.repeat(1000),asset:'a'.repeat(1000)});
+ const raw = fixture(inputs);
+ raw.priority = 'Priority '.padEnd(500,'p');
+ raw.moves = raw.moves.map((_,i) => `Move ${i} `.padEnd(500,'m'));
+ for (const key of Object.keys(raw.compression)) raw.compression[key] = key.padEnd(500,'c');
+ raw.plan.forEach((p,i) => {p.action=`Action ${i} `.padEnd(500,'x');p.checkpoint='Measured condition '.padEnd(240,'y');});
+ const validated = validatePlan(raw, inputs);
+ const result = {...inputs,score:60,stage:'Stabilize',domainScores:Object.fromEntries(Object.keys(QUESTIONS).map(k=>[k,60])),highestLeveragePriority:validated.priority,leverageMoves:validated.moves,compression:validated.compression,liberationPlan:validated.plan,analysisMethod:validated.analysisMethod,checkoutSessionId:'PRIVATE_PAYMENT',userId:'PRIVATE_ACCOUNT'};
+ const prompts = buildBigSyzPrompts(result);
+ assert.equal(prompts.length,6);
+ prompts.forEach((prompt,i) => {
+   assert(prompt.length <= CONTINUATION_LIMIT && prompt.length <= 6000 && prompt.length <= 8000, String(prompt.length));
+   assert(prompt.includes(result.liberationPlan[i]));
+   assert(prompt.includes(inputs.win) && prompt.includes(inputs.drag) && prompt.includes(inputs.asset));
+   assert(prompt.includes(result.highestLeveragePriority));
+   assert.match(prompt,/not the full audit/);assert.match(prompt,/not included here/);
+   assert.doesNotMatch(prompt,/PRIVATE_/);
+   result.liberationPlan.forEach((phase,j)=>{if(i!==j)assert(!prompt.includes(phase));});
+ });
+ // Guard against receiver limits being reduced without updating this contract.
+ const fs=require('fs'),path=require('path');
+ assert.match(fs.readFileSync(path.join(__dirname,'../../client/src/components/CoreContextPanel.jsx'),'utf8'),/maxLength=\{6000\}/);
+ assert.match(fs.readFileSync(path.join(__dirname,'../../client/src/components/ReasoningPanel.jsx'),'utf8'),/maxLength=\{8000\}/);
 });
 
-test('continuation uses the supplied rules-based result without claiming AI generation', () => {
- const { buildBigSyzPrompt } = require('../services/freedomAuditContinuation');
- const result = {...profile(),score:60,stage:'Stabilize',domainScores:Object.fromEntries(Object.keys(QUESTIONS).map(k=>[k,60])),highestLeveragePriority:'Reclaim your calendar.',leverageMoves:['Remove a duplicate task.'],compression:{delete:'A duplicate task'},liberationPlan:['Days 1-3: Inventory commitments.'],analysisMethod:'Rules-based scoring of self-reported answers.'};
- const prompt = buildBigSyzPrompt(result);
- assert.deepEqual(JSON.parse(prompt.split('SAVED AUDIT PLAN (JSON):\n')[1]).liberationPlan,result.liberationPlan);
- assert.match(prompt,/Rules-based scoring/);
- assert.doesNotMatch(prompt,/Gemini-generated/);
+test('continuation never truncates oversized unexpected input and preserves rules labeling', () => {
+ const {buildBigSyzPrompts} = require('../services/freedomAuditContinuation');
+ const result={...profile(),score:60,stage:'Stabilize',domainScores:{},highestLeveragePriority:'Reclaim time',liberationPlan:['Days 1-3: Record a commitment.'],analysisMethod:'Rules-based scoring.'};
+ assert.match(buildBigSyzPrompts(result)[0],/Rules-based scoring/);
+ assert.throws(()=>buildBigSyzPrompts({...result,win:'x'.repeat(6000)}),/receiving limit/);
+});
+
+test('continuation phase choices survive the stored result schema without changing legacy results', () => {
+ const Profile=require('../models/UserProfile');
+ const mongoose=require('mongoose');
+ const result={id:'synthetic',bigSyzPrompt:'first',bigSyzPrompts:['first','second']};
+ const doc=new Profile({userId:new mongoose.Types.ObjectId(),freedomAudit:{latestResult:result,results:[result]}});
+ const stored=doc.toObject();
+ assert.deepEqual(stored.freedomAudit.latestResult.bigSyzPrompts,['first','second']);
+ assert.deepEqual(stored.freedomAudit.results[0].bigSyzPrompts,['first','second']);
+ const legacy=new Profile({userId:new mongoose.Types.ObjectId(),freedomAudit:{latestResult:{id:'old',bigSyzPrompt:'legacy'}}});
+ assert.equal(legacy.toObject().freedomAudit.latestResult.bigSyzPrompts,undefined);
 });

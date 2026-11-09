@@ -358,8 +358,10 @@
         <div class="card stack">
           <div>
             <h3>Big SYZ Continuation Prompt</h3>
-            <p class="muted">Copy this prompt, open Big SYZ, and paste it into your conversation. Opening Big SYZ does not transfer the prompt automatically.</p>
+            <p class="muted">Choose a phase, copy its prompt, then open Big SYZ and paste it. Each prompt includes that phase, your priority, scores and personal inputs. The other phases and recommendations stay in this audit; they are not transferred. Opening Big SYZ does not transfer anything automatically.</p>
           </div>
+          <label for="continuationPhase">Phase to continue</label><select id="continuationPhase"></select>
+          <p class="muted" id="continuationStatus"></p>
           <textarea id="prompt" rows="12" readonly></textarea>
           <div class="result-actions no-print">
             <button id="copyPrompt" type="button">Copy Prompt</button>
@@ -764,7 +766,25 @@
       $('delegateText').textContent = result.compression?.delegate || '';
       $('executeText').textContent = result.compression?.execute || '';
       $('plan').innerHTML = (result.liberationPlan || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
-      $('prompt').value = result.bigSyzPrompt || '';
+      const hasPhases = Array.isArray(result.bigSyzPrompts) && result.bigSyzPrompts.length > 0;
+      const prompts = hasPhases ? result.bigSyzPrompts : [result.bigSyzPrompt || ''];
+      $('continuationPhase').replaceChildren(...prompts.map((prompt, i) => {
+        const option = document.createElement('option');
+        option.value = String(i); option.textContent = hasPhases ? `Phase ${i + 1}` : 'Saved legacy prompt';
+        return option;
+      }));
+      $('continuationPhase').value = '0';
+      const selectPrompt = () => {
+        const prompt = prompts[Number($('continuationPhase').value)] || '';
+        $('prompt').value = prompt;
+        $('copyPrompt').disabled = !prompt || prompt.length > 6000;
+        $('copyPrompt').textContent = 'Copy Prompt';
+        $('continuationStatus').textContent = prompt.length > 6000
+          ? 'This older prompt exceeds Big SYZ’s 6,000-character limit. Copy is disabled; no text was removed. Use the displayed plan to prepare a shorter phase-specific request.'
+          : `${prompt.length} / 6,000 characters. ${hasPhases ? 'Selected phase only.' : 'Legacy prompt; it may not include the delivered plan.'}`;
+      };
+      $('continuationPhase').onchange = selectPrompt;
+      selectPrompt();
       show('result');
       loadResultHistory();
     }
@@ -801,6 +821,7 @@
     $('verifyButton').addEventListener('click', verifyCheckout);
     $('auditForm').addEventListener('submit', submitAudit);
     $('copyPrompt').addEventListener('click', async () => {
+      if (!$('prompt').value || $('prompt').value.length > 6000) return;
       await navigator.clipboard.writeText($('prompt').value);
       $('copyPrompt').textContent = 'Copied';
       setTimeout(() => { $('copyPrompt').textContent = 'Copy Prompt'; }, 1400);

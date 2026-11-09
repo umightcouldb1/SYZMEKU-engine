@@ -70,6 +70,7 @@ const freedomAuditResultSchema = new mongoose.Schema(
     },
     liberationPlan: { type: [String], default: [] },
     bigSyzPrompt: { type: String, default: '' },
+    bigSyzPrompts: { type: [String], default: undefined },
     inputs: {
       ratings: { type: mongoose.Schema.Types.Mixed, default: {} },
       win: { type: String, default: '' },
