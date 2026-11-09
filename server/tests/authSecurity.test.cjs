@@ -52,12 +52,35 @@ test('Google verified email is still required',async()=>{const f=fixture();f.set
 test('schema leaves legacy identity absent and declares partial subject uniqueness',()=>{
  const User=require('../models/User'),user=new User({name:'Legacy',username:'legacy',email:'legacy@example.test',password:'fixture'});assert.equal(user.identity,undefined);assert.equal(user.toObject().identity,undefined);const index=User.schema.indexes().find(([keys])=>keys['identity.googleSubject']===1);assert(index);assert.equal(index[1].unique,true);assert.deepEqual(index[1].partialFilterExpression,{'identity.googleSubject':{$type:'string',$gt:''}});
 });
-test('bootstrap marks only fresh administrators and explicit reset restores password without relabeling legacy',async()=>{
- const src=fs.readFileSync(path.join(__dirname,'../utils/adminIdentity.js'),'utf8');for(const mode of ['fresh','legacy-reset','google-reset']){let stored=mode==='fresh'?null:passwordUser({email:adminEmail,role:'COMMANDER_IN_CHIEF',...(mode==='google-reset'?{identity:{version:1,passwordEnabled:false,googleSubject:'existing-subject'}}:{})});if(mode==='legacy-reset')delete stored.identity;if(stored)stored.save=async()=>stored;const query=v=>({then:(a,b)=>Promise.resolve(v).then(a,b),select:async()=>v});const User={ROLES:{COMMANDER_IN_CHIEF:'COMMANDER_IN_CHIEF'},findOne:f=>query(f.username?null:stored),create:async v=>{stored={_id:'admin-id',...v,save:async()=>stored};return stored;},findById:async()=>stored,collection:{updateOne:async()=>{}}};const sandbox={module:{exports:{}},require:id=>id==='bcryptjs'?{hash:async v=>hash(v)}:User,process:{env:{ADMIN_EMAIL:adminEmail,INITIAL_ADMIN_PASSWORD:'configured-recovery-password',...(mode==='fresh'?{}:{RESET_ADMIN_PASSWORD:'true'})}},console:{log(){},warn(){},error(){}}};vm.runInNewContext(src,sandbox);await sandbox.module.exports.initializeAdminSystem();assert(stored);assert.equal(stored.password,hash('configured-recovery-password'));if(mode==='legacy-reset')assert.equal(stored.identity,undefined);else{assert.equal(stored.identity.version,1);assert.equal(stored.identity.passwordEnabled,true);}if(mode==='google-reset')assert.equal(stored.identity.googleSubject,'existing-subject');}
+test('bootstrap marks only fresh administrators and ignores reset flags for existing credentials',async()=>{
+ const src=fs.readFileSync(path.join(__dirname,'../utils/adminIdentity.js'),'utf8');
+ for(const mode of ['fresh','legacy','password','google'])for(const reset of [false,true]){
+  let stored=mode==='fresh'?null:passwordUser({email:adminEmail,role:'COMMANDER_IN_CHIEF',...(mode==='google'?{identity:{version:1,passwordEnabled:false,googleSubject:'existing-subject'}}:{})});
+  if(mode==='legacy')delete stored.identity;
+  const before=stored?JSON.parse(JSON.stringify(stored)):null,hashCalls=[];
+  if(stored)stored.save=async()=>stored;
+  const query=v=>({then:(a,b)=>Promise.resolve(v).then(a,b),select:async()=>v});
+  const User={ROLES:{COMMANDER_IN_CHIEF:'COMMANDER_IN_CHIEF'},findOne:f=>query(f.username?null:stored),create:async v=>{stored={_id:'admin-id',...v,save:async()=>stored};return stored;},findById:async()=>stored,collection:{updateOne:async()=>{}}};
+  const sandbox={module:{exports:{}},require:id=>id==='bcryptjs'?{hash:async v=>{hashCalls.push(v);return hash(v);}}:User,process:{env:{ADMIN_EMAIL:adminEmail,INITIAL_ADMIN_PASSWORD:'configured-bootstrap-password',...(reset?{RESET_ADMIN_PASSWORD:'true'}:{})}},console:{log(){},warn(){},error(){}}};
+  vm.runInNewContext(src,sandbox);await sandbox.module.exports.initializeAdminSystem();assert(stored);
+  if(mode==='fresh'){
+   assert.equal(stored.password,hash('configured-bootstrap-password'));assert.equal(stored.identity.version,1);assert.equal(stored.identity.passwordEnabled,true);assert.equal(hashCalls.length,1);
+  }else{
+   assert.equal(stored.password,before.password);assert.equal(hashCalls.length,0);assert.deepEqual(stored.identity,before.identity);assert.equal(stored._id,before._id);
+  }
+ }
 });
 
-test('missing identity index blocks new enrollment/linking without changing legacy login',async()=>{
- const signup=fixture([],{indexUnavailable:true});assert.equal((await signup.call('registerUser',{username:'new',email:'new@example.test',password:'known-password'})).statusCode,503);assert.equal(signup.users.length,0);assert.equal(signup.sessions.length,0);
+test('password signup remains available without the Google identity index',async()=>{
+ const signup=fixture([],{indexUnavailable:true});assert.equal((await signup.call('registerUser',{username:'new',email:'new@example.test',password:'known-password'})).statusCode,201);assert.equal(signup.users.length,1);assert.equal(signup.sessions.length,1);assert.equal(signup.users[0].identity.version,1);assert.equal(signup.users[0].role,'USER');
+});
+
+test('React Google-link cancellation is disabled while an authentication request is pending',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'../../client/src/AuthPage.jsx'),'utf8');
+ assert.match(src,/<button type="button" disabled=\{isLoading\} onClick=\{\(\) => \{\s*if \(isLoading\) return;[\s\S]*?Cancel Google linking<\/button>/);
+});
+
+test('missing identity index blocks new Google enrollment/linking without changing legacy login',async()=>{
  const google=fixture([],{indexUnavailable:true});assert.equal((await google.call('googleLoginUser',{credential:'synthetic'})).statusCode,503);assert.equal(google.users.length,0);
  const link=fixture([passwordUser()],{indexUnavailable:true});assert.equal((await link.call('googleLoginUser',{credential:'synthetic',password:'known-password'})).statusCode,503);assert.equal(link.updates.length,0);assert.equal(link.sessions.length,0);
  const old=passwordUser();delete old.identity;const legacy=fixture([old],{indexUnavailable:true});assert.equal((await legacy.call('googleLoginUser',{credential:'synthetic'})).statusCode,200);assert.equal((await legacy.call('loginUser',{email:old.email,password:'known-password'})).statusCode,200);

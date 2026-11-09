@@ -171,7 +171,6 @@ const registerUser = async (req, res) => {
             return res.status(409).json({ message: 'An account already exists for this email. Please log in.' });
         }
 
-        await ensureIdentityIndex();
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
         const normalizedUsername = deriveUsernameFromEmail(username.includes('@') ? username : `${username}@local.user`);

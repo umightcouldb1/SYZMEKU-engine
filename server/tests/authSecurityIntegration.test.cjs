@@ -26,9 +26,9 @@ test('real signup aliases cannot provision the reserved administrator',async()=>
  for(const route of ['/auth/signup','/auth/register'])assert.equal((await call(route,{username:'forged-admin',email:' RESERVED-ADMIN@EXAMPLE.TEST ',password:'known-password'})).status,409);
  assert.equal(await User.countDocuments({email:process.env.ADMIN_EMAIL}),0);
 });
-test('public reset flag cannot replace a real administrator password',async()=>{
+test('reset flag cannot replace a real administrator password at startup or public login',async()=>{
  const password=await bcrypt.hash('known-password',10);const admin=await User.create({name:'Admin',username:'admin',email:process.env.ADMIN_EMAIL,password,role:'COMMANDER_IN_CHIEF',identity:{version:1,passwordEnabled:true}});
- process.env.RESET_ADMIN_PASSWORD='true';try{assert.equal((await call('/auth/login',{email:admin.email,password:'wrong-password'})).status,401);assert.equal((await User.findById(admin._id)).password,password);assert.equal(await AuthSession.countDocuments({userId:admin._id}),0);assert.equal((await call('/auth/login',{email:admin.email,password:'known-password'})).status,200);}finally{delete process.env.RESET_ADMIN_PASSWORD;}
+ process.env.RESET_ADMIN_PASSWORD='true';process.env.INITIAL_ADMIN_PASSWORD='unused-bootstrap-password';try{await require('../utils/adminIdentity').initializeAdminSystem();assert.equal((await User.findById(admin._id)).password,password);assert.equal(await AuthSession.countDocuments({userId:admin._id}),0);assert.equal((await call('/auth/login',{email:admin.email,password:'wrong-password'})).status,401);assert.equal((await User.findById(admin._id)).password,password);assert.equal(await AuthSession.countDocuments({userId:admin._id}),0);assert.equal((await call('/auth/login',{email:admin.email,password:'known-password'})).status,200);}finally{delete process.env.RESET_ADMIN_PASSWORD;delete process.env.INITIAL_ADMIN_PASSWORD;}
 });
 test('real new-account Google linking requires both proofs and preserves existing password and ownership',async()=>{
  const email='new-buyer@example.test';const signup=await call('/auth/signup',{username:'new-buyer',email,password:'known-password',role:'COMMANDER_IN_CHIEF'});assert.equal(signup.status,201);assert.equal(signup.body.role,'USER');const id=signup.body._id;
@@ -48,4 +48,13 @@ test('legacy Google login remains compatible and does not silently create proven
 });
 test('fresh Google signup persists subject-bound identity without enabling password login',async()=>{
  const email='google-only-new@example.test',token=credential('google-only-new',email);const result=await call('/auth/google',{credential:token});assert.equal(result.status,201);const user=await User.findById(result.body._id);assert.equal(user.identity.googleSubject,'google-only-new');assert.equal(user.identity.passwordEnabled,false);assert.equal(await AuthSession.countDocuments({userId:user._id}),1);assert.equal((await call('/auth/google',{credential:token})).status,200);
+});
+
+test('missing real Google index blocks Google identity writes but not password-only signup',async()=>{
+ const indexes=await User.collection.listIndexes().toArray();const idx=indexes.find(i=>i.key['identity.googleSubject']===1);await User.collection.dropIndex(idx.name);
+ try{
+  const email='index-independent@example.test';const signup=await call('/auth/signup',{username:'index-independent',email,password:'known-password'});assert.equal(signup.status,201);
+  const link=await call('/auth/google',{credential:credential('blocked-link',email),password:'known-password'});assert.equal(link.status,503);assert.equal((await User.findById(signup.body._id)).identity.googleSubject,undefined);assert.equal(await AuthSession.countDocuments({userId:signup.body._id}),1);
+  const google=await call('/auth/google',{credential:credential('blocked-google','blocked-google@example.test')});assert.equal(google.status,503);assert.equal(await User.countDocuments({email:'blocked-google@example.test'}),0);
+ }finally{await User.createIndexes();}
 });

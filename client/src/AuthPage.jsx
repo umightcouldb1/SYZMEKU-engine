@@ -214,7 +214,8 @@ const AuthPage = ({ mode = 'login' }) => {
 
           {googleLinkRequired && <div role="status">
             <p>Enter your existing account password below, then choose Google again to link both sign-in methods. Password sign-in is still available.</p>
-            <button type="button" onClick={() => {
+            <button type="button" disabled={isLoading} onClick={() => {
+              if (isLoading) return;
               passwordRef.current = '';
               googleLinkRequiredRef.current = false;
               setGoogleLinkRequired(false);
