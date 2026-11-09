@@ -22,11 +22,8 @@ jobs:
             package-lock.json
             server/package-lock.json
             client/package-lock.json
-      - name: Install locked existing dependencies
-        run: |
-          npm ci
-          npm ci --prefix server
-          npm ci --prefix client
+      - name: Use the existing project dependency setup
+        run: npm run setup
       - name: Verify only the synthetic content browser journey
         run: npm run c0:browser
       - name: Retain synthetic review screenshots
