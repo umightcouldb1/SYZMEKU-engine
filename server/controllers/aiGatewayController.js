@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const axios = require('axios');
 const { logAuditEvent } = require('../utils/audit');
+const { runAnonymousAi } = require('../services/anonymousAiBudget');
 
 const MASTER_ROLE = 'COMMANDER_IN_CHIEF';
 const USER_ROLE = 'USER';
@@ -48,11 +49,12 @@ const extractGeminiText = (response) => {
   return JSON.stringify(response);
 };
 
-const processWithGemini = async (prompt) => {
+const processWithGemini = async (prompt, config) => {
   const ai = await getGeminiClient();
   const response = await ai.models.generateContent({
     model: DEFAULT_GEMINI_MODEL,
     contents: prompt,
+    ...(config ? { config } : {}),
   });
 
   return {
@@ -126,7 +128,9 @@ const processIntelligencePrompt = asyncHandler(async (req, res) => {
   try {
     const result = isCommander
       ? await processWithOllama(prompt)
-      : await processWithGemini(prompt);
+      : req.user
+        ? await processWithGemini(prompt)
+        : await runAnonymousAi(prompt, config => processWithGemini(prompt, config), res);
 
     await auditGatewayEvent({
       req,

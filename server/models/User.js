@@ -6,6 +6,15 @@ const USER_ROLES = Object.freeze({
     COMMANDER_IN_CHIEF: 'COMMANDER_IN_CHIEF',
 });
 
+// Absent on legacy records deliberately: do not infer a verified provider or
+// invalidate existing credentials during a schema-only rollout.
+const identitySchema = new mongoose.Schema({
+    version: { type: Number, enum: [1], required: true },
+    passwordEnabled: { type: Boolean, required: true },
+    googleSubject: { type: String },
+    emailVerifiedAt: { type: Date },
+}, { _id: false });
+
 const userSchema = mongoose.Schema(
     {
         name: {
@@ -28,6 +37,7 @@ const userSchema = mongoose.Schema(
             type: String,
             required: [true, 'Please add a password'],
         },
+        identity: { type: identitySchema, default: undefined },
         role: {
             type: String,
             enum: ['USER', 'COMMANDER_IN_CHIEF'],
@@ -156,6 +166,12 @@ const userSchema = mongoose.Schema(
         timestamps: true,
     }
 );
+
+// New identities only. Existing records have no subject and are not backfilled.
+userSchema.index({ 'identity.googleSubject': 1 }, {
+    unique: true,
+    partialFilterExpression: { 'identity.googleSubject': { $type: 'string', $gt: '' } },
+});
 
 const User = mongoose.model('User', userSchema);
 
