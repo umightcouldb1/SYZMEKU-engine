@@ -1,7 +1,7 @@
 // Explicit retained audit context, stored in the existing owner-scoped memory.
 // Never inferred from chat text, never promoted to verified facts.
 const crypto = require('crypto');
-const {requireCoreScope, requireCoreWrite, rejectOwnerFields, scopeError, invalidateCoreRuntime} = require('./coreScopeService');
+const {requireCoreScope, requireCoreWrite, rejectOwnerFields, scopeError, invalidateCoreRuntime, withRetainedAuditDeletion} = require('./coreScopeService');
 const SOURCE = 'freedom-audit-continuation-v1';
 const CATEGORY = 'retained-freedom-audit';
 const MAX_SNAPSHOT_BYTES = 262144;
@@ -61,10 +61,13 @@ async function retain(body) {
  if(body.retain!==true)fail('Explicit retention consent is required.');
  if(!Object.hasOwn(body,'expectedRetained'))fail('Review current retention before saving.',409);
  requireCoreWrite();
- const response=await core().withContextMutation(async life=>{
+ if(require('../utils/requestContext').getRequestContext().coreTransaction)fail('Audit retention requires its own transaction.',409);
+ const unchanged = new Error('Retained audit unchanged');
+ let response;
+ try { response=await core().withContextMutation(async life=>{
    await requireAccess();const old=await record();const oldData=old?decode(old):null;
    // A confirmed retry preserves the retained record even if the source has left the last-ten history.
-   if(oldData?.audit.id===body.resultId && oldData.sourceHash===body.sourceHash)return {retained:summary(old),changed:false};
+   if(oldData?.audit.id===body.resultId && oldData.sourceHash===body.sourceHash){unchanged.result={retained:summary(old),changed:false};throw unchanged;}
    if(JSON.stringify(stamp(old))!==JSON.stringify(body.expectedRetained))fail('Retained audit changed. Review again before replacing it.',409);
    const source=await preview(body.resultId);
    if(source.sourceHash!==body.sourceHash)fail('Saved audit changed. Review it again.',409);
@@ -73,7 +76,13 @@ async function retain(body) {
    doc.set({source:SOURCE,sourceId:SOURCE,category:CATEGORY,title:'Retained Freedom Audit',content:JSON.stringify(envelope),confirmed:false,provenance:{kind:'derived',recordedVia:'explicit-audit-retention',originRootKey:'audit:'+source.resultId},revision:(old?.revision||0)+1});
    await doc.save();life.revision++;await life.save();if(old)await core().invalidateDerived();
    return {retained:summary(doc.toObject()),changed:true};
- });invalidateCoreRuntime();return response;
+ }); } catch(error) {
+   // Abort the transaction, including its anchor/evidence writes and stale guidance.
+   // Catch only this invocation's private sentinel; concurrency errors still propagate.
+   if(error===unchanged)return unchanged.result;
+   throw error;
+ }
+ invalidateCoreRuntime();return response;
 }
 async function select(body) {
  exact(body,['expectedRetained','section']);if(!SECTIONS.includes(body.section))fail('Unknown audit section.');
@@ -88,11 +97,11 @@ async function select(body) {
 }
 async function remove(body) {
  exact(body,['expectedRetained']);
- const result=await core().withContextMutation(async life=>{
+ const result=await withRetainedAuditDeletion(()=>core().withContextMutation(async life=>{
    const r=await record();if(!r)return {deleted:true};
    if(JSON.stringify(stamp(r))!==JSON.stringify(body.expectedRetained))fail('Retained audit changed. Reload before removing it.',409);
    await model().deleteOne({_id:r._id});life.revision++;await life.save();await core().invalidateDerived();return {deleted:true};
- });invalidateCoreRuntime();return result;
+ }));invalidateCoreRuntime();return result;
 }
 function contextData(e) {
  const audit=e.audit;

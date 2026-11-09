@@ -36,6 +36,13 @@ test('retention requires ownership, consent, exact source and existing write aut
  const doc=await f.scope(f.founder,()=>require('../models/StrategicMemory').findById(saved.retained.memoryId).lean());assert.equal(doc.confirmed,false);assert.equal(doc.provenance.kind,'derived');
  assert(!(await f.scope(f.founder,()=>core.listMemory())).some(m=>m.category===audit.CATEGORY));
 });
+test('same-source HTTP retry leaves saved guidance, context, conversation and snapshot unchanged',async()=>{
+ const p=await preview(f.founder,'owner-audit');
+ const saved=await f.request(f.founder,'/api/core/reasoning/preview','POST',{purpose:'mentor',text:'Continue.',selectedGoalIds:[goal]});assert.equal(saved.status,200);
+ await f.scope(f.founder,()=>core.withContextMutation(()=>require('../models/ReasoningRecord').create({purpose:'mentor',requestKey:'retry-guidance',requestHash:'fixture',freshness:'current',payload:{summary:'Existing guidance'}})));
+ async function state(){return f.scope(f.founder,async()=>JSON.stringify({life:await require('../models/LifeContext').findOne().lean(),guidance:await require('../models/ReasoningRecord').find().lean(),memory:await require('../models/Memory').find().lean(),audit:await audit.status()}));}
+ const before=await state();const retry=await f.request(f.founder,endpoint,'POST',consent(p));assert.equal(retry.status,200);assert.equal(retry.data.changed,false);assert.equal(await state(),before);
+});
 test('HTTP memory lists/search and media exclude retained source; generic deletion cannot remove a replacement',async()=>{
  const before=await retained(f.founder);
  for(const route of ['/api/core/memory','/api/core/memory/search?query=OWNER_AUDIT']) {
@@ -120,5 +127,11 @@ test('personal Core erasure removes only the owner retained audit; revoked acces
  const blocked=await retained(f.other);assert.equal(blocked.accessAllowed,false);assert.equal(blocked.audit,null);
  await assert.rejects(()=>f.scope(f.other,()=>audit.resolve()),e=>e.statusCode===403);
  await f.scope(f.founder,()=>core.eraseContext());assert.equal((await retained(f.founder)).retained,null);assert((await retained(f.other)).retained);
+ process.env.CORE_CONTEXT_WRITE_USER_IDS=f.founder.id;process.env.CORE_CONTEXT_WRITES_ENABLED='false';
+ assert.equal((await f.request(f.other,endpoint,'PATCH',{expectedRetained:blocked.expectedRetained,section:'overview'})).status,503);
+ assert.equal((await f.request(f.other,endpoint,'DELETE',{expectedRetained:{...blocked.expectedRetained,revision:999}})).status,409);
  assert.equal((await f.request(f.other,endpoint,'DELETE',{expectedRetained:blocked.expectedRetained})).status,200);
+ assert.equal((await retained(f.other)).retained,null);
+ assert.equal((await f.request(f.other,'/api/core/memory/save','POST',{content:'Not authorized by deletion'})).status,503);
+ process.env.CORE_CONTEXT_WRITES_ENABLED='true';
 });
