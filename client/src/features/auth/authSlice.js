@@ -148,6 +148,8 @@ export const googleLogin = createAsyncThunk(
             return thunkAPI.rejectWithValue({
                 message: getAuthErrorMessage(error),
                 code: error?.response?.data?.code || '',
+                upgradeChallenge: error?.response?.data?.upgradeChallenge || '',
+                googleRecoveryAvailable: error?.response?.data?.googleRecoveryAvailable === true,
             });
         }
     }

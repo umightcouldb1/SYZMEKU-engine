@@ -42,8 +42,15 @@ const AuthPage = ({ mode = 'login' }) => {
   const { isLoading, message } = useSelector((state) => state.auth || {});
   const googleButtonRef = useRef(null);
   const googleRenderFrameRef = useRef(null);
+  const googleRenderedRef = useRef(null);
   const passwordRef = useRef('');
   const googleLinkRequiredRef = useRef(false);
+  const legacyUpgradeRef = useRef('');
+  const upgradeChallengeRef = useRef('');
+  const googlePendingRef = useRef(false);
+  const [legacyUpgradeRequired, setLegacyUpgradeRequired] = useState(false);
+  const [legacyUpgrade, setLegacyUpgrade] = useState('');
+  const [googleRecoveryAvailable, setGoogleRecoveryAvailable] = useState(false);
   const [googleLinkRequired, setGoogleLinkRequired] = useState(false);
   const googleClientId = getGoogleClientId();
   const hasGoogleClientId = Boolean(googleClientId);
@@ -70,6 +77,7 @@ const AuthPage = ({ mode = 'login' }) => {
   };
 
   const onGoogleSuccess = useCallback(async (credentialResponse) => {
+    if (googlePendingRef.current) return;
     setError('');
 
     if (!credentialResponse?.credential) {
@@ -77,13 +85,36 @@ const AuthPage = ({ mode = 'login' }) => {
       return;
     }
 
-    const result = await dispatch(googleLogin({
-      credential: credentialResponse.credential,
-      ...(googleLinkRequiredRef.current ? { password: passwordRef.current } : {}),
-    }));
+    googlePendingRef.current = true;
+    let result;
+    try {
+      result = await dispatch(googleLogin({
+        credential: credentialResponse.credential,
+        ...(googleLinkRequiredRef.current || legacyUpgradeRef.current === 'link-password' ? { password: passwordRef.current } : {}),
+        ...(legacyUpgradeRef.current ? { legacyUpgrade: legacyUpgradeRef.current, upgradeChallenge: upgradeChallengeRef.current } : {}),
+      }));
+    } finally { googlePendingRef.current = false; }
 
     if (result.meta.requestStatus !== 'fulfilled') {
+      if (result.payload?.code === 'LEGACY_ACCOUNT_UPGRADE_REQUIRED') {
+        googleLinkRequiredRef.current = false;
+        setGoogleLinkRequired(false);
+        passwordRef.current = '';
+        setForm((prev) => ({ ...prev, password: '' }));
+        upgradeChallengeRef.current = result.payload.upgradeChallenge || '';
+        setGoogleRecoveryAvailable(result.payload.googleRecoveryAvailable === true);
+        legacyUpgradeRef.current = '';
+        setLegacyUpgrade('');
+        setLegacyUpgradeRequired(true);
+      }
       if (result.payload?.code === 'GOOGLE_ACCOUNT_LINK_REQUIRED') {
+        legacyUpgradeRef.current = '';
+        upgradeChallengeRef.current = '';
+        setLegacyUpgrade('');
+        setLegacyUpgradeRequired(false);
+        setGoogleRecoveryAvailable(false);
+        passwordRef.current = '';
+        setForm((prev) => ({ ...prev, password: '' }));
         googleLinkRequiredRef.current = true;
         setGoogleLinkRequired(true);
       }
@@ -94,6 +125,10 @@ const AuthPage = ({ mode = 'login' }) => {
 
     passwordRef.current = '';
     googleLinkRequiredRef.current = false;
+    legacyUpgradeRef.current = '';
+    upgradeChallengeRef.current = '';
+    setLegacyUpgrade('');
+    setLegacyUpgradeRequired(false);
     setGoogleLinkRequired(false);
     setForm((prev) => ({ ...prev, password: '' }));
     const completed = Boolean(result.payload?.onboarding?.completed);
@@ -104,6 +139,7 @@ const AuthPage = ({ mode = 'login' }) => {
     if (!hasGoogleClientId) return undefined;
 
     let cancelled = false;
+    googleRenderedRef.current = null;
 
     const drawGoogleButton = (google) => {
       const buttonHost = googleButtonRef.current;
@@ -111,6 +147,9 @@ const AuthPage = ({ mode = 'login' }) => {
 
       const slotWidth = Math.floor(buttonHost.getBoundingClientRect().width);
       if (slotWidth <= 0) return false;
+      const buttonWidth = Math.min(400, slotWidth);
+      if (googleRenderedRef.current?.host === buttonHost
+          && googleRenderedRef.current.width === buttonWidth && buttonHost.childElementCount > 0) return true;
 
       google.accounts.id.initialize({
         client_id: googleClientId,
@@ -124,8 +163,9 @@ const AuthPage = ({ mode = 'login' }) => {
         shape: 'pill',
         type: 'standard',
         text: isSignup ? 'signup_with' : 'signin_with',
-        width: Math.min(400, slotWidth),
+        width: buttonWidth,
       });
+      googleRenderedRef.current = { host: buttonHost, width: buttonWidth };
 
       return true;
     };
@@ -212,10 +252,31 @@ const AuthPage = ({ mode = 'login' }) => {
             )}
           </div>
 
-          {googleLinkRequired && <div role="status">
-            <p>Enter your existing account password below, then choose Google again to link both sign-in methods. Password sign-in is still available.</p>
+          {legacyUpgradeRequired && <div role="status">
+            <p>Secure your existing account once. Your data and purchases stay intact. Either choice signs out prior sessions for this account.</p>
+            <label>Choose how to secure this account
+              <select value={legacyUpgrade} disabled={isLoading} onChange={(event) => {
+                legacyUpgradeRef.current = event.target.value;
+                setLegacyUpgrade(event.target.value);
+                if (event.target.value === 'google-only') { passwordRef.current = ''; setForm((prev) => ({ ...prev, password: '' })); }
+              }}>
+                <option value="">Choose an option before continuing</option>
+                <option value="link-password">Keep my current password and link Google</option>
+                <option value="google-only" disabled={!googleRecoveryAvailable}>Use Google only and disable my old password</option>
+              </select>
+            </label>
+            {!googleRecoveryAvailable && <p>Google cannot verify current ownership of this email for recovery. Use your current password, or contact support for manual account recovery.</p>}
+            <p>{legacyUpgrade === 'link-password' ? 'Enter your current password below, then choose Google again to confirm.' : 'Choosing Google again confirms your selected security upgrade.'}</p>
+          </div>}
+
+          {(googleLinkRequired || legacyUpgradeRequired) && <div role="status">
+            {!legacyUpgradeRequired && <p>Enter your existing account password below, then choose Google again to link both sign-in methods. Password sign-in is still available.</p>}
             <button type="button" disabled={isLoading} onClick={() => {
-              if (isLoading) return;
+              if (isLoading || googlePendingRef.current) return;
+              legacyUpgradeRef.current = '';
+              upgradeChallengeRef.current = '';
+              setLegacyUpgrade('');
+              setLegacyUpgradeRequired(false);
               passwordRef.current = '';
               googleLinkRequiredRef.current = false;
               setGoogleLinkRequired(false);

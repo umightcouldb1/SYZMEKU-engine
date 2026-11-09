@@ -99,7 +99,7 @@ async function generatePersonalizedPlan(assessment, { signal } = {}) {
     'EVIDENCE MAP: ' + JSON.stringify(evidence)
   ].join('\n');
   try {
-    const response = await require('./reasoningProviderService').generate({ purpose:'planner', provider:'gemini', prompt, signal, responseSchema:PLAN_SCHEMA, maxOutputTokens:6144, thinkingBudget:512 });
+    const response = await require('./aiQuotaService').withFreedomAuditQuotaContext(() => require('./reasoningProviderService').generate({ purpose:'planner', provider:'gemini', prompt, signal, responseSchema:PLAN_SCHEMA, maxOutputTokens:6144, thinkingBudget:512 }));
     if (signal?.aborted) throw Object.assign(new Error('Canceled'), {statusCode:504});
     if (response.finishReason && response.finishReason !== 'STOP') invalid();
     if (typeof response.text !== 'string' || response.text.length > 20000) invalid();

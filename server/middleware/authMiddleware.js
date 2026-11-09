@@ -5,6 +5,7 @@ const AuthSession = require('../models/AuthSession');
 const { logAuditEvent } = require('../utils/audit');
 const { getJwtSecret } = require('../utils/jwtSecret');
 const { runWithRequestContext } = require('../utils/requestContext');
+const { isSessionCurrent } = require('../utils/sessionVersion');
 
 const getCookieToken = (cookieHeader = '') => {
     const sessionCookie = cookieHeader
@@ -50,7 +51,7 @@ const protect = asyncHandler(async (req, res, next) => {
         // Get user from the token payload (excluding the password hash)
         req.user = await User.findById(decoded.id).select('-password');
 
-        if (!req.user) {
+        if (!req.user || !isSessionCurrent(req.user, session, decoded.av)) {
             res.status(401);
             throw new Error('User not found');
         }

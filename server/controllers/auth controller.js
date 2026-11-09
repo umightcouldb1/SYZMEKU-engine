@@ -7,6 +7,7 @@ const { OAuth2Client } = require('google-auth-library');
 const { logAuditEvent } = require('../utils/audit');
 const { getJwtSecret } = require('../utils/jwtSecret');
 const { ensureIdentityIndex } = require('../utils/identityIndex');
+const { authVersionOf, isSessionCurrent } = require('../utils/sessionVersion');
 const {
     deriveUsernameFromEmail,
     ensureAdminRoleForUser,
@@ -23,6 +24,7 @@ const googleOAuthClient = new OAuth2Client();
 const buildTokenPayload = (user, sessionId) => ({
     id: user._id,
     sid: sessionId,
+    av: authVersionOf(user),
     role: user.role || User.ROLES.USER,
     mirrorMode: user.mirrorMode,
 });
@@ -73,6 +75,7 @@ const createPersistentSession = async (user, req) => {
     await AuthSession.create({
         userId: user._id,
         sessionId,
+        authVersion: authVersionOf(user),
         expiresAt,
         ip: req?.ip || '',
         userAgent: req?.headers?.['user-agent'] || '',
@@ -138,10 +141,30 @@ const verifyGoogleCredential = async (credential) => {
     return {
         googleId: payload.sub,
         email,
+        // Google is authoritative for Gmail or a verified Workspace account,
+        // not every third-party email address attached to a personal account.
+        emailAuthority: email.endsWith('@gmail.com') || (typeof payload.hd === 'string'
+            && payload.hd.trim().length > 0),
         name: String(payload.name || payload.given_name || email.split('@')[0] || 'Google User').trim(),
         givenName: String(payload.given_name || '').trim(),
         picture: String(payload.picture || '').trim(),
     };
+};
+
+const legacyUpgradeResponse = (res, user, googleProfile, message) => res.status(409).json({
+    code: 'LEGACY_ACCOUNT_UPGRADE_REQUIRED',
+    googleRecoveryAvailable: googleProfile.emailAuthority === true,
+    message: message || 'Secure this existing account before continuing with Google. Choose to keep your current password by proving it, or use Google only and disable the old password. Either choice signs out prior sessions for this account. Your data and purchases stay with this account.',
+    upgradeChallenge: jwt.sign({ purpose: 'legacy-identity-upgrade', uid: String(user._id),
+        sub: googleProfile.googleId, av: authVersionOf(user) }, getJwtSecret(),
+    { expiresIn: '5m', issuer: 'syzmeku-identity-upgrade' }),
+});
+const validUpgradeChallenge = (challenge, user, googleProfile) => {
+    try {
+        const proof = jwt.verify(challenge, getJwtSecret(), { issuer: 'syzmeku-identity-upgrade' });
+        return proof.purpose === 'legacy-identity-upgrade' && proof.uid === String(user._id)
+            && proof.sub === googleProfile.googleId && proof.av === authVersionOf(user);
+    } catch (_error) { return false; }
 };
 
 const buildGooglePasswordHash = async (googleId) => {
@@ -249,9 +272,17 @@ const loginUser = async (req, res) => {
         return res.status(401).json({ message: 'Access Denied: Invalid credentials.' });
     }
 
+    const passwordProof = { hash: user.password, version: authVersionOf(user) };
     user.email = email;
     if (!user.username) user.username = deriveUsernameFromEmail(email);
     user = await ensureAdminRoleForUser(user);
+    // A helper may reload the user. Never promote a stale password proof into a
+    // newer security epoch or a method disabled by concurrent Google recovery.
+    if (!user || user.password !== passwordProof.hash || authVersionOf(user) !== passwordProof.version
+        || (user.identity !== undefined && (!user.identity || user.identity.version !== 1
+            || user.identity.passwordEnabled !== true))) {
+        return res.status(401).json({ message: 'Account sign-in changed. Please start sign-in again.' });
+    }
     const { sessionId } = await createPersistentSession(user, req);
     const token = createAuthToken(user, sessionId);
     setSessionCookie(req, res, token);
@@ -286,6 +317,9 @@ const googleLoginUser = async (req, res) => {
         let isNewUser = false;
 
         if (!user) {
+            if (isAdminEmail(googleProfile.email) && googleProfile.emailAuthority !== true) {
+                return res.status(403).json({ message: 'This administrator identity requires verified Google-managed email or explicit administrator bootstrap.' });
+            }
             await ensureIdentityIndex();
             const preferredUsername = googleProfile.givenName || deriveUsernameFromEmail(googleProfile.email);
             const username = await resolveUniqueUsername(preferredUsername);
@@ -366,9 +400,44 @@ const googleLoginUser = async (req, res) => {
                     }
                 }
             }
-            // Legacy accounts intentionally retain their current sign-in behavior.
-            // Closing their historical email-linking risk requires a reviewed
-            // identity migration, not guessing provenance or resetting passwords.
+            if (user.identity === undefined) {
+                // No inferred provenance or blanket migration. The verified owner
+                // must explicitly choose how this legacy account is secured.
+                const choice = req.body?.legacyUpgrade;
+                if (!['link-password', 'google-only'].includes(choice)
+                    || !validUpgradeChallenge(req.body?.upgradeChallenge, user, googleProfile)) {
+                    return legacyUpgradeResponse(res, user, googleProfile);
+                }
+                if (choice === 'google-only' && googleProfile.emailAuthority !== true) {
+                    return legacyUpgradeResponse(res, user, googleProfile,
+                        'Google cannot verify current ownership of this email for recovery. Link with your current password, or contact support for manual account recovery. No credentials or sessions were changed.');
+                }
+                if (choice === 'link-password' && !(typeof req.body?.password === 'string'
+                    && req.body.password.length > 0 && await bcrypt.compare(req.body.password, user.password))) {
+                    return legacyUpgradeResponse(res, user, googleProfile,
+                        'The current password was not verified. Try it again, or explicitly choose Google-only recovery to disable it and sign out prior sessions.');
+                }
+                await ensureIdentityIndex();
+                const version = authVersionOf(user);
+                user = await User.findOneAndUpdate({
+                    _id: user._id,
+                    password: user.password,
+                    identity: { $exists: false },
+                    ...(version === 0 ? { $or: [{ authVersion: 0 }, { authVersion: { $exists: false } }] } : { authVersion: version }),
+                }, {
+                    $set: { identity: {
+                        version: 1,
+                        passwordEnabled: choice === 'link-password',
+                        googleSubject: googleProfile.googleId,
+                        emailVerifiedAt: new Date(),
+                    } },
+                    $inc: { authVersion: 1 },
+                }, { new: true, runValidators: true });
+                if (!user) return res.status(409).json({ message: 'Account sign-in changed. Please start sign-in again.' });
+                await logAuditEvent({ category: 'auth', event: 'legacy_identity_secured', req,
+                    userId: user._id, role: user.role || User.ROLES.USER, success: true,
+                    details: { method: choice, priorSessionsInvalidated: true } });
+            }
             let changed = false;
             if (!user.name && googleProfile.name) {
                 user.name = googleProfile.name;
@@ -450,8 +519,8 @@ const refreshSession = async (req, res) => {
         }
 
         const user = await User.findById(decoded.id).select('-password');
-        if (!user) {
-            return res.status(401).json({ message: 'User not found.' });
+        if (!user || !isSessionCurrent(user, existingSession, decoded.av)) {
+            return res.status(401).json({ message: 'Session expired or revoked. Please sign in again.' });
         }
 
         const refreshedSession = await extendPersistentSession(decoded.sid, req);

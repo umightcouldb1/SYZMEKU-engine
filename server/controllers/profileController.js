@@ -23,24 +23,6 @@ const sanitizePreferences = (preferences = {}, current = {}) => ({
     : current.interfaceMode || 'crystalline',
 });
 
-const getHighestTier = (purchasedProducts = []) => {
-  const paidProducts = purchasedProducts.filter((product) => product.status === 'paid');
-  if (paidProducts.some((product) => /genesis/i.test(product.name) || /genesis/i.test(product.tier))) {
-    return 'genesis';
-  }
-  if (paidProducts.some((product) => /guardian/i.test(product.name) || /guardian/i.test(product.tier))) {
-    return 'guardian';
-  }
-  if (paidProducts.some((product) => /cosmic/i.test(product.name) || /cosmic/i.test(product.tier))) {
-    return 'cosmic';
-  }
-  if (paidProducts.some((product) => /harmonic/i.test(product.name) || /harmonic/i.test(product.tier))) {
-    return 'harmonic';
-  }
-  if (paidProducts.length > 0) return 'active';
-  return 'public';
-};
-
 const getOrCreateProfile = async (userId) => {
   let profile = await UserProfile.findOne({ userId });
   if (!profile) {
@@ -71,11 +53,8 @@ const getProfile = asyncHandler(async (req, res) => {
   }
 
   const profile = await getOrCreateProfile(user._id);
-  const tier = getHighestTier(profile.purchasedProducts);
-  if (profile.tier !== tier) {
-    profile.tier = tier;
-    await profile.save();
-  }
+  // Payment synchronization maintains purchased tiers atomically. Reads must not
+  // overwrite a concurrent refund or an independently granted legacy tier.
 
   return res.json(buildProfileResponse(user, profile));
 });

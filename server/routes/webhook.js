@@ -1,6 +1,5 @@
 const express = require('express');
 const Stripe = require('stripe');
-const UserProfile = require('../models/UserProfile');
 
 const router = express.Router();
 
@@ -8,7 +7,6 @@ let stripeClient;
 
 const getStripeSecretKey = () => process.env.STRIPE_SECRET_KEY || process.env.Stripe_Secret_Key;
 const getStripeWebhookSecret = () => process.env.STRIPE_WEBHOOK_SECRET || process.env.Stripe_Webhook_Secret;
-const getFreedomAuditPriceId = () => process.env.FREEDOM_AUDIT_STRIPE_PRICE_ID || '';
 
 const getStripe = () => {
   if (!getStripeSecretKey()) {
@@ -24,105 +22,7 @@ const getStripe = () => {
   return stripeClient;
 };
 
-const deriveTier = (name = '', metadataTier = '', priceId = '') => {
-  if (getFreedomAuditPriceId() && priceId === getFreedomAuditPriceId()) return 'freedom_audit';
-  const source = `${metadataTier} ${name}`.toLowerCase();
-  if (source.includes('genesis')) return 'genesis';
-  if (source.includes('guardian')) return 'guardian';
-  if (source.includes('cosmic')) return 'cosmic';
-  if (source.includes('harmonic')) return 'harmonic';
-  if (source.includes('ketsuron')) return 'ketsuron';
-  return 'active';
-};
-
-const rankTier = (tier = 'public') => {
-  const ranks = {
-    public: 0,
-    active: 1,
-    ketsuron: 2,
-    harmonic: 3,
-    cosmic: 4,
-    guardian: 5,
-    genesis: 6,
-  };
-  return ranks[tier] ?? ranks.public;
-};
-
-const highestTier = (currentTier, purchasedProducts = []) => {
-  return purchasedProducts.reduce((best, product) => {
-    const tier = product.status === 'paid' ? product.tier : 'public';
-    return rankTier(tier) > rankTier(best) ? tier : best;
-  }, currentTier || 'public');
-};
-
-const normalizeLineItem = (session, lineItem) => {
-  const price = lineItem.price || {};
-  const product = price.product && typeof price.product === 'object' ? price.product : null;
-  const productName = product?.name || lineItem.description || session.metadata?.productName || '';
-  const tier = deriveTier(productName, product?.metadata?.tier || session.metadata?.tier, price.id || session.metadata?.priceId || '');
-
-  return {
-    productId: product?.id || session.metadata?.productId || '',
-    priceId: price.id || session.metadata?.priceId || '',
-    name: productName,
-    tier,
-    amount: Number(lineItem.amount_total ?? session.amount_total ?? 0) / 100,
-    currency: lineItem.currency || session.currency || 'usd',
-    checkoutSessionId: session.id,
-    purchasedAt: new Date(),
-    status: 'paid',
-  };
-};
-
-const fulfillCheckoutSession = async (session) => {
-  if (session.mode !== 'payment' || session.status !== 'complete' || session.payment_status !== 'paid') {
-    throw new Error(`Checkout session ${session.id} is not a completed paid payment session.`);
-  }
-
-  const userId = session.client_reference_id || session.metadata?.userId || session.metadata?.user_id;
-  if (!userId) {
-    throw new Error(`Checkout session ${session.id} is missing user identity metadata.`);
-  }
-
-  const stripe = getStripe();
-  const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
-    limit: 100,
-    expand: ['data.price.product'],
-  });
-
-  const purchases = lineItems.data.map((lineItem) => normalizeLineItem(session, lineItem));
-  if (purchases.length === 0) {
-    throw new Error(`Checkout session ${session.id} has no line items.`);
-  }
-
-  const auditPurchases = purchases.filter(p => p.priceId === getFreedomAuditPriceId());
-  if (auditPurchases.length === purchases.length) {
-    for (const purchase of auditPurchases) await require('../services/freedomAuditPurchase').recordPurchase(userId, purchase);
-    const profile = await UserProfile.findOne({userId});
-    return {userId, purchases:purchases.length, tier:profile.tier};
-  }
-  let profile = await UserProfile.findOne({ userId });
-  if (!profile) {
-    profile = await UserProfile.create({ userId });
-  }
-
-  for (const purchase of purchases) {
-    const existingIndex = profile.purchasedProducts.findIndex(
-      (product) => product.checkoutSessionId === session.id && product.priceId === purchase.priceId
-    );
-
-    if (existingIndex >= 0) {
-      profile.purchasedProducts[existingIndex] = purchase;
-    } else {
-      profile.purchasedProducts.push(purchase);
-    }
-  }
-
-  profile.tier = highestTier(profile.tier, profile.purchasedProducts);
-  await profile.save();
-
-  return { userId, purchases: purchases.length, tier: profile.tier };
-};
+const { synchronizeEvent } = require('../services/stripeEntitlements');
 
 const handleStripeWebhook = async (req, res) => {
   const signature = req.headers['stripe-signature'];
@@ -140,9 +40,7 @@ const handleStripeWebhook = async (req, res) => {
   }
 
   try {
-    if (event.type === 'checkout.session.completed') {
-      await fulfillCheckoutSession(event.data.object);
-    }
+    await synchronizeEvent(getStripe(), event);
 
     return res.json({ received: true });
   } catch (error) {

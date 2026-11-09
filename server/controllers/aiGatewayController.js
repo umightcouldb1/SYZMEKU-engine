@@ -10,6 +10,7 @@ const DEFAULT_OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
 const DEFAULT_OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS || 45000);
 let genAiClientPromise;
+let freeGenAiClientPromise;
 
 const sanitizePrompt = (value) => String(value || '').trim();
 
@@ -32,8 +33,17 @@ const getGeminiApiKey = () => {
   return process.env.GEMINI_API_KEY;
 };
 
-const getGeminiClient = async () => {
+const getGeminiClient = async (limited = false) => {
   const apiKey = getGeminiApiKey();
+
+  if (limited) {
+    if (!freeGenAiClientPromise) {
+      freeGenAiClientPromise = import('@google/genai').then(({ GoogleGenAI }) => new GoogleGenAI({
+        apiKey, httpOptions: { retryOptions: { attempts: 1 } },
+      }));
+    }
+    return freeGenAiClientPromise;
+  }
 
   if (!genAiClientPromise) {
     genAiClientPromise = import('@google/genai').then(({ GoogleGenAI }) => new GoogleGenAI({ apiKey }));
@@ -50,7 +60,17 @@ const extractGeminiText = (response) => {
 };
 
 const processWithGemini = async (prompt, config) => {
-  const ai = await getGeminiClient();
+  const quota = await require('../services/aiQuotaService').reserveAiUsage();
+  // Free signed-in accounts receive the same prompt/output/deadline bounds as
+  // the anonymous demo; registration is not a route around cost controls.
+  if (quota.limited && !config) {
+    return runAnonymousAi(prompt, bounded => generateWithGemini(prompt, bounded, true));
+  }
+  return generateWithGemini(prompt, config, quota.limited);
+};
+
+const generateWithGemini = async (prompt, config, limited) => {
+  const ai = await getGeminiClient(limited);
   const response = await ai.models.generateContent({
     model: DEFAULT_GEMINI_MODEL,
     contents: prompt,

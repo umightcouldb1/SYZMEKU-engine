@@ -1,7 +1,9 @@
-const {test,afterEach}=require('node:test'),assert=require('node:assert/strict');
+const {test,afterEach,beforeEach}=require('node:test'),assert=require('node:assert/strict');
 const provider=require('../services/reasoningProviderService'),contracts=require('../contracts/reasoningContracts'),policy=require('../logic/reasoningPolicy');
+const quota=require('../services/aiQuotaService'), originalQuota=quota.reserveAiUsage;
+beforeEach(()=>{quota.reserveAiUsage=async()=>({limited:false});});
 const originalFetch=global.fetch,originalEnv={...process.env};
-afterEach(()=>{global.fetch=originalFetch;for(const k of Object.keys(process.env))if(!Object.hasOwn(originalEnv,k))delete process.env[k];Object.assign(process.env,originalEnv);});
+afterEach(()=>{quota.reserveAiUsage=originalQuota;global.fetch=originalFetch;for(const k of Object.keys(process.env))if(!Object.hasOwn(originalEnv,k))delete process.env[k];Object.assign(process.env,originalEnv);});
 function reset(){for(const k of ['GEMINI_API_KEY','Gemini_API_Key','Gemini_API_KEY'])delete process.env[k];}
 test('central credential aliases, conflicting aliases and purpose models',()=>{
  for(const alias of ['GEMINI_API_KEY','Gemini_API_Key','Gemini_API_KEY']){reset();process.env[alias]='fixture-only';assert.equal(provider.configuration('mentor').key,'fixture-only');}
