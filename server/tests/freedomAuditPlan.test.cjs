@@ -37,3 +37,31 @@ test('missing Gemini configuration fails closed without an outbound request',asy
  try {await assert.rejects(generatePersonalizedPlan(profile()),e=>e.statusCode===503&&e.message.includes('no new result was saved'));}
  finally {for(const k of aliases){if(old[k]===undefined)delete process.env[k];else process.env[k]=old[k];}}
 });
+
+
+test('continuation preserves each received plan instead of restarting from scores alone', () => {
+ const { buildBigSyzPrompt } = require('../services/freedomAuditContinuation');
+ const prompts = [];
+ for (const inputs of [profile(), profile({weakestDomain:'money',win:'Track monthly spending',drag:'Scattered receipts',asset:'A spreadsheet'})]) {
+  const validated = validatePlan(fixture(inputs), inputs);
+  const received = {highestLeveragePriority:validated.priority,leverageMoves:validated.moves,compression:validated.compression,liberationPlan:validated.plan,analysisMethod:validated.analysisMethod};
+  const result = {...inputs,score:60,stage:'Stabilize',domainScores:Object.fromEntries(Object.keys(QUESTIONS).map(k=>[k,60])),...received,checkoutSessionId:'PRIVATE_PAYMENT',userId:'PRIVATE_ACCOUNT',providerModel:'PRIVATE_PROVIDER',planEvidence:[{private:'PRIVATE_METADATA'}]};
+  const prompt = buildBigSyzPrompt(result);
+  const copied = JSON.parse(prompt.split('SAVED AUDIT PLAN (JSON):\n')[1]);
+  assert.deepEqual(copied, received);
+  assert.match(prompt, /Preserve its sequence/);
+  assert(prompt.includes(inputs.win) && prompt.includes(inputs.drag) && prompt.includes(inputs.asset));
+  assert.doesNotMatch(prompt, /PRIVATE_/);
+  prompts.push(prompt);
+ }
+ assert.notEqual(prompts[0], prompts[1]);
+});
+
+test('continuation uses the supplied rules-based result without claiming AI generation', () => {
+ const { buildBigSyzPrompt } = require('../services/freedomAuditContinuation');
+ const result = {...profile(),score:60,stage:'Stabilize',domainScores:Object.fromEntries(Object.keys(QUESTIONS).map(k=>[k,60])),highestLeveragePriority:'Reclaim your calendar.',leverageMoves:['Remove a duplicate task.'],compression:{delete:'A duplicate task'},liberationPlan:['Days 1-3: Inventory commitments.'],analysisMethod:'Rules-based scoring of self-reported answers.'};
+ const prompt = buildBigSyzPrompt(result);
+ assert.deepEqual(JSON.parse(prompt.split('SAVED AUDIT PLAN (JSON):\n')[1]).liberationPlan,result.liberationPlan);
+ assert.match(prompt,/Rules-based scoring/);
+ assert.doesNotMatch(prompt,/Gemini-generated/);
+});
