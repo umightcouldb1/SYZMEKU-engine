@@ -61,3 +61,11 @@ test('expired generation session displays recovery in the visible sign-in panel'
 test('switching identity during generation never displays the previous buyer result',async()=>{
  let release;const p=page(()=>new Promise(r=>release=r));p.sandbox.document.querySelector=()=>({value:'3'});p.run("state.token='old'");const pending=p.run('submitAudit({preventDefault(){}})');p.run("state.token='new'");release({status:201,body:{result:{private:true}}});await pending;assert.equal(p.run('state.latestResult'),null);
 });
+test('Google linking requests explicit password retry without persisting provider credential or password',async()=>{
+ let calls=0;const p=page(async(url)=>{if(url.endsWith('/auth/google')){calls++;return calls===1?{status:409,body:{code:'GOOGLE_ACCOUNT_LINK_REQUIRED',message:'Enter account password and choose Google again.'}}:{status:200,body:{token:'linked-app-session'}};}return {status:200,body:{entitled:false}};});
+ p.get('password').value='existing-password';await p.google({credential:'first-provider-credential'});assert.equal(p.run('state.googleLinkRequired'),true);assert.equal(p.stored.size,0);assert.deepEqual(JSON.parse(p.requests[0].options.body),{credential:'first-provider-credential'});
+ await p.google({credential:'fresh-provider-credential'});assert.deepEqual(JSON.parse(p.requests[1].options.body),{credential:'fresh-provider-credential',password:'existing-password'});assert.equal(p.stored.get('freedomAuditToken'),'linked-app-session');assert.equal(p.get('password').value,'');assert.equal(p.run('state.googleLinkRequired'),false);assert(!JSON.stringify([...p.stored]).includes('provider-credential'));assert(!JSON.stringify([...p.stored]).includes('existing-password'));
+});
+test('cancel linking clears transient password and next Google attempt omits it',async()=>{
+ const p=page(async()=>({status:409,body:{code:'GOOGLE_ACCOUNT_LINK_REQUIRED',message:'Link required'}}));await p.google({credential:'synthetic'});p.get('password').value='existing-password';p.run('cancelGoogleLinking()');assert.equal(p.run('state.googleLinkRequired'),false);assert.equal(p.get('password').value,'');await p.google({credential:'new-synthetic'});assert.deepEqual(JSON.parse(p.requests[1].options.body),{credential:'new-synthetic'});assert.equal(p.stored.size,0);
+});

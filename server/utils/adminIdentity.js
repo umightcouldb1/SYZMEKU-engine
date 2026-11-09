@@ -96,6 +96,7 @@ const createFreshAdmin = async (adminEmail, initialPassword) => {
     email: adminEmail,
     password: hashedPassword,
     role: User.ROLES.COMMANDER_IN_CHIEF,
+    identity: { version: 1, passwordEnabled: true },
     isVerified: true,
   });
 };
@@ -115,6 +116,9 @@ const applyAdminPasswordReset = async (adminEmail, initialPassword) => {
     admin._id,
   );
   admin.password = await bcrypt.hash(initialPassword, 10);
+  // Explicit configured bootstrap recovery restores its password method, without
+  // inventing provenance for legacy users or changing an existing Google link.
+  if (admin.identity?.version === 1) admin.identity.passwordEnabled = true;
   if (admin.isVerified !== undefined) admin.isVerified = true;
 
   await admin.save();

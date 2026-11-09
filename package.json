@@ -30,7 +30,9 @@
     "c0:test": "node --test server/tests/contentFactory.test.cjs",
     "c0:browser": "node server/tests/contentFactoryBrowser.cjs",
     "freedom-audit:test": "node --test server/tests/commerceRegression.test.cjs server/tests/freedomAuditPlan.test.cjs freedom-audit/tests/auth.test.cjs",
-    "freedom-audit:browser": "node server/tests/freedomAuditBrowser.cjs"
+    "freedom-audit:browser": "node server/tests/freedomAuditBrowser.cjs",
+    "security:test": "node --test server/tests/authSecurity.test.cjs server/tests/anonymousAiBudget.test.cjs server/tests/billingPrivacy.test.cjs server/tests/mediaSecurity.test.cjs freedom-audit/tests/auth.test.cjs",
+    "security:integration": "node --test server/tests/authSecurityIntegration.test.cjs"
   },
   "keywords": [
     "SYZMEKU",

@@ -111,8 +111,6 @@ const buildAuthResponse = (user, token) => ({
 
 const isDuplicateKeyError = (error) => error?.code === 11000;
 
-const buildUsernameFromEmail = (email) => process.env.ADMIN_USERNAME || deriveUsernameFromEmail(email);
-
 const verifyGoogleCredential = async (credential) => {
     const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.REACT_APP_GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -157,11 +155,16 @@ const registerUser = async (req, res) => {
     const email = normalizeEmail(req.body?.email);
     const { password } = req.body;
 
-    if (!username || !email || !password) {
+    if (!username || !email || typeof password !== 'string' || !password) {
         return res.status(400).json({ message: 'Username, email, and password are required.' });
     }
 
     try {
+        // The public signup route never provisions privileged identities.
+        // Admin bootstrap and verified Google sign-in remain separate paths.
+        if (isAdminEmail(email)) {
+            return res.status(409).json({ message: 'An account already exists for this email. Please log in.' });
+        }
         const userExists = await findUserByEmail(email);
         if (userExists) {
             return res.status(409).json({ message: 'An account already exists for this email. Please log in.' });
@@ -176,14 +179,14 @@ const registerUser = async (req, res) => {
             username: normalizedUsername,
             email,
             password: hashedPassword,
-            role: isAdminEmail(email) ? User.ROLES.COMMANDER_IN_CHIEF : User.ROLES.USER,
+            role: User.ROLES.USER,
+            identity: { version: 1, passwordEnabled: true },
         });
 
         if (!user) {
             return res.status(400).json({ message: 'Invalid operative data.' });
         }
 
-        user = await ensureAdminRoleForUser(user);
         const { sessionId } = await createPersistentSession(user, req);
         const token = createAuthToken(user, sessionId);
         setSessionCookie(req, res, token);
@@ -215,37 +218,19 @@ const loginUser = async (req, res) => {
     const email = normalizeEmail(req.body?.email);
     const { password } = req.body;
 
-    if (!email || !password) {
+    if (!email || typeof password !== 'string' || !password) {
         return res.status(400).json({ message: 'Email and password are required.' });
     }
 
     let user = await findUserByEmail(email);
-    let passwordMatches = Boolean(user && await bcrypt.compare(password, user.password));
-
-    if (!passwordMatches && process.env.RESET_ADMIN_PASSWORD === 'true' && isAdminEmail(email)) {
-        console.log('[SYS-INIT] Admin bootstrap login authorized by reset flag. Setting submitted password as admin password.');
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        if (!user) {
-            user = await User.create({
-                name: process.env.ADMIN_NAME || 'System Commander',
-                username: await resolveUniqueUsername(buildUsernameFromEmail(email)),
-                email,
-                password: hashedPassword,
-                role: User.ROLES.COMMANDER_IN_CHIEF,
-                isVerified: true,
-            });
-        } else {
-            user.email = email;
-            user.username = user.username || await resolveUniqueUsername(buildUsernameFromEmail(email), user._id);
-            user.password = hashedPassword;
-            if (user.isVerified !== undefined) user.isVerified = true;
-            await user.save();
-            user = await ensureAdminRoleForUser(user);
-        }
-
-        passwordMatches = true;
+    if (user && user.identity !== undefined
+        && (!user.identity || user.identity.version !== 1 || typeof user.identity.passwordEnabled !== 'boolean')) {
+        return res.status(503).json({ message: 'Account sign-in needs support. Please try again later.' });
     }
+    // Bootstrap/reset configuration must never turn a failed public login into
+    // credential replacement. Existing passwords and sessions are not mutated.
+    const passwordMatches = Boolean(user && user.identity?.passwordEnabled !== false
+        && await bcrypt.compare(password, user.password));
 
     if (!user || !passwordMatches) {
         await logAuditEvent({
@@ -290,7 +275,10 @@ const googleLoginUser = async (req, res) => {
 
     try {
         const googleProfile = await verifyGoogleCredential(credential);
-        let user = await findUserByEmail(googleProfile.email);
+        // Provider subject is authoritative once linked; email is only a fallback
+        // for new or explicitly legacy identities.
+        let user = await User.findOne({ 'identity.googleSubject': googleProfile.googleId });
+        if (!user) user = await findUserByEmail(googleProfile.email);
         let isNewUser = false;
 
         if (!user) {
@@ -304,6 +292,12 @@ const googleLoginUser = async (req, res) => {
                 email: googleProfile.email,
                 password,
                 role: isAdminEmail(googleProfile.email) ? User.ROLES.COMMANDER_IN_CHIEF : User.ROLES.USER,
+                identity: {
+                    version: 1,
+                    passwordEnabled: false,
+                    googleSubject: googleProfile.googleId,
+                    emailVerifiedAt: new Date(),
+                },
                 onboarding: {
                     completed: false,
                     completedAt: null,
@@ -329,6 +323,46 @@ const googleLoginUser = async (req, res) => {
             });
             isNewUser = true;
         } else {
+            if (user.identity !== undefined
+                && (!user.identity || user.identity.version !== 1 || typeof user.identity.passwordEnabled !== 'boolean')) {
+                return res.status(503).json({ message: 'Account sign-in needs support. Please try again later.' });
+            }
+            if (user.identity?.version === 1) {
+                const linkedSubject = user.identity.googleSubject;
+                if (linkedSubject && linkedSubject !== googleProfile.googleId) {
+                    return res.status(401).json({ message: 'Google identity does not match this account.' });
+                }
+                if (!linkedSubject) {
+                    const linkPassword = req.body?.password;
+                    const canLink = user.identity.passwordEnabled === true
+                        && typeof linkPassword === 'string' && linkPassword.length > 0
+                        && await bcrypt.compare(linkPassword, user.password);
+                    if (!canLink) {
+                        return res.status(409).json({
+                            code: 'GOOGLE_ACCOUNT_LINK_REQUIRED',
+                            message: 'This email has a password account. Enter its password, then choose Google again to link it. If you did not create that account or do not know its password, contact support before continuing.',
+                        });
+                    }
+                    // Both proofs were checked. A concurrent credential change
+                    // or link must invalidate this attempt, not issue a session.
+                    user = await User.findOneAndUpdate({
+                        _id: user._id,
+                        password: user.password,
+                        'identity.version': 1,
+                        'identity.passwordEnabled': true,
+                        'identity.googleSubject': { $exists: false },
+                    }, { $set: {
+                        'identity.googleSubject': googleProfile.googleId,
+                        'identity.emailVerifiedAt': new Date(),
+                    } }, { new: true, runValidators: true });
+                    if (!user) {
+                        return res.status(409).json({ message: 'Account sign-in changed. Please start sign-in again.' });
+                    }
+                }
+            }
+            // Legacy accounts intentionally retain their current sign-in behavior.
+            // Closing their historical email-linking risk requires a reviewed
+            // identity migration, not guessing provenance or resetting passwords.
             let changed = false;
             if (!user.name && googleProfile.name) {
                 user.name = googleProfile.name;
@@ -367,6 +401,9 @@ const googleLoginUser = async (req, res) => {
             isNewUser,
         });
     } catch (error) {
+        if (isDuplicateKeyError(error)) {
+            return res.status(409).json({ message: 'Account sign-in changed. Please start sign-in again.' });
+        }
         const statusCode = error?.statusCode || 401;
         await logAuditEvent({
             category: 'auth',
