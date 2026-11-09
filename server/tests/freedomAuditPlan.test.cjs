@@ -54,7 +54,11 @@ test('constrained and sparse intake reaches the provider intact with feasibility
     const assessment=JSON.parse(prompt.split('ASSESSMENT DATA: ')[1].split('\nEVIDENCE MAP: ')[0]);
     const evidence=JSON.parse(prompt.split('EVIDENCE MAP: ')[1]);
     assert.deepEqual(assessment,a);assert.equal(evidence.drag,a.drag);assert.equal(evidence.asset,a.asset);
-    assert.match(prompt,/Total available hours do not imply uninterrupted blocks/);
+    assert.match(prompt,/Total available hours do not imply uninterrupted blocks or daily availability/);
+    assert.match(prompt,/Keep irregular windows irregular; do not invent a daily cadence/);
+    assert.match(prompt,/preserve essential caregiving and emergency notifications; silence only nonessential alerts/);
+    assert.match(prompt,/if effort is unknown, use one task to calibrate and reduce scope or revise the target with the customer/);
+    assert.match(prompt,/Phase dates are review windows, not evidence that all work will fit/);
     assert.match(prompt,/When capacity is unknown, propose checking one realistic work window/);
     assert.match(prompt,/Do not assume spare money, paid tools or a willing helper/);
     assert.match(prompt,/delegation conditional on confirmed help, with a self-managed or rescheduling alternative/);
