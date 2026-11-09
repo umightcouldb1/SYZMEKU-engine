@@ -12,7 +12,7 @@ Legacy records without identity metadata retain their previous behavior. They ar
 
 Fresh startup-created administrators receive identity metadata. Existing explicit startup password recovery remains separate from public login and can re-enable the password method for a versioned Google administrator without changing its linked subject or inventing legacy provenance.
 
-The model declares a unique partial index on nonempty Google subjects. Deployment must verify the actual index exists; the declaration alone is not proof of enforcement. The isolated database test checks index enforcement, concurrent links, signup/reset protections and legacy compatibility using only disposable records and mocked Google transport.
+The model declares a unique partial index on nonempty Google subjects. New enrollment and linking wait for index initialization and inspect the actual unique partial constraint before writing. Missing or incorrect indexes fail closed for those writes while legacy logins remain available. Startup emits a sanitized index verification success/failure log that must be checked after deployment. The isolated database test checks index enforcement, concurrent links, signup/reset protections and legacy compatibility using only disposable records and mocked Google transport.
 
 ## Anonymous AI
 

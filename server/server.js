@@ -26,6 +26,12 @@ const connectDB = async () => {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('[SYS_LOG] Mongo connected');
     await initializeAdminSystem();
+    try {
+      await require('./utils/identityIndex').ensureIdentityIndex();
+      console.log('[AUTH_SECURITY] Google subject unique index verified.');
+    } catch (_error) {
+      console.error('[AUTH_SECURITY] Google subject index verification failed; new identity enrollment remains blocked.');
+    }
   } catch (err) {
     console.error(`[SYS_ERR] Database connection failed: ${err.message}`);
   }

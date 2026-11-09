@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const { logAuditEvent } = require('../utils/audit');
 const { getJwtSecret } = require('../utils/jwtSecret');
+const { ensureIdentityIndex } = require('../utils/identityIndex');
 const {
     deriveUsernameFromEmail,
     ensureAdminRoleForUser,
@@ -170,6 +171,7 @@ const registerUser = async (req, res) => {
             return res.status(409).json({ message: 'An account already exists for this email. Please log in.' });
         }
 
+        await ensureIdentityIndex();
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
         const normalizedUsername = deriveUsernameFromEmail(username.includes('@') ? username : `${username}@local.user`);
@@ -205,6 +207,9 @@ const registerUser = async (req, res) => {
     } catch (error) {
         if (isDuplicateKeyError(error)) {
             return res.status(409).json({ message: 'An account already exists for this email. Please log in.' });
+        }
+        if (error.code === 'AUTH_IDENTITY_INDEX_UNAVAILABLE') {
+            return res.status(503).json({ message: error.message });
         }
 
         console.error('[AUTH_ERR] Registration failed:', error?.message || error);
@@ -282,6 +287,7 @@ const googleLoginUser = async (req, res) => {
         let isNewUser = false;
 
         if (!user) {
+            await ensureIdentityIndex();
             const preferredUsername = googleProfile.givenName || deriveUsernameFromEmail(googleProfile.email);
             const username = await resolveUniqueUsername(preferredUsername);
             const password = await buildGooglePasswordHash(googleProfile.googleId);
@@ -345,6 +351,7 @@ const googleLoginUser = async (req, res) => {
                     }
                     // Both proofs were checked. A concurrent credential change
                     // or link must invalidate this attempt, not issue a session.
+                    await ensureIdentityIndex();
                     user = await User.findOneAndUpdate({
                         _id: user._id,
                         password: user.password,

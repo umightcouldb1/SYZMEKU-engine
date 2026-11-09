@@ -1,0 +1,8 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
+const source=fs.readFileSync(path.join(__dirname,'../utils/identityIndex.js'),'utf8');
+const expected={key:{'identity.googleSubject':1},unique:true,partialFilterExpression:{'identity.googleSubject':{$type:'string',$gt:''}}};
+function fixture(indexes,fail=false){let initialized=false;const model={init:async()=>{initialized=true;if(fail)throw Error('private database details');},collection:{indexes:async()=>{assert(initialized);return indexes;}}};const context={module:{exports:{}},require:()=>model};vm.runInNewContext(source,context);return context.module.exports.ensureIdentityIndex;}
+test('real-index check awaits initialization and accepts the exact unique partial constraint',async()=>{await fixture([expected])();});
+test('missing, nonunique or incorrectly filtered index fails closed with sanitized response',async()=>{for(const indexes of [[],[{...expected,unique:false}],[{...expected,partialFilterExpression:undefined}],[{...expected,key:{'identity.googleSubject':1,email:1}}],[{...expected,partialFilterExpression:{...expected.partialFilterExpression,role:'USER'}}],[{...expected,partialFilterExpression:{'identity.googleSubject':{$type:'string',$gt:'',$lt:'m'}}}]])await assert.rejects(fixture(indexes),e=>e.statusCode===503&&e.code==='AUTH_IDENTITY_INDEX_UNAVAILABLE');});
+test('database initialization error does not disclose database details',async()=>{await assert.rejects(fixture([],true),e=>e.statusCode===503&&!e.message.includes('private'));});
