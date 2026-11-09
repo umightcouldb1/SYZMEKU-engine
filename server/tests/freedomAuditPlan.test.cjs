@@ -37,3 +37,37 @@ test('missing Gemini configuration fails closed without an outbound request',asy
  try {await assert.rejects(generatePersonalizedPlan(profile()),e=>e.statusCode===503&&e.message.includes('no new result was saved'));}
  finally {for(const k of aliases){if(old[k]===undefined)delete process.env[k];else process.env[k]=old[k];}}
 });
+
+test('constrained and sparse intake reaches the provider intact with feasibility safeguards and unchanged output contract',async()=>{
+ delete process.env.FREEDOM_AUDIT_AI_TEST_MODE;
+ const provider=require('../services/reasoningProviderService'),original=provider.generate;
+ const cases=[
+  profile({win:'Show three existing portfolio pieces to five prospects.',drag:'Four hours total per week in unpredictable 20-minute gaps while caregiving. No spare money or available helper.',asset:'Six unfinished drafts and free design software.'}),
+  profile({win:'the 30-day outcome I choose',drag:'my highest-friction unfinished task',asset:'my strongest underused asset'}),
+  profile({win:'Finish one household budget draft.',drag:'Only one 30-minute window this week; essential care cannot be moved.',asset:'An existing spreadsheet; a friend has explicitly agreed to review it once.'})
+ ];
+ try {
+  for(const a of cases){
+   let calls=0;
+   provider.generate=async request=>{
+    calls++;const {prompt}=request;
+    const assessment=JSON.parse(prompt.split('ASSESSMENT DATA: ')[1].split('\nEVIDENCE MAP: ')[0]);
+    const evidence=JSON.parse(prompt.split('EVIDENCE MAP: ')[1]);
+    assert.deepEqual(assessment,a);assert.equal(evidence.drag,a.drag);assert.equal(evidence.asset,a.asset);
+    assert.match(prompt,/Total available hours do not imply uninterrupted blocks/);
+    assert.match(prompt,/When capacity is unknown, propose checking one realistic work window/);
+    assert.match(prompt,/Do not assume spare money, paid tools or a willing helper/);
+    assert.match(prompt,/delegation conditional on confirmed help, with a self-managed or rescheduling alternative/);
+    assert.match(prompt,/Do not remove essential care or obligations/);
+    assert.match(prompt,/Missing personal details remain unknown/);
+    assert.match(prompt,/OPTIMIZE should use feedback from that trial/);
+    assert.match(prompt,/customer-controlled completion or observations, not guaranteed replies, sales or protected time/);
+    assert.equal(request.maxOutputTokens,6144);assert.equal(request.thinkingBudget,512);
+    assert.deepEqual(Object.keys(request.responseSchema.properties).sort(),['compression','moves','plan','priority']);
+    return {text:JSON.stringify(fixture(a)),model:'contract-fixture',finishReason:'STOP'};
+   };
+   const result=await generatePersonalizedPlan(a);assert.equal(calls,1);assert.equal(result.plan.length,6);
+   assert.deepEqual(result, {...validatePlan(fixture(a),a),providerModel:'contract-fixture'});
+  }
+ }finally{provider.generate=original;}
+});
