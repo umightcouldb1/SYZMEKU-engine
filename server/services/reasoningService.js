@@ -22,10 +22,10 @@ async function generate(body, {
   if (save && !request.requestKey) throw cap.error('INVALID_REQUEST', 'An idempotency request key is required to save.');
   const persistence = require('./reasoningPersistenceService');
   if (save) await persistence.prerequisites();
-  // Explicit chat is a write. Anchor projected context before taking the model
-  // snapshot, so the append transaction does not invalidate its own authority.
+  // Explicit chat/save are writes. Anchor projected context before taking the model
+  // snapshot, so the persistence transaction does not invalidate its own authority.
   // Read-only previews never initialize canonical context.
-  if (conversation) {
+  if (conversation || save) {
     const core = require('./coreContextService');
     if ((await core.getContext()).authority === 'legacy_projection') {
       await core.withContextMutation(() => cap.recheck({write: true}), {evidence: false});

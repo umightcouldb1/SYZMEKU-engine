@@ -101,3 +101,39 @@ test('missing or null interpretation fails after one repair without appending a 
  }
  interpretationMode=undefined;
 });
+
+test('first explicit analyze/reflection save anchors fresh/legacy accounts and retries without writes or generation',async()=>{
+ const Record=require('../models/ReasoningRecord'),Life=require('../models/LifeContext');
+ try {
+ for(const legacy of [false,true])for(const purpose of ['analyze','reflection']){
+  const u=await f.user('save-'+purpose+'-'+legacy);
+  process.env.CORE_REASONING_USER_IDS=f.founder.id+','+u.id;process.env.CORE_CONTEXT_WRITE_USER_IDS=f.founder.id+','+u.id;
+  if(legacy)await require('../models/User').updateOne({_id:u.id},{$set:{'onboarding.profile':{sovereignMatrixNote:'Synthetic saved reflection context.'}}});
+  const count=()=>Life.collection.countDocuments({user_id:new f.mongoose.Types.ObjectId(u.id)});
+  const body={purpose,text:'Interpret this supplied dialogue.',requestKey:'first-save-'+purpose+'-'+legacy};
+  assert.equal(await count(),0);
+  // Authorization and index failures must precede initialization or model calls.
+  const calls=prompts.length;
+  process.env.CORE_CONTEXT_WRITES_ENABLED='false';
+  assert.equal((await f.request(u,'/api/core/reasoning/records','POST',body)).status,503);
+  process.env.CORE_CONTEXT_WRITES_ENABLED='true';
+  await Record.collection.dropIndex('reasoning_owner_request_uq');
+  try {assert.equal((await f.request(u,'/api/core/reasoning/records','POST',body)).data.error.code,'REASONING_INDEXES_REQUIRED');}
+  finally {await Record.createIndexes();}
+  assert.equal(await count(),0);assert.equal(prompts.length,calls);
+  const preview=await f.request(u,'/api/core/reasoning/preview','POST',{purpose,text:body.text});
+  assert.equal(preview.status,200,JSON.stringify(preview));assert.equal(await count(),0);
+  const first=await f.request(u,'/api/core/reasoning/records','POST',body);
+  assert.equal(first.status,200,JSON.stringify(first));assert(first.data.interpretation.text.includes(late));
+  const state=()=>f.scope(u,async()=>JSON.stringify({life:await Life.findOne().lean(),records:await Record.find().lean(),memory:await require('../models/Memory').findOne().lean()}));
+  const before=await state(),n=prompts.length;
+  const retry=await f.request(u,'/api/core/reasoning/records','POST',body);
+  assert.equal(retry.status,200,JSON.stringify(retry));assert.equal(retry.data.persistence.recordId,first.data.persistence.recordId);
+  assert.equal(prompts.length,n);assert.equal(await state(),before);
+  assert.equal((await f.request(u,'/api/core/reasoning/records/'+first.data.persistence.recordId)).data.payload.interpretation.text,first.data.interpretation.text);
+ }
+ } finally {
+  process.env.CORE_CONTEXT_WRITES_ENABLED='true';
+  process.env.CORE_REASONING_USER_IDS=f.founder.id;process.env.CORE_CONTEXT_WRITE_USER_IDS=f.founder.id;
+ }
+});
