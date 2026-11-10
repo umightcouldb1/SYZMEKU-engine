@@ -14,6 +14,7 @@ async function generate(body, {
     requestId = crypto.randomUUID();
   // No HTTP surface requests both. Reject an unsafe future internal caller rather
   // than committing two independently authorized artifacts in separate transactions.
+  if (conversation && request.text.length > 6000) throw cap.error('INVALID_REQUEST', 'Conversation text must be at most 6000 characters.');
   if (save && conversation) throw cap.error('INVALID_REQUEST', 'Choose conversation or explicit saved guidance for this request.');
   await cap.recheck({
     write: save || conversation
@@ -21,6 +22,15 @@ async function generate(body, {
   if (save && !request.requestKey) throw cap.error('INVALID_REQUEST', 'An idempotency request key is required to save.');
   const persistence = require('./reasoningPersistenceService');
   if (save) await persistence.prerequisites();
+  // Explicit chat/save are writes. Anchor projected context before taking the model
+  // snapshot, so the persistence transaction does not invalidate its own authority.
+  // Read-only previews never initialize canonical context.
+  if (conversation || save) {
+    const core = require('./coreContextService');
+    if ((await core.getContext()).authority === 'legacy_projection') {
+      await core.withContextMutation(() => cap.recheck({write: true}), {evidence: false});
+    }
+  }
   const snapshot = await context.assemble(request);
   if (save) {
     const prior = await persistence.replay(request, snapshot);
@@ -32,7 +42,7 @@ async function generate(body, {
       };
     }
   }
-  const question = policy.clarification(snapshot);
+  const question = policy.clarification(snapshot, request);
   if (question) {
     await context.assertFresh(snapshot, request);
     return {
@@ -68,6 +78,7 @@ async function generate(body, {
     try {
       if (typeof model.text !== 'string' || model.text.length > 65536) contracts.fail('Invalid response size.');
       output = contracts.output(JSON.parse(model.text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')), snapshot);
+      if (['analyze', 'reflection'].includes(purpose) && !output.interpretation) contracts.fail('A conversational response needs a validated interpretation.');
       if (['planner', 'agent-plan'].includes(purpose) && !output.plan) contracts.fail('A planner response needs a plan.');
       if (!['planner', 'agent-plan'].includes(purpose) && output.plan) contracts.fail('This purpose does not generate a plan.');
       break;
@@ -83,6 +94,7 @@ async function generate(body, {
   if (combined.aborted) throw cap.error('MODEL_TIMEOUT', 'Model request timed out.', 504);
   if (save) result = await persistence.save(request, snapshot, result, model);
   if (conversation) {
+    result.conversationText = require('./conversationPresentation').reasoning(result);
     let committed;
     const core = require('./coreContextService');
     await core.withContextMutation(async () => {
@@ -97,7 +109,7 @@ async function generate(body, {
         timestamp: new Date()
       }, {
         role: 'model',
-        text: result.summary,
+        text: result.conversationText,
         timestamp: new Date(),
         reasoningRefs: Object.keys(snapshot.manifest).slice(0, 100),
         patternRefs: result.patternContext.patterns.map(p => ({
@@ -145,9 +157,9 @@ async function preview() {
 function compatibility(result) {
   return {
     ...result,
-    text: result.summary,
+    text: result.conversationText || result.summary,
     summary: result.summary,
-    reasoning_summary: result.summary,
+    reasoning_summary: result.conversationText || result.summary,
     objectives: [result.summary],
     constraints: result.constraintConflicts.map(c => c.description),
     risks: result.limitations,

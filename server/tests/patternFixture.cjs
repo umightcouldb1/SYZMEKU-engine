@@ -1,8 +1,8 @@
 const path=require('node:path');
-async function fixture({reasoning=false}={}){
+async function fixture({reasoning=false,mongoArgs=[]}={}){
   Object.assign(process.env,{NODE_ENV:'test',JWT_SECRET:'pattern-disposable-fixture',CORE_CONTEXT_WRITES_ENABLED:'true',CORE_PATTERN_INTELLIGENCE_ENABLED:'true',CORE_PERSONAL_EXECUTION_ENABLED:'false',PATTERN_HYPOTHESIS_HMAC_KEY:'synthetic-pattern-key-with-at-least-32-characters',MONGOMS_DOWNLOAD_DIR:path.resolve(__dirname,'../../.cache/mongodb-binaries')});delete process.env.MONGO_URI;
   const mongoose=require('mongoose'),express=require('express'),jwt=require('jsonwebtoken');const {MongoMemoryReplSet}=require('mongodb-memory-server');
-  const db=await MongoMemoryReplSet.create({replSet:{count:1,dbName:'pattern_fixtures'}});await mongoose.connect(db.getUri(),{autoIndex:false,autoCreate:false,monitorCommands:true});
+  const db=await MongoMemoryReplSet.create({replSet:{count:1,dbName:'pattern_fixtures',args:mongoArgs}});await mongoose.connect(db.getUri(),{autoIndex:false,autoCreate:false,monitorCommands:true});
   for(const name of ['LifeContext','Memory','Pattern','SignalEntry','Task'])await require('../models/'+name).createIndexes();
   const {runWithRequestContext}=require('../utils/requestContext');
   async function user(name,role='USER') {const u=await require('../models/User').create({name,username:name,email:name+'@example.test',password:'fixture-hash',role});const sid='pattern-'+name;await require('../models/AuthSession').create({userId:u._id,sessionId:sid,expiresAt:new Date(Date.now()+3600000)});return {id:String(u._id),sid,token:jwt.sign({id:String(u._id),sid},process.env.JWT_SECRET)};}
