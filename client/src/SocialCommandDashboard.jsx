@@ -197,7 +197,7 @@ export default function SocialCommandDashboard() {
 
   const activateSchedule = async () => {
     const release = activeCampaign?.campaign?.metadata?.c0;
-    if (release?.storage === 'GOOGLE_DRIVE' && !window.confirm(`Activate this exact YouTube upload for ${release.scheduledTime}, channel ${release.providerAccountId}, ${release.privacyStatus} visibility? Due posts can upload automatically after activation.`)) return;
+    if (release?.storage === 'GOOGLE_DRIVE' && !window.confirm(`Activate this approved YouTube upload no earlier than ${release.scheduledTime}, channel ${release.providerAccountId}, ${release.privacyStatus} visibility? Due posts can upload automatically after activation. The app checks every five minutes by default while enabled and running. Server sleep or downtime, uploads and YouTube processing can delay publication; this is not an exact publication-time guarantee.`)) return;
     if (activeCampaign?.dirty) { setError('Save and approve your edited version before scheduling.'); return; }
     if (!activeCampaign?.campaign?._id) return;
     setLoading(true);
@@ -209,7 +209,7 @@ export default function SocialCommandDashboard() {
       const data = await api('post', `/api/social-command/campaigns/${activeCampaign.campaign._id}/schedule`, { postSchedules });
       setActiveCampaign(data);
       await loadAll();
-      setMessage('Campaign schedule activated. Due posts will publish through connected official APIs.');
+      setMessage('Campaign schedule activated. The app can upload due posts while the scheduler is running; publication may be delayed.');
     } catch (scheduleError) {
       setError(scheduleError?.response?.data?.error || 'Could not activate campaign schedule.');
     } finally {
@@ -423,7 +423,7 @@ export default function SocialCommandDashboard() {
                       </label>
                     )}
                     <label>
-                      Planned launch time
+                      {c0Release ? 'Approved not-before upload time' : 'Planned launch time'}
                       <input
                         readOnly={!!c0Release}
                         type="datetime-local"
@@ -450,6 +450,7 @@ export default function SocialCommandDashboard() {
                 ))}
               </div>
 
+              {c0Release?.scheduledTime && <p>Scheduling uses the app, not YouTube's native scheduler. When enabled and running, the app checks due uploads every five minutes by default. The approved time is a not-before upload time, not a guaranteed publication time. Server sleep or downtime, uploads and YouTube processing can delay publication.</p>}
               <div className="social-command__actions">
                 <button type="button" onClick={saveCampaign} disabled={loading||!!c0Release}>Save Drafts</button>
                 <button type="button" onClick={approvalAction} disabled={approvalActionDisabled||!!c0Release&&!plannedScheduleAvailable}>{approvalActionLabel}</button>

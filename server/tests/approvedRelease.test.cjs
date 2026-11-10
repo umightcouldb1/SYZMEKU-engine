@@ -103,17 +103,17 @@ test('uncertain YouTube upload is durably blocked from manual and scheduled retr
  assert.match((await db.collection('enterprisestates').findOne({_id:pointerKey(owner,x.d.itemId)})).operationId,/^publish:/);
  await db.collection('socialcampaigns').updateOne({_id:saved._id},{$set:{status:'scheduled','posts.0.scheduledTime':new Date('2020-01-01')}});assert.deepEqual(await scheduling.processDuePosts(),[]);
 });
-test('schedule activation is explicit, fixed to approved time; early publishing and alternate times are rejected',async()=>{
+test('schedule activation is explicit, fixed to the approved not-before time; early publishing and alternate times are rejected',async()=>{
  const time='2099-02-01T12:00:00.000Z',x=await released('release-schedule',{...options,scheduledTime:time});
  await assert.rejects(publish(x.campaign),/C0_APPROVED_TIME_NOT_DUE/);
  await assert.rejects(scheduling.scheduleCampaignPosts({userId:owner,campaignId:x.campaign._id,postSchedules:[{postId:x.campaign.posts[0]._id,scheduledTime:'2099-02-01T13:00:00.000Z'}]}),/C0_EXACT_APPROVED_SCHEDULE_REQUIRED/);
  const scheduled=await scheduling.scheduleCampaignPosts({userId:owner,campaignId:x.campaign._id,postSchedules:[{postId:x.campaign.posts[0]._id,scheduledTime:time}]});assert.equal(scheduled.status,'scheduled');assert.equal(scheduled.posts[0].scheduledTime.toISOString(),time);
  assert.throws(()=>scheduling.activatePlannedSchedule(scheduled),/C0_EXPLICIT_SCHEDULE_REQUIRED/);
 });
-test('provider adapter uploads supplied verified bytes without fetching a public URL and disables HTTP retries',async()=>{
+test('provider adapter uploads verified bytes without a public URL, native publishAt or HTTP retries',async()=>{
  const {google:g}=require('googleapis'),original=g.youtube;let called=0;
- g.youtube=()=>({videos:{insert:async(params,opts)=>{called++;assert.equal(opts.retry,false);const chunks=[];for await(const chunk of params.media.body)chunks.push(chunk);assert.equal(Buffer.concat(chunks).toString(),'approved-bytes');return {data:{id:'synthetic_adapter'}};}}});
- try{const result=await providerOriginal.publishVideo.call(provider,{accessToken:'synthetic-only',post:{title:'Test',description:'Approved',mediaAssets:[],metadata:{privacyStatus:'private'}},approvedMedia:{buffer:Buffer.from('approved-bytes'),mimeType:'video/mp4'}});assert.equal(result.id,'synthetic_adapter');assert.equal(called,1);}finally{g.youtube=original;}
+ g.youtube=()=>({videos:{insert:async(params,opts)=>{called++;assert.equal(opts.retry,false);assert.equal(params.requestBody.status.publishAt,undefined);const chunks=[];for await(const chunk of params.media.body)chunks.push(chunk);assert.equal(Buffer.concat(chunks).toString(),'approved-bytes');return {data:{id:'synthetic_adapter'}};}}});
+ try{const result=await providerOriginal.publishVideo.call(provider,{accessToken:'synthetic-only',post:{title:'Test',description:'Approved',mediaAssets:[],scheduledTime:'2099-02-01T12:00:00.000Z',metadata:{privacyStatus:'private'}},approvedMedia:{buffer:Buffer.from('approved-bytes'),mimeType:'video/mp4'}});assert.equal(result.id,'synthetic_adapter');assert.equal(called,1);}finally{g.youtube=original;}
 });
 
 test('ambiguous final Mongo create and lost Drive receipt responses reconcile without duplicate records',async()=>{

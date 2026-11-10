@@ -40,3 +40,51 @@ test('late upload refresh preserves a newer campaign selection and its unsaved e
 test('a mismatched campaign refresh never clears the selected campaign pending guard',async()=>{
  const f=fixture({latest:approved('different-id')});await f.publishReleased();assert.equal(f.state.active.campaign._id,'a');assert.equal(f.state.active.publicationRefreshPending,true);assert.match(f.state.error,/latest campaign status could not be loaded/);
 });
+
+test('schedule activation explains not-before timing and preserves the exact approved request', async () => {
+ const scheduledTime = '2099-02-01T12:00:00.000Z';
+ for (const accepted of [false, true]) {
+  const selected = approved();
+  selected.campaign.metadata.c0.scheduledTime = scheduledTime;
+  selected.campaign.posts = [{ _id: 'synthetic-post', connectedAccountId: 'synthetic-connection', scheduledTime }];
+  const calls = [], confirmations = [], messages = [];
+  const context = {
+   activeCampaign: selected, window: { confirm: text => { confirmations.push(text); return accepted; } },
+   setLoading: () => {}, setError: () => {}, setActiveCampaign: () => {}, setMessage: text => messages.push(text), loadAll: async () => {},
+   api: async (...args) => { calls.push(args); return selected; },
+  };
+  vm.createContext(context);
+  vm.runInContext(extract('  const activateSchedule =', '\n  const approveCampaign =') + '\nglobalThis.activate = activateSchedule;', context);
+  await context.activate();
+  assert.equal(confirmations.length, 1);
+  assert.match(confirmations[0], /no earlier than 2099-02-01T12:00:00.000Z/);
+  assert.match(confirmations[0], /five minutes by default while enabled and running/);
+  assert.match(confirmations[0], /Server sleep or downtime/);
+  assert.match(confirmations[0], /not an exact publication-time guarantee/);
+  assert.equal(calls.length, accepted ? 1 : 0);
+  if (accepted) {
+   assert.deepEqual(JSON.parse(JSON.stringify(calls[0])), ['post', '/api/social-command/campaigns/a/schedule', { postSchedules: [{ postId: 'synthetic-post', scheduledTime }] }]);
+   assert.match(messages[0], /publication may be delayed/);
+  }
+ }
+});
+
+test('release timing warning is rendered before approval and on the recorded schedule', () => {
+ const path = require('node:path'), Module = require('node:module');
+ const client = path.resolve(__dirname, '../../client'), esbuild = require(path.join(client, 'node_modules/esbuild'));
+ const filename = path.join(client, 'timing-test.cjs'), queuePath = path.join(client, 'src/ContentQueue.jsx');
+ const result = esbuild.buildSync({ stdin: { contents: fs.readFileSync(queuePath, 'utf8') + '\nexport { ReleaseReview };', resolveDir: path.dirname(queuePath), loader: 'jsx' }, bundle: true, write: false, platform: 'node', format: 'cjs', loader: { '.css': 'empty' }, external: ['react'] });
+ const output = new Module(filename); output.filename = filename; output.paths = Module._nodeModulePaths(client); output._compile(result.outputFiles[0].text, filename);
+ const React = require(path.join(client, 'node_modules/react')), { renderToStaticMarkup } = require(path.join(client, 'node_modules/react-dom/server'));
+ for (const released of [false, true]) {
+  const item = { id: 'synthetic-content', status: 'APPROVED', package: { platform: 'youtube' }, ...(released ? { release: { providerAccountId: 'synthetic-channel', privacyStatus: 'private', scheduledTime: '2099-02-01T12:00:00.000Z' } } : {}) };
+  const html = renderToStaticMarkup(React.createElement(output.exports.ReleaseReview, { item, connections: [], act: () => { throw Error('Rendering must not act'); } }));
+  assert.match(html, released ? /Approved not-before upload time:/ : /Optional not-before upload time/);
+  assert.match(html, /not a guaranteed publication time/);
+  assert.match(html, /every five minutes by default/);
+  assert.match(html, /Server sleep or downtime, uploads and YouTube processing can delay publication/);
+  assert(!html.includes('exact approved schedule'));
+ }
+ assert.match(source, /c0Release\?\.scheduledTime && <p>Scheduling uses the app, not YouTube's native scheduler/);
+ esbuild.buildSync({ entryPoints: [path.join(client, 'src/SocialCommandDashboard.jsx')], bundle: true, write: false, platform: 'node', format: 'cjs', loader: { '.css': 'empty' }, external: ['react'] });
+});
