@@ -28,6 +28,7 @@ async function main(){
   const fill=async(selector,value)=>evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   const ready=()=>waitFor(`[...document.querySelectorAll('button')].some(e=>e.textContent==='Generate preview'&&!e.disabled)`);
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});await call('Page.navigate',{url:fixture.base});await waitFor(`!!document.querySelector('[aria-label="Reasoning and planning"]')`);
+  await waitFor(`!!document.querySelector('.reasoning-panel input[type="checkbox"]:enabled')`);
   await evaluate(`document.querySelector('.reasoning-panel input[type="checkbox"]').click()`);await waitFor(`document.body.innerText.includes('1. Publish a design portfolio')`);
   await fill('.reasoning-panel textarea','Help me prepare a portfolio outline.');await ready();await button('Generate preview');
   await waitFor(`document.body.innerText.includes('Clarify the saved constraint')`);assert.equal(await require('../models/ReasoningRecord').collection.countDocuments({}),0);
