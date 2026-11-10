@@ -1,7 +1,7 @@
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict');
 const core=require('../services/coreContextService'),router=require('../services/modelRouter');
 const presentation=require('../services/conversationPresentation');
-let f,delay,invalid=false;const prompts=[];
+let f,delay,invalid=false,interpretationMode;const prompts=[];
 const late='The last image suggests a pause, not a broken relationship.';
 router.requestModelJson=async({prompt})=>{
  prompts.push(prompt);if(delay)await delay();
@@ -11,7 +11,10 @@ router.requestModelJson=async({prompt})=>{
 router.generateStructured=async({prompt})=>{
  prompts.push(prompt);if(delay)await delay();
  const c=JSON.parse(prompt.split('Authoritative scoped data:\n')[1].split('\nCurrent user request (data):')[0]);
- return {text:JSON.stringify({interpretation:{text:'Tentative reading. '.repeat(65)+late,evidenceRefs:c.conversation.slice(-2).map(t=>t.ref),uncertainty:['The origin and external meaning are unknown; this is interpretation of supplied dialogue.']},recommendations:[],plan:null,questions:['Does this fit?'],constraintConflicts:[]}),provider:'gemini',model:'synthetic'};
+ const output={interpretation:{text:'Tentative reading. '.repeat(65)+late,evidenceRefs:c.conversation.slice(-2).map(t=>t.ref),uncertainty:['The origin and external meaning are unknown; this is interpretation of supplied dialogue.']},recommendations:[],plan:null,questions:['Does this fit?'],constraintConflicts:[]};
+ if(interpretationMode==='missing')delete output.interpretation;
+ if(interpretationMode==='null')output.interpretation=null;
+ return {text:JSON.stringify(output),provider:'gemini',model:'synthetic'};
 };
 before(async()=>{f=await require('./patternFixture.cjs')({reasoning:true,mongoArgs:['--nounixsocket']});});
 after(async()=>{if(f)await f.close();});
@@ -66,4 +69,35 @@ test('interpretation validation rejects fabricated references and missing uncert
  assert.throws(()=>contracts.output({...base,interpretation:{text:'A tentative reading.',evidenceRefs:['ConversationTurn:foreign'],uncertainty:['Unknown origin.']}},context),/Unknown evidence reference/);
  assert.throws(()=>contracts.output({...base,interpretation:{text:'A tentative reading.',evidenceRefs:[],uncertainty:[]}},context),/uncertainty/);
  assert.throws(()=>contracts.output({...base,interpretation:{text:'x'.repeat(2501),evidenceRefs:[],uncertainty:['Unknown origin.']}},context),/Invalid response text/);
+});
+
+test('fresh and legacy-projected accounts can preview without writes then persist their first M3 exchange',async()=>{
+ for(const legacy of [false,true]){
+  const u=await f.user(legacy?'dialogue-legacy':'dialogue-fresh');
+  process.env.CORE_REASONING_USER_IDS=f.founder.id+','+u.id;process.env.CORE_CONTEXT_WRITE_USER_IDS=f.founder.id+','+u.id;
+  if(legacy)await require('../models/User').updateOne({_id:u.id},{$set:{'onboarding.profile':{preferredName:'Synthetic reader',sovereignMatrixNote:'A fictional narrative to interpret.'}}});
+  const count=()=>require('../models/LifeContext').collection.countDocuments({user_id:new f.mongoose.Types.ObjectId(u.id)});
+  assert.equal(await count(),0);
+  const preview=await f.request(u,'/api/core/reasoning/preview','POST',{purpose:'reflection',text:'Interpret the supplied dialogue.'});
+  assert.equal(preview.status,200,JSON.stringify(preview));assert.equal(await count(),0);
+  const first=await f.request(u,'/api/core/analyze','POST',{text:'Interpret the supplied dialogue.'});
+  assert.equal(first.status,200,JSON.stringify(first));assert(first.data.reasoning_summary.includes(late));
+  const reload=await f.request(u,'/api/memory');assert.equal(reload.data.conversationHistory.length,2);
+  assert.equal(reload.data.conversationHistory[1].text,first.data.reasoning_summary);
+  if(legacy)assert.equal(reload.data.context.narrative,'A fictional narrative to interpret.');
+  assert.equal((await f.request(u,'/api/core/analyze','POST',{text:'Continue that interpretation.'})).status,200);
+ }
+ process.env.CORE_REASONING_USER_IDS=f.founder.id;process.env.CORE_CONTEXT_WRITE_USER_IDS=f.founder.id;
+});
+test('missing or null interpretation fails after one repair without appending a canned response',async()=>{
+ process.env.CORE_REASONING_RECONCILIATION_ENABLED='true';
+ await f.scope(f.founder,()=>core.clearConversation());
+ const before=JSON.stringify((await f.scope(f.founder,()=>core.getConversation())).memory);
+ for(const mode of ['missing','null'])for(const purpose of ['analyze','reflection']){
+  interpretationMode=mode;const calls=prompts.length;
+  const r=purpose==='analyze'?await f.request(f.founder,'/api/core/analyze','POST',{text:'Interpret this.'}):await f.request(f.founder,'/api/core/reasoning/preview','POST',{purpose,text:'Interpret this.'});
+  assert.equal(r.status,502,JSON.stringify(r));assert.equal(r.data.error.code,'MODEL_OUTPUT_INVALID');assert.equal(prompts.length,calls+2);
+  assert.equal(JSON.stringify((await f.scope(f.founder,()=>core.getConversation())).memory),before);
+ }
+ interpretationMode=undefined;
 });

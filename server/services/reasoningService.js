@@ -22,6 +22,15 @@ async function generate(body, {
   if (save && !request.requestKey) throw cap.error('INVALID_REQUEST', 'An idempotency request key is required to save.');
   const persistence = require('./reasoningPersistenceService');
   if (save) await persistence.prerequisites();
+  // Explicit chat is a write. Anchor projected context before taking the model
+  // snapshot, so the append transaction does not invalidate its own authority.
+  // Read-only previews never initialize canonical context.
+  if (conversation) {
+    const core = require('./coreContextService');
+    if ((await core.getContext()).authority === 'legacy_projection') {
+      await core.withContextMutation(() => cap.recheck({write: true}), {evidence: false});
+    }
+  }
   const snapshot = await context.assemble(request);
   if (save) {
     const prior = await persistence.replay(request, snapshot);
@@ -69,6 +78,7 @@ async function generate(body, {
     try {
       if (typeof model.text !== 'string' || model.text.length > 65536) contracts.fail('Invalid response size.');
       output = contracts.output(JSON.parse(model.text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')), snapshot);
+      if (['analyze', 'reflection'].includes(purpose) && !output.interpretation) contracts.fail('A conversational response needs a validated interpretation.');
       if (['planner', 'agent-plan'].includes(purpose) && !output.plan) contracts.fail('A planner response needs a plan.');
       if (!['planner', 'agent-plan'].includes(purpose) && output.plan) contracts.fail('This purpose does not generate a plan.');
       break;

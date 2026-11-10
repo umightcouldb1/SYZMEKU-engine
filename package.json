@@ -24,7 +24,7 @@
     "m2:browser": "node server/tests/patternBrowser.cjs",
     "m2:prerequisites": "node server/scripts/verifyPatternPrerequisites.cjs",
     "m2:index-plan": "node server/scripts/provisionPatternIndexes.cjs",
-    "m3:test": "node --test server/tests/reasoningIntegration.test.cjs server/tests/reasoningProvider.test.cjs server/tests/reasoningPatterns.test.cjs",
+    "m3:test": "node --test server/tests/dialogueContinuity.test.cjs server/tests/reasoningIntegration.test.cjs server/tests/reasoningProvider.test.cjs server/tests/reasoningPatterns.test.cjs",
     "m3:browser": "node server/tests/reasoningBrowser.cjs",
     "m3:index-plan": "node server/scripts/provisionReasoningIndexes.cjs",
     "c0:test": "node --test server/tests/contentFactory.test.cjs",
