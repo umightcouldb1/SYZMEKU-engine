@@ -53,7 +53,7 @@ const ONBOARDING_STEPS = [
     key: 'goals',
     type: 'long',
     prompt: 'What would progress look like for you over the next few weeks?',
-    label: 'Baseline state and goals',
+    label: 'Goals (optional—you can simply keep talking)',
     placeholder: 'Describe the state you want to move toward',
   },
 ];
@@ -68,47 +68,17 @@ const SUPPORT_COPY = {
 const formatValue = (value) => (Array.isArray(value) ? value.join(', ') : value);
 
 const generateSystemReflection = (stages = []) => {
-  if (!stages.length) {
-    return 'Acknowledging system connection. Let’s explore your current vector alignment with patience and precision.';
-  }
-
-  const lowerStages = stages.map((stage) => stage.toLowerCase());
-  const hasBuilding = lowerStages.some((stage) => stage.includes('building'));
-  const hasFiguring = lowerStages.some((stage) => stage.includes('figuring'));
-  const hasResetting = lowerStages.some((stage) => stage.includes('recovering') || stage.includes('reset'));
-  const hasMomentum = lowerStages.some((stage) => stage.includes('momentum'));
-  const hasCustom = stages.some((stage) => !LIFE_STAGE_OPTIONS.includes(stage));
-
-  if (hasBuilding && hasResetting) {
-    return 'Balancing construction with deep structural restoration takes real internal capacity. We will tune the engine to protect your energy while supporting what you are building.';
-  }
-
-  if (hasBuilding && hasMomentum) {
-    return 'Your field is oriented toward expansion and continuity. Big SYZ will prioritize operational momentum without letting speed outrun alignment.';
-  }
-
-  if (hasBuilding) {
-    return 'Focusing coordinates on manifestation and expansion. Big SYZ is calibrating around operational momentum and the architecture you are bringing into form.';
-  }
-
-  if (hasResetting || hasFiguring) {
-    return 'A season of calibration is not a delay. It is a tactical position for restoring clarity, protecting signal quality, and choosing the next move with intention.';
-  }
-
-  if (hasCustom) {
-    return 'You named a more specific coordinate than the default grid could hold. Big SYZ will keep that signal visible as we map what needs attention next.';
-  }
-
-  return `Acknowledging your current alignment with ${formatValue(stages)}. Let’s map the emotional bandwidth around that field with care.`;
+  if (!stages.length) return 'We can take this at your pace. What would you like me to understand about you?';
+  return `Thank you for sharing where you are: ${formatValue(stages)}. We can explore what matters to you without rushing to a plan.`;
 };
 
 const getResponse = (field, value) => {
   const displayValue = formatValue(value);
   if (field === 'name') return `${displayValue}—great to meet you. We’ll build your guidance around that identity.`;
   if (field === 'lifeStage') return generateSystemReflection(Array.isArray(value) ? value : [value].filter(Boolean));
-  if (field === 'primaryConcern') return 'That signal is received. We’ll translate it into guidance that is specific enough to move with.';
+  if (field === 'primaryConcern') return 'Thank you for trusting me with that. We can talk it through together.';
   if (field === 'interactionStyle') return `${displayValue} works. I’ll keep that tone consistent with you.`;
-  if (field === 'goals') return 'Clear direction. We can now translate this into daily aligned momentum.';
+  if (field === 'goals') return 'We can explore that together, and change direction whenever you need to.';
   return 'Thank you for sharing that.';
 };
 
@@ -158,7 +128,7 @@ const getStoredToken = (user = null) => user?.token || localStorage.getItem('tok
 
 const hasValue = (value) => (Array.isArray(value) ? value.length > 0 : Boolean(String(value || '').trim()));
 
-const formatStageCode = (stepNumber) => `STAGE_${String(stepNumber).padStart(2, '0')} // ${String(ONBOARDING_STEPS.length).padStart(2, '0')}`;
+const formatStageCode = (stepNumber) => `${stepNumber} of ${ONBOARDING_STEPS.length}`;
 
 const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
   const navigate = useNavigate();
@@ -257,7 +227,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
 
   const nextStep = async () => {
     const value = form[currentStep.key];
-    if (!hasValue(value) || loading) return;
+    if ((!hasValue(value) && currentStep.key !== 'goals') || loading) return;
 
     if (currentStep.key === 'primaryConcern') {
       setLoading(true);
@@ -337,7 +307,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
         <section className="onboarding-stage onboarding-wide onboarding-prism-card">
           <div className="iridescent-shimmer" />
           <h2>You’re all set.</h2>
-          <p className="mentor-muted">Big SYZ is calibrated and ready to support your next moves.</p>
+          <p className="mentor-muted">BIG SYZ is ready to continue the conversation.</p>
           <button type="button" className="entry-primary-button" disabled={loading} onClick={navigateToHome}>
             {loading ? 'Checking session...' : 'ENTER BIG SYZ HOME'}
           </button>
@@ -361,7 +331,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
         <div className="iridescent-shimmer" />
         <header className="onboarding-header-row">
           <div>
-            <p className="auth-eyebrow">{isConcernStep ? 'System Discernment' : 'Guided Onboarding'}</p>
+            <p className="auth-eyebrow">{isConcernStep ? 'Getting to know you' : 'Getting to know you'}</p>
             <h2>{currentStep.prompt}</h2>
           </div>
           <p className="onboarding-progress">{formatStageCode(stepNumber)}</p>
@@ -369,13 +339,13 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
 
         {isConcernStep && (
           <div className="sovereign-feedback-panel">
-            <span>■ Sovereign Feedback //</span>
+            <span>A reflection</span>
             <p>{currentReflection}</p>
           </div>
         )}
 
         <label className="onboarding-field-label">
-          {isMultiChoice ? '[ Select all frequency fields that apply ]' : currentStep.label}
+          {isMultiChoice ? 'Select any that feel right' : currentStep.label}
           {currentStep.type !== 'choice' && currentStep.type !== 'multi-choice' && (
             currentStep.type === 'long' ? (
               <textarea
@@ -438,7 +408,7 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
                     onChange={(event) => setCustomLifeStageText(event.target.value)}
                     onKeyDown={handleCustomLifeStageKeyDown}
                     onBlur={commitCustomLifeStage}
-                    placeholder="Type vector details and press Enter"
+                    placeholder="Describe your situation and press Enter"
                     className="onboarding-custom-choice-input"
                   />
                 </div>
@@ -477,17 +447,17 @@ const OnboardingFlow = ({ user, onComplete, appHomeRoute = '/app' }) => {
           >
             Back
           </button>
-          <button type="button" className="entry-primary-button" onClick={nextStep} disabled={!hasValue(form[currentStep.key]) || loading}>
-            {loading ? 'Synchronizing...' : isConcernStep ? 'Synchronize Matrix' : 'Continue'}
+          <button type="button" className="entry-primary-button" onClick={nextStep} disabled={(!hasValue(form[currentStep.key]) && currentStep.key !== 'goals') || loading}>
+            {loading ? 'Reflecting…' : 'Continue'}
           </button>
         </div>
       </section>
 
       <aside className="onboarding-support-panel onboarding-prism-support">
-        <p className="auth-eyebrow">System Matrix Note</p>
+        <p className="auth-eyebrow">Your pace, your direction</p>
         <h3>{SUPPORT_COPY[currentStep.type]}</h3>
         <p className="mentor-muted">
-          These metrics tune how Big SYZ reflects, prioritizes, and supports you once interface authorization is complete.
+          What you share helps BIG SYZ understand you. You can change your preferences and direction later.
         </p>
       </aside>
     </main>

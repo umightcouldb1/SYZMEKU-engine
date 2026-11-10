@@ -32,7 +32,7 @@ async function generate(body, {
       };
     }
   }
-  const question = policy.clarification(snapshot);
+  const question = policy.clarification(snapshot, request);
   if (question) {
     await context.assertFresh(snapshot, request);
     return {
@@ -97,7 +97,7 @@ async function generate(body, {
         timestamp: new Date()
       }, {
         role: 'model',
-        text: result.summary,
+        text: result.response || result.summary,
         timestamp: new Date(),
         reasoningRefs: Object.keys(snapshot.manifest).slice(0, 100),
         patternRefs: result.patternContext.patterns.map(p => ({
@@ -145,9 +145,9 @@ async function preview() {
 function compatibility(result) {
   return {
     ...result,
-    text: result.summary,
+    text: result.response || result.summary,
     summary: result.summary,
-    reasoning_summary: result.summary,
+    reasoning_summary: result.response || result.summary,
     objectives: [result.summary],
     constraints: result.constraintConflicts.map(c => c.description),
     risks: result.limitations,
