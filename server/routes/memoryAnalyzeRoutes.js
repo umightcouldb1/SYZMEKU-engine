@@ -14,34 +14,23 @@ const stripJsonFence = (text = '') =>
     .replace(/```$/i, '')
     .trim();
 
-const normalizeArray = (value) =>
-  Array.isArray(value)
-    ? value.map((item) => String(item || '').trim()).filter(Boolean)
-    : [];
-
+const dialogue = require('../services/conversationPresentation');
 const parseModelAnalysis = (modelText = '') => {
   try {
+    if (typeof modelText !== 'string' || modelText.length > 16000) throw new Error();
     const parsed = JSON.parse(stripJsonFence(modelText));
-    return REQUIRED_KEYS.reduce((acc, key) => {
-      acc[key] = normalizeArray(parsed?.[key]);
-      return acc;
-    }, {});
-  } catch (_error) {
-    return {
-      objectives: ['Keep the current request grounded in the active lineage context.'],
-      constraints: ['The model returned text that could not be parsed as JSON.'],
-      risks: [],
-      leverage: [String(modelText || '').slice(0, 500)].filter(Boolean),
-      next_actions: ['Ask one clearer follow-up question or simplify the prompt.'],
-    };
+    if (!parsed || Object.keys(parsed).some(k => !REQUIRED_KEYS.includes(k))) throw new Error();
+    for (const key of REQUIRED_KEYS) {
+      if (!Array.isArray(parsed[key]) || parsed[key].length > 5 ||
+          parsed[key].some(x => typeof x !== 'string' || !x.trim() || x.length > 2000)) throw new Error();
+    }
+    return parsed;
+  } catch (_) {
+    const error = new Error('The model returned an invalid public response.');
+    error.statusCode = 502; throw error;
   }
 };
-
-const toConversationLines = (history = []) =>
-  history
-    .slice(-12)
-    .map((turn, index) => `${index + 1}. ${turn.role}: ${String(turn.text || '').slice(0, 700)}`)
-    .join('\n');
+const toConversationLines = dialogue.history;
 
 const cleanString = (value, maxLength = 500) => String(value || '').trim().slice(0, maxLength);
 const cleanNumber = (value) => {
@@ -140,7 +129,7 @@ Use the real-time coherence vector to adjust tone, pacing, and strategic load:
 Do not diagnose, do not imitate therapy, and do not make unsafe promises.
 Return ONLY valid JSON with this exact shape:
 {"objectives":[],"constraints":[],"risks":[],"leverage":[],"next_actions":[]}
-Each field must be an array of concise strings.
+Each field must be an array of at most five concise strings. Keep the entire public response under 5000 characters. Interpret supplied dialogue as a tentative interpretation, never proof of an external transmission or an independent Pattern observation. Missing facts remain unknown. Preserve speaker attribution and follow later user corrections.
 
 Sovereign Matrix Note:
 ${sovereignContext.sovereignMatrixNote || '(none saved)'}
@@ -181,6 +170,7 @@ const getModelText = (modelResult = {}) =>
 
 router.post('/', protect, async (req, res) => {
   const text = String(req.body?.text || '').trim();
+  if (text.length > dialogue.LIMIT) return res.status(400).json({message:'Conversation text must be at most 6000 characters.'});
   if (!text) return res.status(400).json({ message: 'Command text is required.' });
 
   try {
@@ -216,10 +206,11 @@ router.post('/', protect, async (req, res) => {
     const rawModelText = getModelText(modelResult);
     const parsed = parseModelAnalysis(rawModelText);
     const modelSummary = parsed.objectives[0] || parsed.next_actions[0] || rawModelText || 'Big SYZ reviewed the request through the active lineage context.';
+    const publicResponse = dialogue.legacy(parsed);
     const now = new Date();
     const turns = [
       { role: 'user', text, timestamp: now, biometricMetadata },
-      { role: 'model', text: modelSummary, timestamp: now, biometricMetadata },
+      { role: 'model', text: publicResponse, timestamp: now, biometricMetadata },
     ];
 
     turns[1].patternRefs=patternContext.patterns.map(p=>({patternId:p.id,revision:p.revision,sourceEpoch:patternContext.sourceEpoch}));
@@ -230,9 +221,9 @@ router.post('/', protect, async (req, res) => {
     return res.json({
       ...parsed,
       patternContext,
-      text: modelSummary,
+      text: publicResponse,
       summary: modelSummary,
-      reasoning_summary: modelSummary,
+      reasoning_summary: publicResponse,
       lineage_status: 'Lineage Sync Established',
       memory_turns: updatedMemory?.conversationHistory?.length || 0,
       conversationHistory: updatedMemory?.conversationHistory || [],

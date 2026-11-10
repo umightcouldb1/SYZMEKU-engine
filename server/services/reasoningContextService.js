@@ -106,6 +106,7 @@ async function assemble(request) {
       patternContext = await require('./patternPresentationService').getPatternContext({
         purpose: request.purpose === 'recommend' ? 'recommend' : ['planner', 'agent-plan'].includes(request.purpose) ? 'planner' : 'mentor'
       });
+    coverage.ConversationTurn = {included: Math.min(memory?.conversationHistory?.length || 0, 40), truncated: (memory?.conversationHistory?.length || 0) > 40};
     const turns = (memory?.conversationHistory || []).slice(-40).map(t => ({
       ...pick(t, ['_id', 'role', 'text', 'timestamp']),
       ref: ref('ConversationTurn', t, t.role === 'user' ? 'user-statement' : 'derivative')
@@ -144,8 +145,9 @@ async function assemble(request) {
     };
     // Stable source digest excludes wall-clock and serialization-only writeSequence.
     for (const [name, items] of [['ConversationTurn', context.conversation], ['KernelCycle', context.outcomes.cycles], ['ActionExecution', context.outcomes.actions], ['Task', context.tasks], ['SignalEntry', context.observations], ['StrategicMemory', context.hypotheses], ['StrategicMemory', context.facts]]) {
-      while (Buffer.byteLength(JSON.stringify(context)) > 65536 && items.length) {
-        const removed = items.pop();
+      while (Buffer.byteLength(JSON.stringify(context)) > 65536 && items.length > (name === 'ConversationTurn' ? 2 : 0)) {
+        // Conversation is chronological: remove oldest whole turns, never newest corrections.
+        const removed = name === 'ConversationTurn' ? items.shift() : items.pop();
         delete manifest[removed.ref];
         coverage[name] = {
           ...coverage[name],

@@ -133,12 +133,24 @@ function plan(v, context) {
   };
 }
 function output(v, context) {
-  exact(v, ['recommendations', 'plan', 'questions', 'constraintConflicts'], true);
+  exact(v, ['recommendations', 'plan', 'questions', 'constraintConflicts', 'interpretation'], true);
+  let interpretation = null;
+  if (v.interpretation != null) {
+    exact(v.interpretation, ['text', 'evidenceRefs', 'uncertainty'], true);
+    interpretation = {
+      kind: 'assistant-interpretation',
+      text: string(v.interpretation.text, 2500, true),
+      evidenceRefs: references(v.interpretation.evidenceRefs, context),
+      uncertainty: array(v.interpretation.uncertainty, 5, true).map(x => string(x, 300, true))
+    };
+    if (!interpretation.uncertainty.length) fail('Interpretations must state uncertainty.');
+  }
   const recommendations = array(v.recommendations, 5, true).map(r => candidate(r, context));
   if (new Set(recommendations.map(r => r.id)).size !== recommendations.length) fail('Duplicate recommendation IDs.');
   const constraintConflicts = references(v.constraintConflicts || [], context);
   if (constraintConflicts.some(k => context.manifest[k].kind !== 'constraint')) fail('Invalid constraint reference.');
   return {
+    interpretation,
     recommendations,
     plan: v.plan ? plan(v.plan, context) : null,
     questions: array(v.questions || [], 5, true).map(q => string(q, 500, true)),

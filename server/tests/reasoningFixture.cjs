@@ -5,4 +5,4 @@ function modelOutput(prompt){
  const planning=/Purpose: (planner|agent-plan)/.test(prompt);
  return {recommendations:[r],plan:planning?{title:'Reviewable draft',goalIds:r.goalIds,steps:[{...r,dependsOn:[],existingTaskRefs:[]}],successCriteria:r.successCriteria,uncertainty:r.uncertainty}:null,questions:[],constraintConflicts:[]};
 }
-module.exports=async()=>fixture({reasoning:true});module.exports.modelOutput=modelOutput;
+module.exports=async()=>fixture({reasoning:true,mongoArgs:['--nounixsocket']});module.exports.modelOutput=modelOutput;

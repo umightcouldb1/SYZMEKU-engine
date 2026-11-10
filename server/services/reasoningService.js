@@ -14,6 +14,7 @@ async function generate(body, {
     requestId = crypto.randomUUID();
   // No HTTP surface requests both. Reject an unsafe future internal caller rather
   // than committing two independently authorized artifacts in separate transactions.
+  if (conversation && request.text.length > 6000) throw cap.error('INVALID_REQUEST', 'Conversation text must be at most 6000 characters.');
   if (save && conversation) throw cap.error('INVALID_REQUEST', 'Choose conversation or explicit saved guidance for this request.');
   await cap.recheck({
     write: save || conversation
@@ -32,7 +33,7 @@ async function generate(body, {
       };
     }
   }
-  const question = policy.clarification(snapshot);
+  const question = policy.clarification(snapshot, request);
   if (question) {
     await context.assertFresh(snapshot, request);
     return {
@@ -83,6 +84,7 @@ async function generate(body, {
   if (combined.aborted) throw cap.error('MODEL_TIMEOUT', 'Model request timed out.', 504);
   if (save) result = await persistence.save(request, snapshot, result, model);
   if (conversation) {
+    result.conversationText = require('./conversationPresentation').reasoning(result);
     let committed;
     const core = require('./coreContextService');
     await core.withContextMutation(async () => {
@@ -97,7 +99,7 @@ async function generate(body, {
         timestamp: new Date()
       }, {
         role: 'model',
-        text: result.summary,
+        text: result.conversationText,
         timestamp: new Date(),
         reasoningRefs: Object.keys(snapshot.manifest).slice(0, 100),
         patternRefs: result.patternContext.patterns.map(p => ({
@@ -145,9 +147,9 @@ async function preview() {
 function compatibility(result) {
   return {
     ...result,
-    text: result.summary,
+    text: result.conversationText || result.summary,
     summary: result.summary,
-    reasoning_summary: result.summary,
+    reasoning_summary: result.conversationText || result.summary,
     objectives: [result.summary],
     constraints: result.constraintConflicts.map(c => c.description),
     risks: result.limitations,
