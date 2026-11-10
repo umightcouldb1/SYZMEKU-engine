@@ -98,7 +98,7 @@ app.use(helmet({
       formAction: ["'self'"],
       frameAncestors: ["'self'"],
       frameSrc: ["'self'", 'https://accounts.google.com', 'https://*.google.com'],
-      imgSrc: ["'self'", 'data:', 'https:'],
+      imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
       objectSrc: ["'none'"],
       scriptSrc: ["'self'", 'https://accounts.google.com', 'https://apis.google.com'],
       scriptSrcAttr: ["'none'"],

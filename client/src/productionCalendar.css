@@ -1,0 +1,27 @@
+.production-calendar { margin: 1.5rem 0; padding: 1.25rem; border: 1px solid rgba(162, 190, 179, .35); border-radius: 14px; color: inherit; background: rgba(10, 24, 20, .35); overflow-wrap: anywhere; }
+.production-calendar h3, .production-calendar h4 { margin: 0 0 .5rem; }
+.production-heading, .production-slot-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.production-calendar p { line-height: 1.55; }
+.production-boundary { padding: 1rem; border-left: 3px solid #8bad9a; }
+.production-warning { color: #ffddae; padding: .65rem; border: 1px solid currentColor; border-radius: 6px; }
+.production-calendar a { color: #bddfdb; text-decoration: underline; text-underline-offset: .15em; }
+.production-calendar button, .production-calendar input, .production-calendar select, .production-calendar textarea { font: inherit; }
+.production-calendar button { padding: .6rem .85rem; border: 1px solid #9ab6aa; border-radius: 6px; color: #f1f7f5; background: #284438; cursor: pointer; min-height: 44px; }
+.production-calendar button:disabled { opacity: .55; cursor: not-allowed; }
+.production-calendar :is(button, input, select, textarea):focus-visible { outline: 3px solid #ddc2ff; outline-offset: 3px; }
+.production-form fieldset { border: 1px solid #708d80; border-radius: 8px; padding: 1rem; min-width: 0; margin: 1rem 0; }
+.production-form legend { padding: 0 .4rem; }
+.production-form label { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .85rem; }
+.production-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .75rem; }
+.production-form :is(input, select, textarea) { width: 100%; min-width: 0; min-height: 44px; box-sizing: border-box; color: #f0f6f3; background: #17251f; border: 1px solid #8eaa9c; border-radius: 5px; padding: .6rem; color-scheme: dark; }
+.production-form textarea { min-height: 90px; resize: vertical; }
+.production-form .production-check { display: flex; flex-direction: row; align-items: flex-start; gap: .6rem; }
+.production-form .production-check input { width: 1.2rem; height: 1.2rem; min-height: auto; flex: 0 0 auto; margin-top: .15rem; }
+.production-actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+.production-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 1rem; margin: 1rem 0; }
+.production-slot { min-width: 0; padding: 1rem; border: 1px solid #6e897b; border-radius: 10px; background: rgba(0, 0, 0, .15); }
+.production-slot-heading span { border-radius: 5px; padding: .3rem .5rem; background: #314537; white-space: nowrap; }
+.production-note { white-space: pre-wrap; }
+.production-calendar details { padding: .75rem 0; }
+.production-calendar summary { cursor: pointer; min-height: 30px; }
+@media (max-width: 600px) { .production-calendar { padding: .85rem; } .production-heading, .production-slot-heading { flex-direction: column; gap: .5rem; } .production-form-grid { grid-template-columns: minmax(0, 1fr); } .production-form fieldset { padding: .75rem; } }

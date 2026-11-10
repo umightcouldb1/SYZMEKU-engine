@@ -7,9 +7,12 @@ const { createOAuthState, consumeOAuthState } = require('../social/oauthState');
 const { getProvider, listProviders } = require('../social/providers');
 const { generateCampaignDraft } = require('../social/campaignGenerationService');
 const { publishCampaign, publishPost, getFreshAccessToken } = require('../social/publishingService');
-const { scheduleCampaignPosts, activatePlannedSchedule, processDuePosts } = require('../social/schedulingService');
+const { scheduleCampaignPosts, processDuePosts } = require('../social/schedulingService');
 const { refreshCampaignAnalytics, summarizeCampaign } = require('../social/analyticsService');
 const { validateMediaAsset } = require('../social/mediaAssetService');
+
+const { createCampaignDrafts } = require('../social/driveCampaignDrafts');
+const draftsFor = req => createCampaignDrafts({ owner: userIdOf(req) });
 
 const sanitizeText = (value = '', max = 4000) => String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').trim().slice(0, max);
 const userIdOf = (req) => req.user?._id;
@@ -56,13 +59,6 @@ const serializeConnection = (connection) => ({
   active: connection.active,
   metadata: connection.metadata,
 });
-
-const activateApprovedScheduleIfReady = async (campaign) => {
-  if (!campaign || campaign.status !== 'approved') return 0;
-  const scheduledCount = activatePlannedSchedule(campaign);
-  if (scheduledCount > 0) await campaign.save();
-  return scheduledCount;
-};
 
 const normalizeCampaignInput = (body = {}) => ({
   name: sanitizeText(body.name, 160),
@@ -219,79 +215,61 @@ const refreshConnectionToken = asyncHandler(async (req, res) => {
 
 const generateCampaign = asyncHandler(async (req, res) => {
   const generated = generateCampaignDraft(normalizeCampaignInput(req.body));
-  const campaign = await SocialCampaign.create({
-    userId: userIdOf(req),
-    ...generated,
-  });
-  await audit(req, 'campaign_created', { campaignId: campaign._id, templateKey: campaign.metadata?.templateKey || '' });
+  const campaign = await draftsFor(req).create(generated);
+  await audit(req, 'campaign_created', { campaignId: campaign._id, storage: 'google-drive' });
   res.status(201).json({ campaign, summary: summarizeCampaign(campaign) });
 });
 
 const seedFreedomAuditCampaign = asyncHandler(async (req, res) => {
-  let campaign = await SocialCampaign.findOne({
-    userId: userIdOf(req),
-    'metadata.templateKey': 'freedom_audit_launch',
-  }).sort({ createdAt: -1 });
-
+  const drafts = draftsFor(req);
+  let campaign = (await drafts.list({ requireDrive: true })).find(item => item.metadata?.templateKey === 'freedom_audit_launch');
   if (!campaign) {
-    const generated = generateCampaignDraft({ productName: 'The Freedom Audit(TM)' });
-    campaign = await SocialCampaign.create({ userId: userIdOf(req), ...generated });
-    await audit(req, 'campaign_created', { campaignId: campaign._id, templateKey: 'freedom_audit_launch' });
+    campaign = await drafts.create(generateCampaignDraft({ productName: 'The Freedom Audit(TM)' }));
+    await audit(req, 'campaign_created', { campaignId: campaign._id, storage: 'google-drive' });
   }
-
   res.json({ campaign, summary: summarizeCampaign(campaign), seeded: true });
 });
 
 const listCampaigns = asyncHandler(async (req, res) => {
-  const campaigns = await SocialCampaign.find({ userId: userIdOf(req) }).sort({ updatedAt: -1 }).limit(50);
-  await Promise.all(campaigns.map(activateApprovedScheduleIfReady));
-  res.json({ campaigns: campaigns.map((campaign) => ({ ...campaign.toObject(), summary: summarizeCampaign(campaign) })) });
+  const campaigns = await draftsFor(req).list();
+  res.json({ campaigns: campaigns.map(campaign => ({ ...campaign, summary: summarizeCampaign(campaign) })), storageError: campaigns.storageError });
 });
 
 const getCampaign = asyncHandler(async (req, res) => {
-  const campaign = await SocialCampaign.findOne({ _id: req.params.campaignId, userId: userIdOf(req) });
+  const campaign = await draftsFor(req).get(req.params.campaignId);
   if (!campaign) return res.status(404).json({ error: 'Campaign not found.' });
-  await activateApprovedScheduleIfReady(campaign);
   res.json({ campaign, summary: summarizeCampaign(campaign) });
 });
 
 const updateCampaign = asyncHandler(async (req, res) => {
-  const campaign = await SocialCampaign.findOne({ _id: req.params.campaignId, userId: userIdOf(req) });
-  if (!campaign) return res.status(404).json({ error: 'Campaign not found.' });
-  if (req.body.name !== undefined) campaign.name = sanitizeText(req.body.name, 160);
-  if (req.body.objective !== undefined) campaign.objective = sanitizeText(req.body.objective, 1000);
-  if (Array.isArray(req.body.posts)) {
-    campaign.posts = req.body.posts.map((post, index) => ({
-      ...(campaign.posts[index]?.toObject?.() || {}),
-      provider: post.provider,
-      connectedAccountId: post.connectedAccountId || null,
-      format: post.format || 'text',
-      caption: sanitizeText(post.caption, 4000),
-      title: sanitizeText(post.title, 160),
-      description: sanitizeText(post.description, 5000),
-      hashtags: Array.isArray(post.hashtags) ? post.hashtags.map((tag) => sanitizeText(tag, 80).replace(/^#/, '')).filter(Boolean) : [],
-      link: sanitizeText(post.link, 500),
-      mediaAssets: Array.isArray(post.mediaAssets) ? post.mediaAssets.map(validateMediaAsset).filter(Boolean) : [],
-      metadata: post.metadata && typeof post.metadata === 'object' ? post.metadata : {},
-      scheduledTime: post.scheduledTime || null,
-      publishStatus: post.publishStatus || 'draft',
-    }));
-  }
-  await campaign.save();
+  const campaign = await draftsFor(req).edit(req.params.campaignId, req.body.expectedHash, req.body.expectedRevision, draft => {
+    if (req.body.name !== undefined) draft.name = sanitizeText(req.body.name, 160);
+    if (req.body.objective !== undefined) draft.objective = sanitizeText(req.body.objective, 1000);
+    if (Array.isArray(req.body.posts)) {
+      draft.posts = req.body.posts.map((post, index) => ({
+        ...(draft.posts[index] || {}),
+        provider: post.provider,
+        connectedAccountId: post.connectedAccountId || null,
+        format: post.format || 'text',
+        caption: sanitizeText(post.caption, 4000),
+        title: sanitizeText(post.title, 160),
+        description: sanitizeText(post.description, 5000),
+        hashtags: Array.isArray(post.hashtags) ? post.hashtags.map(tag => sanitizeText(tag, 80).replace(/^#/, '')).filter(Boolean) : [],
+        link: sanitizeText(post.link, 500),
+        mediaAssets: Array.isArray(post.mediaAssets) ? post.mediaAssets.map(validateMediaAsset).filter(Boolean) : [],
+        metadata: post.metadata && typeof post.metadata === 'object' ? post.metadata : {},
+        scheduledTime: post.scheduledTime || null,
+        publishStatus: 'draft',
+      }));
+    }
+    return draft;
+  });
   res.json({ campaign, summary: summarizeCampaign(campaign) });
 });
 
 const approveCampaign = asyncHandler(async (req, res) => {
-  const campaign = await SocialCampaign.findOne({ _id: req.params.campaignId, userId: userIdOf(req) });
-  if (!campaign) return res.status(404).json({ error: 'Campaign not found.' });
-  campaign.status = 'approved';
-  campaign.approvedAt = new Date();
-  campaign.posts.forEach((post) => {
-    if (post.publishStatus === 'draft') post.publishStatus = 'approved';
-  });
-  const scheduledCount = activatePlannedSchedule(campaign);
-  await campaign.save();
-  await audit(req, 'campaign_approved', { campaignId: campaign._id, scheduledCount });
+  const campaign = await draftsFor(req).approve(req.params.campaignId, req.body.expectedHash, req.body.expectedRevision);
+  await audit(req, 'campaign_approved', { campaignId: campaign._id, scheduledCount: 0 });
   res.json({ campaign, summary: summarizeCampaign(campaign) });
 });
 
@@ -324,6 +302,10 @@ const scheduleCampaign = asyncHandler(async (req, res) => {
 });
 
 const uploadTikTokDraft = asyncHandler(async (req, res) => {
+  const reviewed = await draftsFor(req).get(req.params.campaignId);
+  if (reviewed && (reviewed.storage === 'google-drive' || !reviewed.approvedAt || !['approved', 'scheduled'].includes(reviewed.status))) {
+    return res.status(409).json({ code: 'FINAL_APPROVAL_REQUIRED', error: 'Drafts awaiting approval stay only in Google Drive. Approve the exact final version before a TikTok handoff.' });
+  }
   const campaign = await SocialCampaign.findOne({ _id: req.params.campaignId, userId: userIdOf(req) });
   if (!campaign) return res.status(404).json({ error: 'Campaign not found.' });
 
@@ -349,6 +331,7 @@ const uploadTikTokDraft = asyncHandler(async (req, res) => {
     });
   }
 
+  await require('../enterprise/content/service').assertPublication({ db: require('mongoose').connection.db, campaign, post });
   const provider = getProvider('tiktok');
   const accessToken = await getFreshAccessToken({ connection, provider });
   const result = await provider.uploadVideoDraft({ accessToken, post });
@@ -375,6 +358,8 @@ const processSchedule = asyncHandler(async (req, res) => {
 });
 
 const refreshAnalytics = asyncHandler(async (req, res) => {
+  const reviewed = await draftsFor(req).get(req.params.campaignId);
+  if (reviewed?.storage === 'google-drive') return res.status(409).json({ error: 'Analytics are available after final approval and publishing.' });
   const snapshots = await refreshCampaignAnalytics({ userId: userIdOf(req), campaignId: req.params.campaignId });
   const campaign = await SocialCampaign.findOne({ _id: req.params.campaignId, userId: userIdOf(req) });
   res.json({ snapshots, campaign, summary: summarizeCampaign(campaign) });

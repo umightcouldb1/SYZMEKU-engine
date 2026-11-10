@@ -34,12 +34,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('package.json', 'server/package.json', 'client/package.json') }}
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json', 'server/package-lock.json', 'client/package-lock.json') }}
           restore-keys: |
             npm-${{ runner.os }}-
 
-      - name: Install root, server, and client dependencies
-        run: npm run setup
+      - name: Clean install locked root, server, and client dependencies
+        run: npm run setup:ci
 
       - name: Verify security boundaries and database identity enforcement
         run: npm run security:test && npm run security:integration
@@ -49,6 +49,15 @@ jobs:
 
       - name: Verify C0 content versions, approvals, voice and browser
         run: npm run c0:test && npm run c0:browser
+
+      - name: Retain synthetic C0 browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: c0-browser-review
+          path: .cache/content-factory-browser/*.png
+          if-no-files-found: ignore
+          retention-days: 3
 
       - name: Verify E0 business isolation, monitoring and event fixtures
         run: npm run e0:test && npm run e0:browser

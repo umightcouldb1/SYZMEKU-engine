@@ -15,6 +15,20 @@ const scheduleCampaignPosts = async ({ userId, campaignId, postSchedules = [] })
     throw error;
   }
 
+  if (campaign.metadata?.c0?.storage === 'GOOGLE_DRIVE') {
+    const post = campaign.posts[0], receipt = campaign.metadata.c0;
+    await require('../enterprise/content/approvedRelease').assertReleasedPublication({db:SocialCampaign.db.db,campaign,post,checkTime:false});
+    if (postSchedules.length !== 1 || String(postSchedules[0]?.postId) !== String(post._id) || !receipt.scheduledTime ||
+        !Number.isFinite(Date.parse(postSchedules[0]?.scheduledTime)) || new Date(postSchedules[0].scheduledTime).toISOString() !== receipt.scheduledTime || Date.parse(receipt.scheduledTime) <= Date.now()) {
+      throw Object.assign(new Error('C0_EXACT_APPROVED_SCHEDULE_REQUIRED'), {statusCode:409});
+    }
+    const scheduled = await SocialCampaign.findOneAndUpdate({_id:campaign._id,userId,status:'approved',
+      posts:{$elemMatch:{_id:post._id,publishStatus:'approved',publishAttempts:0}}},
+      {$set:{status:'scheduled',scheduledAt:new Date(),'posts.$.publishStatus':'scheduled'}},{new:true});
+    if (!scheduled) throw Object.assign(new Error('C0_PUBLICATION_INSPECTION_REQUIRED'), {statusCode:409});
+    return scheduled;
+  }
+
   const scheduleMap = new Map(postSchedules.map((item) => [String(item.postId), item]));
   for (const post of campaign.posts) {
     const schedule = scheduleMap.get(String(post._id));
@@ -29,6 +43,7 @@ const scheduleCampaignPosts = async ({ userId, campaignId, postSchedules = [] })
 };
 
 const activatePlannedSchedule = (campaign) => {
+  if (campaign.metadata?.c0) throw Object.assign(new Error('C0_EXPLICIT_SCHEDULE_REQUIRED'), {statusCode:409});
   let scheduledCount = 0;
   const now = Date.now();
 
@@ -69,6 +84,7 @@ const processDuePosts = async ({ limit = 10 } = {}) => {
   const results = [];
   for (const campaign of campaigns) {
     for (const post of campaign.posts) {
+      if (campaign.metadata?.c0?.storage === 'GOOGLE_DRIVE' && Number(post.publishAttempts || 0) > 0) continue;
       const scheduledTime = post.scheduledTime ? new Date(post.scheduledTime) : null;
       const nextAttempt = post.nextPublishAttemptAt ? new Date(post.nextPublishAttemptAt) : null;
       const retryableFailure = retryFailedPosts

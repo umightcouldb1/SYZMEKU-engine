@@ -173,14 +173,18 @@ The founder/operator must approve a campaign before publishing. Publishing requi
 
 ## Scheduling
 
-Schedules are stored in MongoDB on the campaign post records. Run due scheduled posts by calling:
+Approved campaign schedules are stored in MongoDB on the post records. The timestamp is a not-before upload time, not a guaranteed publication time. YouTube uploads start when the app processes a due post; the adapter does not pre-upload videos with YouTube `status.publishAt`.
+
+The existing server scheduler runs by default: its first check is scheduled 30 seconds after startup, followed by checks every five minutes while the process is running and MongoDB is connected. `SOCIAL_COMMAND_SCHEDULER_ENABLED=false` disables it. `SOCIAL_COMMAND_SCHEDULER_INTERVAL_MS` changes the interval (default `300000`, minimum `60000`), and `SOCIAL_COMMAND_SCHEDULER_LIMIT` limits work per pass (default `10`). Server sleep or downtime, database unavailability and queued work can delay upload start; transfers and YouTube processing can further delay publication. Free Render web services may sleep, so this polling does not guarantee an exact publication time.
+
+The authenticated operator can also explicitly process due posts by calling:
 
 ```http
 POST /api/social-command/scheduler/run-due
 Authorization: Bearer <commander-token>
 ```
 
-For production, call this endpoint from a trusted Render Cron job or an existing internal scheduler. The first implementation slice does not add an always-on worker process.
+This endpoint can initiate uploads for activated, due posts; it is not a read-only status check. No external Cron job, always-on worker, wake-up mechanism or hosting change is configured by this implementation. Approval and release do not activate a C0 schedule; activation remains a separate explicit action, fixed to the approved timestamp.
 
 The scheduler endpoint is restricted to the authenticated `COMMANDER_IN_CHIEF` role because it can process due posts across stored campaigns.
 

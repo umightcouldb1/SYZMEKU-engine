@@ -97,20 +97,33 @@ export default function SocialCommandDashboard() {
     }
   };
 
-  const loadAll = async () => {
-    setError('');
-    const [providerData, connectionData, campaignData] = await Promise.all([
+  const loadAll = async ({ preserveError = false, refreshCampaignId = null } = {}) => {
+    if (!preserveError) setError('');
+    const [providerData, connectionData, campaignData, refreshedCampaign] = await Promise.all([
       api('get', '/api/social-command/providers'),
       api('get', '/api/social-command/connections'),
       api('get', '/api/social-command/campaigns'),
+      refreshCampaignId ? api('get', `/api/social-command/campaigns/${refreshCampaignId}`) : null,
     ]);
+    if (refreshCampaignId && String(refreshedCampaign?.campaign?._id) !== String(refreshCampaignId)) {
+      throw new Error('The latest campaign response could not be verified.');
+    }
     setProviders(providerData.providers || []);
     setConnections(connectionData.connections || []);
     setCampaigns(campaignData.campaigns || []);
-    if (!activeCampaign && campaignData.campaigns?.[0]) {
-      const latestCampaign = campaignData.campaigns[0];
-      setActiveCampaign({ campaign: latestCampaign, summary: latestCampaign.summary });
-    }
+    if (campaignData.storageError && !preserveError) setError(campaignData.storageError);
+    setActiveCampaign((current) => {
+      // A late publication refresh must not steal a newer selection or overwrite
+      // edits in another campaign. Fetch the exact ID even outside the list page.
+      if (refreshCampaignId && String(current?.campaign?._id) === String(refreshCampaignId)) {
+        return { ...refreshedCampaign, publicationRefreshPending: false };
+      }
+      if (!current && campaignData.campaigns?.[0]) {
+        const latestCampaign = campaignData.campaigns[0];
+        return { campaign: latestCampaign, summary: latestCampaign.summary };
+      }
+      return current;
+    });
   };
 
   useEffect(() => {
@@ -174,7 +187,7 @@ export default function SocialCommandDashboard() {
       const data = await api('put', `/api/social-command/campaigns/${activeCampaign.campaign._id}`, activeCampaign.campaign);
       setActiveCampaign(data);
       await loadAll();
-      setMessage('Campaign edits saved.');
+      setMessage('Review version saved only in Google Drive. Approve this version before publishing.');
     } catch (saveError) {
       setError(saveError?.response?.data?.error || 'Could not save campaign edits.');
     } finally {
@@ -183,6 +196,9 @@ export default function SocialCommandDashboard() {
   };
 
   const activateSchedule = async () => {
+    const release = activeCampaign?.campaign?.metadata?.c0;
+    if (release?.storage === 'GOOGLE_DRIVE' && !window.confirm(`Activate this approved YouTube upload no earlier than ${release.scheduledTime}, channel ${release.providerAccountId}, ${release.privacyStatus} visibility? Due posts can upload automatically after activation. The app checks every five minutes by default while enabled and running. Server sleep or downtime, uploads and YouTube processing can delay publication; this is not an exact publication-time guarantee.`)) return;
+    if (activeCampaign?.dirty) { setError('Save and approve your edited version before scheduling.'); return; }
     if (!activeCampaign?.campaign?._id) return;
     setLoading(true);
     setError('');
@@ -193,7 +209,7 @@ export default function SocialCommandDashboard() {
       const data = await api('post', `/api/social-command/campaigns/${activeCampaign.campaign._id}/schedule`, { postSchedules });
       setActiveCampaign(data);
       await loadAll();
-      setMessage('Campaign schedule activated. Due posts will publish through connected official APIs.');
+      setMessage('Campaign schedule activated. The app can upload due posts while the scheduler is running; publication may be delayed.');
     } catch (scheduleError) {
       setError(scheduleError?.response?.data?.error || 'Could not activate campaign schedule.');
     } finally {
@@ -202,21 +218,50 @@ export default function SocialCommandDashboard() {
   };
 
   const approveCampaign = async () => {
+    if (activeCampaign?.dirty) { setError('Save your edits to Drive, then review and approve that version.'); return; }
     if (!activeCampaign?.campaign?._id) return;
     setLoading(true);
     setError('');
     try {
-      const data = await api('post', `/api/social-command/campaigns/${activeCampaign.campaign._id}/approve`, {});
+      const data = await api('post', `/api/social-command/campaigns/${activeCampaign.campaign._id}/approve`, { expectedHash: activeCampaign.campaign.receiptSync?.status === 'pending' ? activeCampaign.campaign.receiptSync.hash : activeCampaign.campaign.metadata?.driveApproval?.hash || activeCampaign.campaign.expectedHash, expectedRevision: activeCampaign.campaign.expectedRevision });
       setActiveCampaign(data);
       await loadAll();
-      setMessage(data.campaign?.status === 'scheduled'
-        ? 'Campaign approved and schedule activated.'
-        : 'Campaign approved. Publishing is now available for connected accounts.');
+      setMessage(data.campaign?.receiptSync?.status === 'pending'
+        ? 'Campaign approved. Its Drive receipt is still syncing. Retry receipt sync without approving or publishing again.'
+        : 'Campaign approved and Drive receipt confirmed. Scheduling and publishing remain separate actions.');
     } catch (approveError) {
       setError(approveError?.response?.data?.error || 'Could not approve campaign.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const publishReleased = async () => {
+    const selected = activeCampaign?.campaign, receipt = selected?.metadata?.c0;
+    if (!receipt || receipt.storage !== 'GOOGLE_DRIVE' || activeCampaign?.dirty || activeCampaign?.publicationRefreshPending || receipt.scheduledTime || selected.posts?.some(post => post.publishAttempts > 0 || post.publishStatus === 'published')) return;
+    if (!window.confirm(`Upload this exact approved video now to YouTube channel ${receipt.providerAccountId} with ${receipt.privacyStatus} visibility?`)) return;
+    setLoading(true); setError(''); setMessage('');
+    setActiveCampaign((current) => String(current?.campaign?._id) === String(selected._id)
+      ? { ...current, publicationRefreshPending: true } : current);
+    let uploadError = '';
+    try {
+      try {
+        await api('post', `/api/social-command/campaigns/${selected._id}/publish`, {});
+        setMessage('YouTube confirmed the upload.');
+      } catch (publishError) {
+        uploadError = publishError?.response?.data?.code || publishError?.response?.data?.error || 'Upload outcome is unconfirmed. Inspect the channel before retrying.';
+        setError(uploadError);
+      }
+      try {
+        await loadAll({ preserveError: true, refreshCampaignId: selected._id });
+      } catch {
+        // Keep the local pending flag and original upload error when the read
+        // fails. An old publishAttempts=0 must not re-enable the Publish button.
+        setError(uploadError
+          ? `${uploadError} Latest campaign status could not be loaded. Publishing remains blocked here; inspect the channel.`
+          : 'YouTube confirmed the upload, but its latest campaign status could not be loaded. Publishing remains blocked here.');
+      }
+    } finally { setLoading(false); }
   };
 
   const refreshAnalytics = async () => {
@@ -239,7 +284,7 @@ export default function SocialCommandDashboard() {
       const campaign = { ...(current?.campaign || {}) };
       campaign.posts = [...(campaign.posts || [])];
       campaign.posts[postIndex] = { ...campaign.posts[postIndex], ...patch };
-      return { ...(current || {}), campaign };
+      return { ...(current || {}), campaign, dirty: true };
     });
   };
 
@@ -258,15 +303,16 @@ export default function SocialCommandDashboard() {
         }]
         : [];
       campaign.posts[postIndex] = post;
-      return { ...(current || {}), campaign };
+      return { ...(current || {}), campaign, dirty: true };
     });
   };
 
   const campaign = activeCampaign?.campaign || null;
+  const c0Release = campaign?.metadata?.c0?.storage === 'GOOGLE_DRIVE' ? campaign.metadata.c0 : null;
   const plannedScheduleAvailable = hasPlannedSchedule(campaign);
-  const approvalActionLabel = campaign?.status === 'approved' && plannedScheduleAvailable ? 'Activate Schedule' : 'Approve Campaign';
-  const approvalAction = campaign?.status === 'approved' && plannedScheduleAvailable ? activateSchedule : approveCampaign;
-  const approvalActionDisabled = loading || campaign?.status === 'scheduled' || campaign?.status === 'published';
+  const approvalActionLabel = campaign?.receiptSync?.status === 'pending' ? 'Retry Drive Receipt Sync' : campaign?.status === 'approved' && plannedScheduleAvailable ? 'Activate Schedule' : 'Approve Campaign';
+  const approvalAction = campaign?.receiptSync?.status !== 'pending' && campaign?.status === 'approved' && plannedScheduleAvailable ? activateSchedule : approveCampaign;
+  const approvalActionDisabled = loading || activeCampaign?.dirty || (campaign?.receiptSync?.status !== 'pending' && ['scheduled','published'].includes(campaign?.status));
 
   return (
     <main className="social-command" aria-label="SYZMEKU Social Command">
@@ -339,8 +385,9 @@ export default function SocialCommandDashboard() {
               <label className="social-command__field">
                 Campaign objective
                 <textarea
+                  readOnly={!!c0Release}
                   value={campaign.objective || ''}
-                  onChange={(event) => setActiveCampaign((current) => ({ ...current, campaign: { ...current.campaign, objective: event.target.value } }))}
+                  onChange={(event) => setActiveCampaign((current) => ({ ...current, dirty: true, campaign: { ...current.campaign, objective: event.target.value } }))}
                 />
               </label>
 
@@ -354,20 +401,21 @@ export default function SocialCommandDashboard() {
                     </div>
                     <label>
                       Title
-                      <input value={post.title || ''} onChange={(event) => updatePost(index, { title: event.target.value })} />
+                      <input readOnly={!!c0Release} value={post.title || ''} onChange={(event) => updatePost(index, { title: event.target.value })} />
                     </label>
                     <label>
                       Caption / copy
-                      <textarea value={post.caption || post.description || ''} onChange={(event) => updatePost(index, { caption: event.target.value, description: event.target.value })} />
+                      <textarea readOnly={!!c0Release} value={post.caption || post.description || ''} onChange={(event) => updatePost(index, { caption: event.target.value, description: event.target.value })} />
                     </label>
                     <label>
                       Link
-                      <input value={post.link || ''} onChange={(event) => updatePost(index, { link: event.target.value })} />
+                      <input readOnly={!!c0Release} value={post.link || ''} onChange={(event) => updatePost(index, { link: event.target.value })} />
                     </label>
                     {post.format !== 'text' && (
                       <label>
-                        Hosted media URL
+                        {c0Release?'Private Drive source (no public URL)':'Hosted media URL'}
                         <input
+                          readOnly={!!c0Release}
                           value={firstMediaUrl(post)}
                           placeholder="https://..."
                           onChange={(event) => updatePostMediaUrl(index, event.target.value)}
@@ -375,8 +423,9 @@ export default function SocialCommandDashboard() {
                       </label>
                     )}
                     <label>
-                      Planned launch time
+                      {c0Release ? 'Approved not-before upload time' : 'Planned launch time'}
                       <input
+                        readOnly={!!c0Release}
                         type="datetime-local"
                         value={toDatetimeLocalValue(post.scheduledTime)}
                         onChange={(event) => updatePost(index, { scheduledTime: fromDatetimeLocalValue(event.target.value) })}
@@ -384,7 +433,7 @@ export default function SocialCommandDashboard() {
                     </label>
                     <label>
                       Account
-                      <select value={post.connectedAccountId || ''} onChange={(event) => updatePost(index, { connectedAccountId: event.target.value })}>
+                      <select disabled={!!c0Release} value={post.connectedAccountId || ''} onChange={(event) => updatePost(index, { connectedAccountId: event.target.value })}>
                         <option value="">Choose connected account later</option>
                         {activeConnections.filter((connection) => connection.provider === post.provider).map((connection) => (
                           <option key={connection.id} value={connection.id}>{connection.accountName} ({connection.accountType})</option>
@@ -401,11 +450,13 @@ export default function SocialCommandDashboard() {
                 ))}
               </div>
 
+              {c0Release?.scheduledTime && <p>Scheduling uses the app, not YouTube's native scheduler. When enabled and running, the app checks due uploads every five minutes by default. The approved time is a not-before upload time, not a guaranteed publication time. Server sleep or downtime, uploads and YouTube processing can delay publication.</p>}
               <div className="social-command__actions">
-                <button type="button" onClick={saveCampaign} disabled={loading}>Save Drafts</button>
-                <button type="button" onClick={approvalAction} disabled={approvalActionDisabled}>{approvalActionLabel}</button>
+                <button type="button" onClick={saveCampaign} disabled={loading||!!c0Release}>Save Drafts</button>
+                <button type="button" onClick={approvalAction} disabled={approvalActionDisabled||!!c0Release&&!plannedScheduleAvailable}>{approvalActionLabel}</button>
+                {c0Release&&!c0Release.scheduledTime&&<button type="button" onClick={publishReleased} disabled={loading||activeCampaign?.dirty||activeCampaign?.publicationRefreshPending||campaign.posts.some(p=>p.publishAttempts>0||p.publishStatus==='published')}>Publish approved video now ({c0Release.privacyStatus})</button>}
                 <button type="button" onClick={refreshAnalytics} disabled={loading}>Refresh Analytics</button>
-                <p>Planned launch times are saved with drafts. Approval activates the schedule before any publishing workflow can run.</p>
+                <p>Approval, release, schedule activation and publishing are separate actions. A C0 release is read-only here. To change its copy, channel, visibility or time, edit and review a new version in Content Factory.</p>
               </div>
             </>
           )}

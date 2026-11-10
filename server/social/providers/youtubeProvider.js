@@ -207,13 +207,13 @@ class YouTubeProvider extends SocialProviderAdapter {
     }));
   }
 
-  async publishVideo({ accessToken, post }) {
+  async publishVideo({ accessToken, post, approvedMedia }) {
     const videoAsset = findPostMediaAsset(post, 'video');
-    if (!videoAsset) {
+    if (!videoAsset && !approvedMedia) {
       throw new Error('YouTube publishing requires a hosted video URL.');
     }
 
-    const { stream, mimeType } = await fetchMediaBuffer(videoAsset, {
+    const { stream, mimeType } = approvedMedia ? { stream: require('node:stream').Readable.from(approvedMedia.buffer), mimeType: approvedMedia.mimeType } : await fetchMediaBuffer(videoAsset, {
       maxBytes: Number(process.env.YOUTUBE_MAX_UPLOAD_BYTES || 75 * 1024 * 1024),
     });
     const auth = new google.auth.OAuth2();
@@ -225,7 +225,7 @@ class YouTubeProvider extends SocialProviderAdapter {
         part: ['snippet', 'status'],
         requestBody: buildYouTubeUploadRequest(post),
         media: { mimeType, body: stream },
-      });
+      }, approvedMedia ? { retry: false } : undefined);
 
       return {
         id: response.data?.id || '',
