@@ -15,7 +15,7 @@ window.freedomBusinessEvent = (() => {
     const nextCampaign = params.get('utm_campaign');
     if (/^(freedom_audit_launch|fa_launch_[a-z0-9_]{1,90})$/i.test(nextCampaign || '')) sessionStorage.setItem('freedomBusinessCampaign', nextCampaign);
     const nextContent = params.get('utm_content');
-    if (/^fa_launch_[a-z0-9_]{1,90}$/i.test(nextContent || '')) sessionStorage.setItem('freedomBusinessContent', nextContent);
+    if (/^fa_(?:launch|c0)_[a-z0-9_]{1,90}$/i.test(nextContent || '')) sessionStorage.setItem('freedomBusinessContent', nextContent);
     source = sessionStorage.getItem('freedomBusinessSource') || '';
     medium = sessionStorage.getItem('freedomBusinessMedium') || '';
     campaign = sessionStorage.getItem('freedomBusinessCampaign') || '';
