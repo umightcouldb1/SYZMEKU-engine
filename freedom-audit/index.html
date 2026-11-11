@@ -356,9 +356,19 @@
           <ol id="plan"></ol>
         </div>
         <div class="card stack">
+          <h3>Keep this full audit in Big SYZ</h3>
+          <p>Choose whether Big SYZ should retain this audit for future conversations. One retained audit stays in your private memory until you replace or remove it or delete personal Core data, even after it leaves your ten-result audit history. Recommendations remain proposals, not verified facts. Replacing or removing a retained audit clears derived guidance and conversation that could repeat it; original audits and purchases stay unchanged.</p>
+          <button type="button" id="reviewRetention">Review retention choice</button>
+          <div id="retentionReview" class="hidden"><pre id="retentionAudit" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+            <label><input type="checkbox" id="retainConsent">Retain this full audit in Big SYZ for future conversations under these terms.</label>
+            <button type="button" id="retainAudit" disabled>Retain full audit</button>
+          </div>
+          <p id="retentionStatus" role="status"></p>
+        </div>
+        <div class="card stack">
           <div>
-            <h3>Big SYZ Continuation Prompt</h3>
-            <p class="muted">Use this as the next handoff into Big SYZ, your ongoing execution layer.</p>
+            <h3>Optional manual prompt</h3>
+            <p class="muted">This older manual prompt contains scores and inputs, not the full plan. For durable full-audit context, use the explicit retention choice above. Opening Big SYZ alone does not transfer your audit.</p>
           </div>
           <textarea id="prompt" rows="12" readonly></textarea>
           <div class="result-actions no-print">
@@ -742,6 +752,43 @@
       }
     }
 
+    function configureAuditRetention(result) {
+      const token = state.token;
+      let preview = null;
+      $('retentionReview').classList.add('hidden');
+      $('retentionAudit').textContent = '';
+      $('retentionStatus').textContent = '';
+      $('retainConsent').checked = false;
+      $('retainAudit').disabled = true;
+      $('reviewRetention').disabled = !result.id;
+      const current = () => state.token === token && $('reviewRetention').onclick === review;
+      async function review() {
+        preview = null; $('retainConsent').checked = false; $('retainAudit').disabled = true;
+        $('retentionReview').classList.add('hidden'); $('reviewRetention').disabled = true;
+        try {
+          const data = await api('/core/audit-continuation/source/' + encodeURIComponent(result.id));
+          if (!current()) return;
+          preview = data;
+          $('retentionAudit').textContent = JSON.stringify(data.audit, null, 2);
+          $('retentionStatus').textContent = data.expectedRetained ? 'This will replace the retained audit and clear earlier derived guidance and conversation.' : data.retention;
+          $('retentionReview').classList.remove('hidden');
+        } catch (error) { if(current()) $('retentionStatus').textContent = error.message; }
+        finally { if(current()) $('reviewRetention').disabled = false; }
+      }
+      $('reviewRetention').onclick = review;
+      $('retainConsent').onchange = () => { $('retainAudit').disabled = !preview || !$('retainConsent').checked; };
+      $('retainAudit').onclick = async () => {
+        if(!current() || !preview || !$('retainConsent').checked) return;
+        $('retainAudit').disabled = true;
+        try {
+          await api('/core/audit-continuation', {method:'POST',body:JSON.stringify({resultId:preview.resultId,sourceHash:preview.sourceHash,expectedRetained:preview.expectedRetained,retain:true})});
+          if(!current())return;
+          preview=null; $('retainConsent').checked=false; $('retentionReview').classList.add('hidden');
+          $('retentionStatus').textContent='Full audit retained. Open Big SYZ with the same account. Its retained-audit controls show the active context and let you remove the copy.';
+        } catch(error) {if(current()) {$('retentionStatus').textContent=error.message;$('retainAudit').disabled=false;}}
+      };
+    }
+
     function renderResult(result) {
       if (!result) {
         show('gate');
@@ -765,6 +812,7 @@
       $('executeText').textContent = result.compression?.execute || '';
       $('plan').innerHTML = (result.liberationPlan || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
       $('prompt').value = result.bigSyzPrompt || '';
+      configureAuditRetention(result);
       show('result');
       loadResultHistory();
     }

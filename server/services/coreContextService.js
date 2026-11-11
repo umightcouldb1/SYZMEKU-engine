@@ -172,6 +172,7 @@ async function getConversation() {
 
 async function appendConversation(turns, expected) {
   return withContextMutation(async life => {
+    if(Object.hasOwn(expected,'auditStamp'))await require('./freedomAuditContinuation').assertCurrent(expected.auditStamp);
     if(expected.patternStamp)await require('./patternPresentationService').checkStamp(expected.patternStamp);
     const {userId} = requireCoreScope();
     const memory=await Memory.findOne({userId});
@@ -241,16 +242,18 @@ async function completeTask(id) {
 }
 async function listMemory(query='') {
   requireCoreScope();const escaped=text(query,200).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  return StrategicMemory.find(escaped ? {$or:['title','content','category','tags'].map(k=>({[k]:{$regex:escaped,$options:'i'}}))} : {}).sort({updatedAt:-1}).limit(100).lean();
+  return StrategicMemory.find(escaped ? {category:{$ne:require('./freedomAuditContinuation').CATEGORY},$or:['title','content','category','tags'].map(k=>({[k]:{$regex:escaped,$options:'i'}}))} : {category:{$ne:require('./freedomAuditContinuation').CATEGORY}}).sort({updatedAt:-1}).limit(100).lean();
 }
 async function saveMemory(payload) {
   rejectOwnerFields(payload);
+  if(require('./freedomAuditContinuation').reserved(payload))throw scopeError('Use explicit audit retention controls.',400);
   return withContextMutation(async()=>StrategicMemory.create({title:text(payload.title || payload.content,80),content:text(payload.content,6000),category:text(payload.category || 'general',80),source:text(payload.source || 'user',120),sourceCommand:text(payload.sourceCommand || '',500),tags:list(payload.tags || []).map(v=>text(v,80)),confirmed:payload.confirmed !== false}));
 }
 async function changeMemory(id, payload) {
   if(payload) rejectOwnerFields(payload);
   const result=await withContextMutation(async life=>{
     const memory=await StrategicMemory.findById(id);if(!memory) throw scopeError('Memory not found.',404);
+    if(require('./freedomAuditContinuation').reserved(memory))throw scopeError('Retained audits are immutable. Remove or replace the retained copy through audit controls.',409);
     if(payload?.expectedRevision!==undefined)require('./patternSourceService').ensureExpected(memory,payload.expectedRevision);
     if(payload) {memory.content=text(payload.content,6000);memory.title=text(payload.title || memory.content,80);memory.sourceCommand='';memory.tags=[];memory.confirmed=true;memory.source='user-correction';if(memory.category==='kernel')memory.category='general';memory.revision+=1;await memory.save();}
     else await memory.deleteOne();
@@ -308,4 +311,4 @@ async function loopStatus() {
   return {active:Boolean(state?.active && runtime?.timer && runtime?.active),last_cycle:state?.last_run_at || null,cycle_count:state?.run_count || 0};
 }
 
-module.exports={getContext,saveContext,onboardingStatus,saveOnboarding,getConversation,appendConversation,clearConversation,eraseContext,ingestObservation,listObservations,listTasks,createTask,completeTask,listMemory,saveMemory,changeMemory,changeObservation,saveTaskIntent,reasoningContext,withContextMutation,createProtocol,listProtocols,saveUserProtocol,listUserProtocols,loopStatus};
+module.exports={invalidateDerived,getContext,saveContext,onboardingStatus,saveOnboarding,getConversation,appendConversation,clearConversation,eraseContext,ingestObservation,listObservations,listTasks,createTask,completeTask,listMemory,saveMemory,changeMemory,changeObservation,saveTaskIntent,reasoningContext,withContextMutation,createProtocol,listProtocols,saveUserProtocol,listUserProtocols,loopStatus};

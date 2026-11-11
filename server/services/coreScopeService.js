@@ -19,8 +19,17 @@ const coreCapabilities = (user = {}) => ({
   personalContext: ['USER', 'COMMANDER_IN_CHIEF'].includes(user.role),
 });
 
+// Opaque server-only authority for the dedicated retained-audit deletion lifecycle.
+// Cannot be supplied by request bodies; ordinary writes never enter this scope.
+const retainedAuditDeletionAuthority = Symbol('retainedAuditDeletion');
+const withRetainedAuditDeletion = callback => {
+  requireCoreScope();
+  return runWithRequestContext({...getRequestContext(),retainedAuditDeletionAuthority}, callback);
+};
+
 const requireCoreWrite = () => {
   const { userId } = requireCoreScope();
+  if(getRequestContext().retainedAuditDeletionAuthority === retainedAuditDeletionAuthority)return;
   if (process.env.CORE_CONTEXT_WRITES_ENABLED !== 'true') throw scopeError('Personal Core writes are paused for maintenance.', 503);
   // An empty, malformed or wildcard list never falls back to global enablement.
   // IDs come from deployment configuration, never from request bodies or roles.
@@ -92,4 +101,4 @@ const invalidateCoreRuntime = () => {
   for (const callback of invalidators) callback(id);
 };
 
-module.exports = { requireCoreScope, requireCoreWrite, requireCoreExecution, scopeError, coreCapabilities, rejectOwnerFields, runAuthenticatedCoreJob, scopedRuntime, invalidateCoreRuntime, onCoreInvalidation, readCoreRuntime };
+module.exports = { withRetainedAuditDeletion, requireCoreScope, requireCoreWrite, requireCoreExecution, scopeError, coreCapabilities, rejectOwnerFields, runAuthenticatedCoreJob, scopedRuntime, invalidateCoreRuntime, onCoreInvalidation, readCoreRuntime };

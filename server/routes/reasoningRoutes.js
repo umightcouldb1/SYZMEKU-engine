@@ -46,7 +46,7 @@ router.get('/reasoning/evidence', handle(async req => {
   const snapshot = await context.assemble(request),
     ref = req.query.ref;
   if (typeof ref !== 'string' || !Object.hasOwn(snapshot.manifest, ref)) throw cap.error('NOT_FOUND', 'Evidence is not available in current scoped context.', 404);
-  const entries = [...snapshot.goals, ...snapshot.constraints, ...snapshot.resources, ...snapshot.facts, ...snapshot.hypotheses, ...snapshot.observations, ...snapshot.tasks, ...snapshot.conversation, ...snapshot.outcomes.cycles, ...snapshot.outcomes.actions, ...snapshot.patternContext.patterns.map(p => ({
+  const entries = [...(snapshot.retainedAudit?[snapshot.retainedAudit]:[]),...snapshot.goals, ...snapshot.constraints, ...snapshot.resources, ...snapshot.facts, ...snapshot.hypotheses, ...snapshot.observations, ...snapshot.tasks, ...snapshot.conversation, ...snapshot.outcomes.cycles, ...snapshot.outcomes.actions, ...snapshot.patternContext.patterns.map(p => ({
     ...p,
     ref: 'Pattern:' + p.id
   }))];

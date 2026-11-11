@@ -1,3 +1,4 @@
+import AuditContinuationPanel from './AuditContinuationPanel';
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import './CoreContextPanel.css';
@@ -69,6 +70,7 @@ export default function CoreContextPanel({ onChanged }) {
         <button className="mentor-button" type="submit" disabled={busy || !context || !goal.trim()}>{goalId ? 'Save goal changes' : 'Save goal'}</button>
         {goalId && <button type="button" disabled={busy} onClick={() => {setGoalId(null);setGoal('');setMeasure('');}}>Cancel goal edit</button>}
       </form>
+      <AuditContinuationPanel/>
       <h3>Saved facts and reflections</h3>
       <p>Correcting or removing a saved fact clears earlier conversation summaries that could repeat it.</p>
       {memories.length === 0 && <p>No saved facts yet.</p>}

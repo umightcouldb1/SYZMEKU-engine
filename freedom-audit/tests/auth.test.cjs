@@ -69,3 +69,18 @@ test('Google linking requests explicit password retry without persisting provide
 test('cancel linking clears transient password and next Google attempt omits it',async()=>{
  const p=page(async()=>({status:409,body:{code:'GOOGLE_ACCOUNT_LINK_REQUIRED',message:'Link required'}}));await p.google({credential:'synthetic'});p.get('password').value='existing-password';p.run('cancelGoogleLinking()');assert.equal(p.run('state.googleLinkRequired'),false);assert.equal(p.get('password').value,'');await p.google({credential:'new-synthetic'});assert.deepEqual(JSON.parse(p.requests[1].options.body),{credential:'new-synthetic'});assert.equal(p.stored.size,0);
 });
+
+test('audit retention requires reviewed source and explicit consent, and sends references only',async()=>{
+ const p=page(async()=>({status:200,body:{resultId:'own',sourceHash:'hash',expectedRetained:null,audit:{liberationPlan:['Full plan']},retention:'Until removed'}}));
+ p.run("state.token='owner';configureAuditRetention({id:'own'})");assert.equal(p.requests.length,0);
+ await p.get('retainAudit').onclick();assert.equal(p.requests.length,0);
+ await p.get('reviewRetention').onclick();assert.equal(p.get('retainAudit').disabled,true);
+ await p.get('retainAudit').onclick();assert.equal(p.requests.length,1);
+ p.get('retainConsent').checked=true;p.get('retainConsent').onchange();await p.get('retainAudit').onclick();
+ assert.deepEqual(JSON.parse(p.requests[1].options.body),{resultId:'own',sourceHash:'hash',expectedRetained:null,retain:true});assert.equal(p.get('retainConsent').checked,false);
+});
+test('retention review ignores a prior account response and cannot submit its audit',async()=>{
+ let release;const p=page(()=>new Promise(r=>release=r));p.run("state.token='old';configureAuditRetention({id:'old-audit'})");
+ const pending=p.get('reviewRetention').onclick();p.run("state.token='new'");release({status:200,body:{resultId:'old-audit',sourceHash:'hash',audit:{private:'canary'}}});await pending;
+ assert.equal(p.get('retentionAudit').textContent,'');p.get('retainConsent').checked=true;await p.get('retainAudit').onclick();assert.equal(p.requests.length,1);
+});

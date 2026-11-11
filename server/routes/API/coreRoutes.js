@@ -691,7 +691,7 @@ const runScopedReasoningKernel = async ({ trigger = "loop", text = "kernel evalu
     System.find().sort({ updatedAt: -1 }).limit(10).lean(),
     Task.find({ status: "open" }).sort({ createdAt: -1 }).limit(50).lean(),
     AlertRecord.find({ status: "open" }).sort({ updatedAt: -1 }).limit(25).lean(),
-    StrategicMemory.find().sort({ updatedAt: -1 }).limit(10).lean(),
+    core.listMemory().then(entries => entries.slice(0, 10)),
     KernelCycle.find({ error_summary: "" }).sort({ createdAt: -1 }).limit(1).lean(),
   ]);
 
@@ -859,7 +859,7 @@ const runAgentKernelEvaluation = async ({ text, rawContext, allowTaskExecution =
     SignalEntry.find().sort({ createdAt: -1 }).limit(5).lean(),
     System.find().sort({ createdAt: -1 }).limit(5).lean(),
     Task.find().sort({ createdAt: -1 }).limit(10).lean(),
-    StrategicMemory.find().sort({ updatedAt: -1 }).limit(5).lean(),
+    core.listMemory().then(entries => entries.slice(0, 5)),
   ]);
 
   const mode_selected = selectAgentMode(text, latestSignals);
@@ -1561,7 +1561,7 @@ router.post("/memory/save", async (req, res) => {
 });
 
 router.get("/memory", async (req, res) => {
-  const entries = await StrategicMemory.find().sort({ updatedAt: -1 }).limit(50).lean();
+  const entries = await core.listMemory().then(entries => entries.slice(0, 50));
   return res.json({ entries });
 });
 
@@ -1569,13 +1569,7 @@ router.get("/memory/search", async (req, res) => {
   const query = typeof req.query?.query === "string" ? req.query.query.trim() : "";
   if (!query) return res.status(400).json({ message: "Search query is required." });
 
-  const regex = new RegExp(escapeRegex(query), "i");
-  const entries = await StrategicMemory.find({
-    $or: [{ title: regex }, { category: regex }, { content: regex }, { tags: regex }],
-  })
-    .sort({ updatedAt: -1 })
-    .limit(50)
-    .lean();
+  const entries = (await core.listMemory(query)).slice(0, 50);
 
   return res.json({ query, entries });
 });
