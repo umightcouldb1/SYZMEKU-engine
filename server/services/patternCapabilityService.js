@@ -8,7 +8,7 @@ function requirePatternRead(){if(!enabled())throw scopeError('Pattern Intelligen
 function requirePatternWrite(){requireCoreWrite();if(!enabled())throw scopeError('Pattern Intelligence is paused for this account.',503);}
 async function recheckSession(){
   const {userId,sessionId}=requireCoreScope();
-  const live=await require('../models/AuthSession').exists({userId,sessionId,revokedAt:null,expiresAt:{$gt:new Date()}});
+  const live=await require('../utils/sessionVersion').findCurrentSession({userId,sessionId});
   if(!live)throw scopeError('Authenticated session is no longer available.',401);
 }
 module.exports={enabled,requirePatternRead,requirePatternWrite,recheckSession};

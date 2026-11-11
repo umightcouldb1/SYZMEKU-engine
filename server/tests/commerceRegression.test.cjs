@@ -5,7 +5,7 @@ const mongoose=require('mongoose');const express=require('express');const jwt=re
 const User=require('../models/User');const AuthSession=require('../models/AuthSession');const UserProfile=require('../models/UserProfile');const SocialCampaign=require('../models/SocialCampaign');
 const realStripe=require('stripe')('sk_test_fixture');let session,checkoutInput,priceAmount=3700;
 const price={id:'price_fixture',active:true,currency:'usd',product:{id:'prod_fixture',name:'The Freedom Audit',active:true}};
-const fakeStripe={webhooks:realStripe.webhooks,prices:{retrieve:async()=>({...price,unit_amount:priceAmount})},checkout:{sessions:{create:async input=>{checkoutInput=input;return {url:'https://example.test/mock-checkout'};},retrieve:async()=>session,listLineItems:async()=>({data:[{price,amount_total:3700,currency:'usd'}]})}}};
+const fakeStripe={paymentIntents:{retrieve:async()=>({id:'pi_fixture',status:'succeeded',latest_charge:'ch_fixture'})},charges:{retrieve:async()=>({id:'ch_fixture',payment_intent:'pi_fixture',paid:true,amount:3700,amount_refunded:0,disputed:false})},webhooks:realStripe.webhooks,prices:{retrieve:async()=>({...price,unit_amount:priceAmount})},checkout:{sessions:{create:async input=>{checkoutInput=input;return {url:'https://example.test/mock-checkout'};},retrieve:async()=>session,listLineItems:async()=>({data:[{price,amount_total:3700,currency:'usd'}]})}}};
 require.cache[require.resolve('stripe')].exports=()=>fakeStripe;
 let db,server,base,a,b;
 async function makeUser(name,role){const u=await User.create({name,username:name,email:name+'@example.test',password:'fixture',role});const sid='commerce-'+name;await AuthSession.create({userId:u._id,sessionId:sid,expiresAt:new Date(Date.now()+600000)});return {id:String(u._id),token:jwt.sign({id:String(u._id),sid},process.env.JWT_SECRET)};}
@@ -13,7 +13,7 @@ async function request(u,route,method='GET',body){const r=await fetch(base+route
 before(async()=>{db=await MongoMemoryReplSet.create({replSet:{count:1,dbName:'commerce_fixtures'}});await mongoose.connect(db.getUri());await require('../models/LifeContext').createIndexes();await require('../models/Memory').createIndexes();a=await makeUser('buyer','USER');b=await makeUser('operator','COMMANDER_IN_CHIEF');
  process.env.CORE_CONTEXT_WRITE_USER_IDS=[a.id,b.id].join(',');
  const app=express();app.use('/webhook',require('../routes/webhook'));app.use(express.json());app.use('/audit',require('../routes/freedomAuditRoutes'));app.use('/social',require('../routes/socialCommandRoutes'));app.use('/core',require('../routes/coreContextRoutes'));app.use((e,_req,res,_next)=>res.status(e.statusCode || (res.statusCode>=400?res.statusCode:500)).json({error:e.message}));server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));base='http://127.0.0.1:'+server.address().port;
- session={id:'cs_fixture',client_reference_id:a.id,mode:'payment',status:'complete',payment_status:'paid'};
+ session={id:'cs_fixture',payment_intent:'pi_fixture',client_reference_id:a.id,mode:'payment',status:'complete',payment_status:'paid'};
 });
 after(async()=>{if(server)await new Promise(r=>server.close(r));await mongoose.disconnect();if(db)await db.stop();});
 test('shared auth preserves checkout ownership, fixed price and unpaid restrictions',async()=>{

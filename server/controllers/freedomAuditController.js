@@ -3,7 +3,7 @@ const Stripe = require('stripe');
 const UserProfile = require('../models/UserProfile');
 const { randomUUID } = require('node:crypto');
 const { generatePersonalizedPlan } = require('../services/freedomAuditPlan');
-const { ensureProfile, recordPurchase } = require('../services/freedomAuditPurchase');
+const { ensureProfile } = require('../services/freedomAuditPurchase');
 
 const FREEDOM_AUDIT_PRODUCT_SLUG = 'freedom-audit';
 const FREEDOM_AUDIT_TIER = 'freedom_audit';
@@ -80,37 +80,10 @@ const buildEntitlementResponse = (profile) => ({
   latestResult: hasFreedomAuditEntitlement(profile) ? profile?.freedomAudit?.latestResult || null : null,
 });
 
-const recordFreedomAuditPurchaseFromSession = async (session, userId) => {
-  if (!session || session.payment_status !== 'paid') return null;
-
-  const stripe = getStripe();
-  const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
-    limit: 100,
-    expand: ['data.price.product'],
+const recordFreedomAuditPurchaseFromSession = (session, userId) =>
+  require('../services/stripeEntitlements').synchronizeCheckout(getStripe(), session.id, {
+    expectedUserId: userId, requiredPriceId: getFreedomAuditPriceId(),
   });
-
-  const priceId = getFreedomAuditPriceId();
-  const matchingItem = lineItems.data.find((lineItem) => lineItem.price?.id === priceId);
-  if (!matchingItem) return null;
-
-  const product = matchingItem.price?.product && typeof matchingItem.price.product === 'object'
-    ? matchingItem.price.product
-    : {};
-  const purchase = {
-    productId: product.id || session.metadata?.productId || FREEDOM_AUDIT_PRODUCT_SLUG,
-    priceId,
-    name: product.name || session.metadata?.productName || 'The Freedom Audit',
-    tier: FREEDOM_AUDIT_TIER,
-    amount: Number(matchingItem.amount_total ?? session.amount_total ?? 3700) / 100,
-    currency: matchingItem.currency || session.currency || 'usd',
-    checkoutSessionId: session.id,
-    purchasedAt: new Date(),
-    status: 'paid',
-  };
-
-  await recordPurchase(userId, purchase);
-  return UserProfile.findOne({userId});
-};
 
 const createFreedomAuditCheckout = asyncHandler(async (req, res) => {
   const stripe = getStripe();

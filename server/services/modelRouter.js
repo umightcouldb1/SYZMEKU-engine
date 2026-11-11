@@ -64,13 +64,17 @@ const requestModelJson = async ({ mode, prompt, parts = [] }) => {
     };
   }
 
+  const quota = await require('./aiQuotaService').reserveAiUsage();
+  require('./aiQuotaService').boundFreeRequest(quota, { prompt, parts });
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`, {
     method: 'POST',
+    ...(quota.limited ? { signal: AbortSignal.timeout(15000) } : {}),
     headers: {
       'Content-Type': 'application/json',
       'x-goog-api-key': apiKey,
     },
-    body: JSON.stringify({ contents: [{ parts: buildGeminiParts({ prompt, parts }) }] }),
+    body: JSON.stringify({ contents: [{ parts: buildGeminiParts({ prompt, parts }) }],
+      ...(quota.limited ? { generationConfig: { maxOutputTokens: 4096 } } : {}) }),
   });
 
   if (!response.ok) {

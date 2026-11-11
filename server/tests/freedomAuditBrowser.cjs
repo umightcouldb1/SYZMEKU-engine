@@ -12,7 +12,7 @@ async function main(){
   db=await MongoMemoryReplSet.create({replSet:{count:1,dbName:'audit_browser'}});await mongoose.connect(db.getUri());
   const stripe=require('stripe')('sk_test_fixture');
   const price={id:'price_fixture',active:true,unit_amount:3700,currency:'usd',product:{id:'prod_fixture',active:true,name:'Freedom Audit'}};
-  require.cache[require.resolve('stripe')].exports=()=>({webhooks:stripe.webhooks,prices:{retrieve:async()=>price},checkout:{sessions:{create:async input=>{session={id:'cs_browser',mode:'payment',status:'complete',payment_status:'paid',client_reference_id:input.client_reference_id};return {url:base+'/?checkout=success&session_id=cs_browser'};},retrieve:async()=>session,listLineItems:async()=>({data:[{price,amount_total:3700,currency:'usd'}]})}}});
+  require.cache[require.resolve('stripe')].exports=()=>({paymentIntents:{retrieve:async()=>({id:'pi_browser',status:'succeeded',latest_charge:'ch_browser'})},charges:{retrieve:async()=>({id:'ch_browser',payment_intent:'pi_browser',paid:true,amount:3700,amount_refunded:0,disputed:false})},webhooks:stripe.webhooks,prices:{retrieve:async()=>price},checkout:{sessions:{create:async input=>{session={id:'cs_browser',payment_intent:'pi_browser',mode:'payment',status:'complete',payment_status:'paid',client_reference_id:input.client_reference_id};return {url:base+'/?checkout=success&session_id=cs_browser'};},retrieve:async()=>session,listLineItems:async()=>({data:[{price,amount_total:3700,currency:'usd'}]})}}});
   global.fetch=async(url,options)=>{
    if(String(url).startsWith('https://generativelanguage.googleapis.com/')){
     if(providerFailure)return new Response('{}',{status:503});

@@ -8,6 +8,7 @@ const authSessionSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    authVersion: { type: Number, min: 0, validate: Number.isSafeInteger },
     sessionId: {
       type: String,
       required: true,

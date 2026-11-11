@@ -35,14 +35,7 @@ async function recheck({
     userId,
     sessionId
   } = requireCoreScope();
-  if (!(await require('../models/AuthSession').exists({
-    userId,
-    sessionId,
-    revokedAt: null,
-    expiresAt: {
-      $gt: new Date()
-    }
-  }))) throw error('AUTH_REQUIRED', 'Sign in again.', 401);
+  if (!(await require('../utils/sessionVersion').findCurrentSession({ userId, sessionId }))) throw error('AUTH_REQUIRED', 'Sign in again.', 401);
 }
 module.exports = {
   error,

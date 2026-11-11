@@ -10,6 +10,12 @@ const purchasedProductSchema = new mongoose.Schema(
     currency: { type: String, default: 'usd' },
     checkoutSessionId: { type: String, default: '' },
     purchasedAt: { type: Date, default: Date.now },
+    paymentIntentId: String,
+    chargeId: String,
+    paymentStatus: String,
+    amountRefunded: { type: Number, min: 0 }, // Stripe minor currency units, session total.
+    fullyRefunded: Boolean,
+    disputeStatus: String,
     status: {
       type: String,
       enum: ['pending', 'paid', 'refunded', 'canceled'],

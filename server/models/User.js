@@ -38,6 +38,7 @@ const userSchema = mongoose.Schema(
             required: [true, 'Please add a password'],
         },
         identity: { type: identitySchema, default: undefined },
+        authVersion: { type: Number, min: 0, validate: Number.isSafeInteger },
         role: {
             type: String,
             enum: ['USER', 'COMMANDER_IN_CHIEF'],

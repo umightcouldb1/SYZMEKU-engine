@@ -60,7 +60,7 @@ function loadFixture(relative, substitutes, extra = {}) {
   if (extra.importGemini) {
     const original = "import('@google/genai')";
     assert(source.includes(original));
-    source = source.replace(original, 'importGemini()');
+    source = source.replaceAll(original, 'importGemini()');
   }
   const context = { module: { exports: {} }, require: id => Object.hasOwn(substitutes, id) ? substitutes[id] : realRequire(id),
     process: { env: { GEMINI_API_KEY: 'synthetic-unused-test-key' } }, console: { error() {} }, AbortController, ...extra };
@@ -73,6 +73,7 @@ test('controller bounds anonymous Gemini but leaves authenticated Gemini and com
     axios: { post: async (...args) => { ollama.push(args); return { data: { response: 'local' } }; } },
     '../utils/audit': { logAuditEvent: async () => {} },
     '../services/anonymousAiBudget': { runAnonymousAi: createAnonymousAiBudget() },
+    '../services/aiQuotaService': { reserveAiUsage: async () => ({ limited: false }) },
     '../services/reasoningCapabilityService': { enabled: () => false },
   }, { importGemini: async () => ({ GoogleGenAI: class { constructor() { this.models = { generateContent: async options => { gemini.push(options); return { text: 'cloud' }; } }; } } }) });
   async function call(user, prompt = 'hello') {
@@ -106,4 +107,25 @@ test('public route dedicated limiter rejects sixth request without limiting auth
     assert.equal((await fetch(base + '/api/ai/intelligence', { method: 'POST' })).status, 200);
     assert.equal(calls, 6);
   } finally { await new Promise(resolve => server.close(resolve)); }
+});
+test('free signed-in gateway cannot bypass demo bounds and quota storage failure prevents SDK call', async () => {
+  const calls = [], clients = []; let unavailable = false;
+  const controller = loadFixture('../controllers/aiGatewayController.js', {
+    'express-async-handler': fn => fn, axios: {},
+    '../utils/audit': { logAuditEvent: async () => {} },
+    '../services/anonymousAiBudget': { runAnonymousAi: createAnonymousAiBudget() },
+    '../services/aiQuotaService': { reserveAiUsage: async () => {
+      if (unavailable) throw Object.assign(Error('Usage verification unavailable'), { statusCode: 503 });
+      return { limited: true };
+    } },
+    '../services/reasoningCapabilityService': { enabled: () => false },
+  }, { importGemini: async () => ({ GoogleGenAI: class { constructor(options) { clients.push(options); this.models = { generateContent: async options => { calls.push(options); return { text: 'cloud' }; } }; } } }) });
+  async function call(prompt) {
+    const res = { status(code) { this.statusCode = code; return this; }, json(value) { this.data = value; return this; } };
+    await controller.processIntelligencePrompt({ body: { prompt }, user: { role: 'USER' } }, res); return res;
+  }
+  assert.equal((await call('x'.repeat(4001))).statusCode, 413); assert.equal(calls.length, 0);
+  assert.equal((await call('fixture')).statusCode, 200); assert.equal(calls[0].config.maxOutputTokens, 512); assert(calls[0].config.abortSignal);
+  assert.equal(clients[0].httpOptions.retryOptions.attempts, 1);
+  unavailable = true; assert.equal((await call('fixture')).statusCode, 503); assert.equal(calls.length, 1);
 });

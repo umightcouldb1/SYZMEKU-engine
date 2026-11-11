@@ -33,6 +33,15 @@ async function generate({
   if (!['gemini', 'ollama'].includes(provider)) throw error('MODEL_NOT_CONFIGURED', 'Unknown model provider.', 503);
   const c = configuration(purpose, provider);
   const url = provider === 'gemini' ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(c.model)}:generateContent` : (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/+$/, '') + '/api/generate';
+  // One durable admission per actual Gemini attempt, including caller retries.
+  if (provider === 'gemini') {
+    const quota = await require('./aiQuotaService').reserveAiUsage();
+    require('./aiQuotaService').boundFreeRequest(quota, { prompt, media });
+    if (quota.limited) {
+      maxOutputTokens = Math.min(maxOutputTokens, 4096);
+      signal = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(15000)]);
+    }
+  }
   let response;
   try {
     response = await fetch(url, {

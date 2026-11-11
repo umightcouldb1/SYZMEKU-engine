@@ -48,12 +48,10 @@ const rejectOwnerFields = (payload = {}) => {
 // Re-authenticate captured sessions on every background tick. No ownerless boot restore.
 const runAuthenticatedCoreJob = async (principal, callback) => {
   if (process.env.CORE_CONTEXT_WRITES_ENABLED !== 'true') throw scopeError('Personal Core jobs are paused for maintenance.', 503);
-  const AuthSession = require('../models/AuthSession');
-  const User = require('../models/User');
   if (!principal?.sessionId || !principal?.userId) throw scopeError();
-  const session = await AuthSession.findOne({ sessionId: principal.sessionId, userId: principal.userId, revokedAt: null, expiresAt: { $gt: new Date() } }).lean();
-  const user = session && await User.findById(principal.userId).select('role').lean();
-  if (!session || !user || !coreCapabilities(user).operator) throw scopeError('The operator session is no longer authorized.');
+  const live = await require('../utils/sessionVersion').findCurrentSession(principal);
+  if (!live || !coreCapabilities(live.user).operator) throw scopeError('The operator session is no longer authorized.');
+  const { user, session } = live;
   return runWithRequestContext({ userId: user._id, sessionId: session.sessionId, authenticated: true }, () => {
     // Recheck account approval and execution permission on every tick.
     requireCoreExecution();

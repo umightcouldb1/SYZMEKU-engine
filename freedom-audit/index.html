@@ -269,6 +269,16 @@
             <div id="googleSignIn" aria-label="Sign in with Google"></div>
             <p id="googleStatus" class="muted" role="status" aria-live="polite">Loading Google sign-in…</p>
             <button id="googleRetry" type="button" class="ghost hidden">Retry Google sign-in</button>
+            <div id="legacyUpgradePanel" class="hidden" role="status">
+              <p>Secure your existing account once. Your data and purchases stay intact. Either choice signs out prior sessions for this account.</p>
+              <label for="legacyUpgradeChoice">Choose how to secure this account</label>
+              <select id="legacyUpgradeChoice">
+                <option value="">Choose an option before continuing</option>
+                <option value="link-password">Keep my current password and link Google</option>
+                <option id="googleOnlyRecovery" value="google-only" disabled>Use Google only and disable my old password</option>
+              </select>
+              <p>To keep your password, enter it below. Choose Google again to confirm the selected security upgrade.</p>
+            </div>
             <button id="googleLinkCancel" type="button" class="ghost hidden">Cancel Google linking</button>
             <p class="muted">or use email and password</p>
           </div>
@@ -424,6 +434,8 @@
       authBusy: false,
       auditBusy: false,
       googleLinkRequired: false,
+      legacyUpgradeRequired: false,
+      upgradeChallenge: '',
       results: []
     };
 
@@ -464,6 +476,8 @@
         const error = new Error(payload.error || payload.message || 'The Freedom Audit API request failed.');
         error.status = response.status;
         error.code = payload.code || '';
+        error.upgradeChallenge = payload.upgradeChallenge || '';
+        error.googleRecoveryAvailable = payload.googleRecoveryAvailable === true;
         throw error;
       }
       if (['/auth/google', '/auth/login', '/auth/register'].includes(path)) window.freedomBusinessEvent?.('sign_in_success');
@@ -598,7 +612,7 @@
 
     function setAuthBusy(busy) {
       state.authBusy = busy;
-      ['authSubmit', 'loginTab', 'signupTab', 'googleRetry'].forEach(id => { $(id).disabled = busy; });
+      ['authSubmit', 'loginTab', 'signupTab', 'googleRetry', 'legacyUpgradeChoice', 'googleLinkCancel'].forEach(id => { $(id).disabled = busy; });
       $('googleSignIn').inert = busy;
       $('googleSignIn').setAttribute('aria-busy', String(busy));
     }
@@ -610,6 +624,10 @@
       state.latestResult = null;
       state.results = [];
       state.googleLinkRequired = false;
+      state.legacyUpgradeRequired = false;
+      state.upgradeChallenge = '';
+      $('legacyUpgradeChoice').value = '';
+      $('legacyUpgradePanel').classList.add('hidden');
       $('googleLinkCancel').classList.add('hidden');
       $('password').value = '';
       localStorage.setItem('freedomAuditToken', state.token);
@@ -629,11 +647,27 @@
         setAuthBusy(true);
         const data = await api('/auth/google', { method: 'POST', body: JSON.stringify({
           credential: response.credential,
-          ...(state.googleLinkRequired ? { password: $('password').value } : {})
+          ...(state.googleLinkRequired || (state.legacyUpgradeRequired && $('legacyUpgradeChoice').value === 'link-password') ? { password: $('password').value } : {}),
+          ...(state.legacyUpgradeRequired && $('legacyUpgradeChoice').value ? { legacyUpgrade: $('legacyUpgradeChoice').value, upgradeChallenge: state.upgradeChallenge } : {})
         }) });
         await completeSignIn(data);
       } catch (error) {
+        if (error.code === 'LEGACY_ACCOUNT_UPGRADE_REQUIRED') {
+          state.googleLinkRequired = false;
+          $('password').value = '';
+          state.legacyUpgradeRequired = true;
+          state.upgradeChallenge = error.upgradeChallenge || '';
+          $('googleOnlyRecovery').disabled = !error.googleRecoveryAvailable;
+          $('legacyUpgradeChoice').value = '';
+          $('legacyUpgradePanel').classList.remove('hidden');
+          $('googleLinkCancel').classList.remove('hidden');
+        }
         if (error.code === 'GOOGLE_ACCOUNT_LINK_REQUIRED') {
+          state.legacyUpgradeRequired = false;
+          state.upgradeChallenge = '';
+          $('legacyUpgradeChoice').value = '';
+          $('legacyUpgradePanel').classList.add('hidden');
+          $('password').value = '';
           state.googleLinkRequired = true;
           $('googleLinkCancel').classList.remove('hidden');
         }
@@ -646,6 +680,10 @@
     function cancelGoogleLinking() {
       if (state.authBusy) return;
       state.googleLinkRequired = false;
+      state.legacyUpgradeRequired = false;
+      state.upgradeChallenge = '';
+      $('legacyUpgradeChoice').value = '';
+      $('legacyUpgradePanel').classList.add('hidden');
       $('password').value = '';
       $('googleLinkCancel').classList.add('hidden');
       message($('gateMessage'), 'Google linking canceled. You can still sign in with your password.', 'success');
