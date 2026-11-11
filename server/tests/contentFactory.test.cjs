@@ -35,6 +35,33 @@ test('finished October 1 media proofs materialize exactly once into founder revi
  }
  assert.equal(items.some(x=>x.title==='What keeps getting to make the decision?'),false);
 });
+test('materializer preserves real stored founder holds, rejections, feedback and approval receipts',async()=>{
+ const proof=service.OCTOBER_1_MEDIA_PROOFS[0],states=db.collection('enterprisestates');
+ const original=await states.findOne({_id:service.key(f.founder.id,proof.id),owner:f.founder.id});
+ const voiceBefore=await states.findOne({_id:'c0:voice:'+f.founder.id});
+ const campaignsBefore=await db.collection('socialcampaigns').find({}).toArray();
+ try{
+  for(const action of ['HOLD','REJECT','FEEDBACK']){
+   await states.replaceOne({_id:original._id},original);
+   await service.change({db,owner:f.founder.id,id:proof.id,expectedHash:service.current(original).hash,action,
+    ...(action==='FEEDBACK'?{feedback:{category:'authentic_preserve_pattern',phrase:'A possibility is not a conclusion.',note:'Keep this distinction.'}}:{})});
+   const before=await states.findOne({_id:original._id});
+   for(const sha256 of [proof.media.sha256,'a'.repeat(64)]){
+    const result=await service.materializeFounderReview({db,owner:f.founder.id,items:[{...proof,media:{...proof.media,sha256}}]});
+    assert.equal(result.items[0].status,'PRESERVED');assert.equal(result.reviewItemCount,0);
+    assert.deepEqual(await states.findOne({_id:original._id}),before);
+   }
+  }
+  await states.replaceOne({_id:original._id},{...original,status:'APPROVED',approval:{hash:service.current(original).hash,approvedBy:f.founder.id},socialCampaignId:'existing-campaign'});
+  const approved=await states.findOne({_id:original._id});
+  assert.equal((await service.materializeFounderReview({db,owner:f.founder.id,items:[proof]})).items[0].status,'PRESERVED');
+  assert.deepEqual(await states.findOne({_id:original._id}),approved);
+  assert.deepEqual(await db.collection('socialcampaigns').find({}).toArray(),campaignsBefore);
+ }finally{
+  await states.replaceOne({_id:original._id},original);
+  await states.replaceOne({_id:voiceBefore._id},voiceBefore);
+ }
+});
 test('real HTTP owner/role gates deny customers, unknown owner injection and disabled flag',async()=>{assert.equal((await f.request(f.other,'/api/content-factory')).status,404);assert.equal((await f.request(null,'/api/content-factory')).status,401);assert.equal((await f.request(f.founder,'/api/content-factory')).status,200);const item=await get('variant-b-facebook');assert.equal((await f.request(f.founder,'/api/content-factory/'+item.id,'PATCH',{action:'HOLD',expectedHash:item.hash,owner:f.other.id})).status,400);process.env.CONTENT_FACTORY_ENABLED='false';assert.equal((await f.request(f.founder,'/api/content-factory')).status,404);process.env.CONTENT_FACTORY_ENABLED='true';});
 test('read-only queue GET, isolated versions and exact snapshot edits',async()=>{const writes=[],listener=e=>{if(['insert','update','delete','findAndModify'].includes(e.commandName))writes.push(e.commandName);};f.mongoose.connection.getClient().on('commandStarted',listener);try{for(let i=0;i<3;i++)assert.equal((await f.request(f.founder,'/api/content-factory')).status,200);}finally{f.mongoose.connection.getClient().off('commandStarted',listener);}assert.deepEqual(writes,[]);const item=await get('variant-b-facebook');assert.equal((await f.request(f.other,'/api/content-factory/'+item.id,'PATCH',{action:'HOLD',expectedHash:item.hash})).status,404);assert.equal((await f.request(f.founder,'/api/content-factory/'+item.id,'PATCH',{action:'EDIT',expectedHash:item.hash,patch:{title:'Who gets to decide what goes first?'}})).status,200);const changed=await get(item.id);assert.notEqual(changed.hash,item.hash);assert.equal(changed.history.length,2);assert.equal(changed.approval,null);assert.equal((await f.request(f.founder,'/api/content-factory/'+item.id,'PATCH',{action:'HOLD',expectedHash:item.hash})).status,409);});
 test('failed/pending QA cannot be agent-approved or bulk approved; malformed feedback has zero mutation',async()=>{const item=await get('variant-b-instagram');assert.equal((await f.request(f.founder,'/api/content-factory/approve','POST',{items:[{id:item.id,hash:item.hash,version:item.version}]})).status,409);assert.equal(await db.collection('socialcampaigns').countDocuments({}),0);assert.equal((await f.request(f.founder,'/api/content-factory/'+item.id,'PATCH',{action:'REJECT',expectedHash:item.hash,feedback:{phrase:'x',replacement:'bad'}})).status,400);assert.equal((await get(item.id)).status,'DRAFT');});

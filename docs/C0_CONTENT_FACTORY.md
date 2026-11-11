@@ -24,6 +24,8 @@ Four platform Variant B packages preserve the 24-second conversion sequence with
 
 The bounded in-process job checks every 15 minutes and shortly after boot. Stable per-item IDs make retries/restarts idempotent. It prepares due material from the authorized 30-day calendar, applies current phrase corrections and records the last run. It stops at the calendar boundary. There are no continuous model calls or new paid services. Render free-instance sleep can delay preparation; this is not an always-on scheduler or a guarantee of 10–15-minute end-to-end founder involvement.
 
+The founder-review media materializer only attaches initial proof to untouched catalog drafts. Later ticks and manual preparation preserve holds, rejections, approvals, edits, feedback, and existing media, including when the configured proof changes. Preserved items are reported separately rather than counted as awaiting review. A replacement requires the existing explicit founder edit/media-review flow; periodic preparation cannot clear a decision or invalidate an approved Social handoff.
+
 Preparation, editing, regeneration, hold and reject cannot create Social campaigns or perform public actions. The queue shows actual failed/pending checks. Media approval is disabled while render/audio/destination review is incomplete. Current storyboard previews are not rendered videos.
 
 ## Approval and existing publishing integration

@@ -51,7 +51,7 @@ async function change({db,owner,id,expectedHash,action,patch,feedback}){
  if(action==='EDIT'){validatePatch(patch);packageNext=finish({...json(old.package),...json(patch)});packageNext.production={...old.package.production,status:'PACKAGE_READY_MEDIA_PENDING',media:null,review:null};validatePackage(packageNext);}
  if(action==='REGENERATE'){packageNext=regenerate(old.package,[...learned.rules,...(feedback?[feedback]:[])],true);if(hash(packageNext)===old.hash)fail('NO_NEW_DIRECTION_PROVIDED',409);}
  const revised=['EDIT','REGENERATE'].includes(action);if(revised&&doc.versions.length>=20)fail('VERSION_LIMIT_REACHED',409);
- const update={$set:{status:action==='HOLD'?'HOLD':action==='REJECT'?'REJECTED':'DRAFT',approval:null,updatedAt:new Date()}};
+ const update={$set:{status:action==='HOLD'?'HOLD':action==='REJECT'?'REJECTED':'DRAFT',approval:null,founderActionAt:new Date(),updatedAt:new Date()}};
  if(revised){update.$set.currentVersion=doc.currentVersion+1;update.$push={versions:{number:doc.currentVersion+1,hash:hash(packageNext),package:packageNext,createdAt:new Date(),voiceRulesVersion:learned.version}};}
  const result=await states.updateOne({_id:doc._id,owner,currentVersion:doc.currentVersion,'versions.hash':expectedHash,status:doc.status},update);if(!result.modifiedCount)fail('CONTENT_VERSION_CHANGED',409);
  if(feedback){await states.updateOne({_id:'c0:voice:'+owner},{$setOnInsert:{owner,kind:'C0_VOICE'},$inc:{version:1},$push:{rules:{$each:[{...feedback,action,source:id,version:doc.currentVersion,at:new Date()}],$slice:-100}}},{upsert:true});}
@@ -78,17 +78,24 @@ async function materializeFounderReview({db,owner,items=OCTOBER_1_MEDIA_PROOFS,n
    if(!proof?.media||typeof proof.media.url!=='string'||!/^https:\/\/www\.toisouljahacademy\.com\/assets\/content-factory\/[a-zA-Z0-9._/-]+\.mp4$/.test(proof.media.url)||!(/^[a-f0-9]{64}$/).test(proof.media.sha256)||!Number.isFinite(proof.media.duration)||proof.media.duration<=0)fail('EXACT_MEDIA_PROOF_REQUIRED');
    const doc=await ensureCatalogItem({db,owner,id:proof.id,now}),old=current(doc);
    if(old.package.production?.media?.sha256===proof.media.sha256&&doc.status==='FOUNDER_REVIEW'){results.push({id:proof.id,status:'EXISTS',version:doc.currentVersion,hash:old.hash});continue;}
+   // This job only attaches initial proof to an untouched catalog draft. It must
+   // never replace a founder decision, edit, review, or already attached media.
+   if(doc.status!=='DRAFT'||doc.currentVersion!==1||doc.versions.length!==1
+    ||doc.approval||doc.socialCampaignId||doc.founderActionAt||old.package.production?.media
+    ||new Date(doc.updatedAt).getTime()!==new Date(doc.createdAt).getTime()){
+    results.push({id:proof.id,status:'PRESERVED',contentStatus:doc.status,version:doc.currentVersion,hash:old.hash});continue;
+   }
    if(doc.versions.length>=20)fail('VERSION_LIMIT_REACHED',409);
    const p=json(old.package);p.duration=proof.media.duration;
    p.production={status:'FOUNDER_REVIEW',method:'MATERIALIZED_FROM_QA_PASSED_MEDIA_PROOF',decision:proof.decision||'COMBINE',technicalQa:proof.technicalQa||'PASS',media:{url:proof.media.url,sha256:proof.media.sha256,duration:proof.media.duration},review:{method:'AUTOMATED_TECHNICAL_QA_WITH_FOUNDER_REVIEW_PENDING',by:'content-factory-materializer',at:now.toISOString(),checks:allReviewChecks()},storage:{productionAsset:'AVAILABLE',googleDriveArchive:'PENDING',archiveReason:'Drive archival is separate from production-asset founder review.'}};
    const next={number:doc.currentVersion+1,hash:hash(p),package:p,createdAt:now};
-   const r=await states.updateOne({_id:doc._id,owner,currentVersion:doc.currentVersion,status:doc.status},{$set:{currentVersion:next.number,status:'FOUNDER_REVIEW',approval:null,updatedAt:now},$push:{versions:next}});
+   const r=await states.updateOne({_id:doc._id,owner,currentVersion:doc.currentVersion,status:doc.status,updatedAt:doc.updatedAt,founderActionAt:{$exists:false}},{$set:{currentVersion:next.number,status:'FOUNDER_REVIEW',approval:null,updatedAt:now},$push:{versions:next}});
    if(!r.modifiedCount)fail('CONTENT_VERSION_CHANGED',409);
    results.push({id:proof.id,status:'MATERIALIZED',version:next.number,hash:next.hash});
   }catch(e){results.push({id:proof?.id||'unknown',status:'BLOCKED',code:e.message});}
  }
  const duplicateGroups=await states.aggregate([{$match:{kind:'C0_ITEM',owner,itemId:{$in:items.map(x=>x.id)}}},{$group:{_id:'$itemId',count:{$sum:1}}},{$match:{count:{$gt:1}}}]).toArray();
- return {status:results.some(x=>x.status==='BLOCKED')?'BLOCKED':'READY',reviewItemCount:results.filter(x=>x.status!=='BLOCKED').length,items:results,duplicateReviewItems:duplicateGroups.length,execution:'NONE',publicContentPublished:'NO',publicContentScheduled:'NO'};
+ return {status:results.some(x=>x.status==='BLOCKED')?'BLOCKED':'READY',reviewItemCount:results.filter(x=>['MATERIALIZED','EXISTS'].includes(x.status)).length,preservedItemCount:results.filter(x=>x.status==='PRESERVED').length,items:results,duplicateReviewItems:duplicateGroups.length,execution:'NONE',publicContentPublished:'NO',publicContentScheduled:'NO'};
 }
 async function attachReviewedMedia({db,owner,id,expectedHash,media,checks}){
  if(!media||typeof media.url!=='string'||!/^https:\/\/www\.toisouljahacademy\.com\/assets\/content-factory\/[a-zA-Z0-9._/-]+\.mp4$/.test(media.url)||!(/^[a-f0-9]{64}$/).test(media.sha256)||!Number.isFinite(media.duration)||media.duration<=0||REVIEW_CHECKS.some(k=>checks?.[k]!==true)||Object.keys(checks).some(k=>!REVIEW_CHECKS.includes(k)))fail('EXACT_MEDIA_AND_REVIEW_REQUIRED');
