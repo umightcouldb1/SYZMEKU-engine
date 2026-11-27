@@ -434,7 +434,10 @@
     function show(sectionId) {
       if (sectionId === 'audit') window.freedomBusinessEvent?.('product_start');
       ['hero', 'gate', 'audit', 'result'].forEach((id) => $(id).classList.toggle('hidden', id !== sectionId));
-      if (sectionId === 'gate') initializeGoogleSignIn();
+      if (sectionId === 'gate') {
+        $('checkoutButton').classList.toggle('hidden', state.entitled);
+        initializeGoogleSignIn();
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -686,6 +689,10 @@
     }
 
     async function checkout() {
+      if (state.entitled) {
+        show('audit');
+        return;
+      }
       window.freedomBusinessEvent?.('cta_click');
       if (!state.token) {
         message($('gateMessage'), 'Sign in or create an account before checkout so your purchase can be attached to your profile.');
@@ -790,7 +797,12 @@
     $('heroStart').addEventListener('click', startFlow);
     $('heroResults').addEventListener('click', async () => {
       if (!state.token) return show('gate');
-      await refreshEntitlement();
+      const entitled = await refreshEntitlement();
+      if (entitled && !state.latestResult) {
+        show('audit');
+        message($('auditError'), 'Your purchase is active. No report has been saved yet. Complete the assessment to generate it. You do not need to pay again.', 'success');
+        return;
+      }
       renderResult(state.latestResult);
     });
     $('authForm').addEventListener('submit', submitAuth);
