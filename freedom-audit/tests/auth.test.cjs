@@ -2,11 +2,11 @@ const {test}=require('node:test');const assert=require('node:assert/strict');
 const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const source=html.match(/<script>([\s\S]*?)<\/script>/)[1].replaceAll('__FREEDOM_AUDIT_GOOGLE_CLIENT_ID__','994975817231-obs40351opa36ljffmelqb4o3vtru044.apps.googleusercontent.com');
-function page(respond){
+function page(respond,search=''){
  const elements=new Map();const stored=new Map();const requests=[];let callback;
  function element(){const classes=new Set();return {value:'',textContent:'',innerHTML:'',disabled:false,children:[],classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x),toggle:(x,yes)=>yes?classes.add(x):classes.delete(x)},setAttribute(){},addEventListener(){},appendChild(child){this.children.push(child)},remove(){}};}
  const get=id=>{if(!elements.has(id))elements.set(id,element());return elements.get(id)};
- const sandbox={console,URLSearchParams,setTimeout,clearTimeout,localStorage:{getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,v),removeItem:k=>stored.delete(k)},document:{getElementById:get,createElement:element,head:element()},window:{location:{search:''},scrollTo(){},google:{accounts:{id:{initialize:o=>{callback=o.callback},renderButton(){}}}}},fetch:async(url,options)=>{requests.push({url,options});const reply=await respond(url,options);return {ok:reply.status<400,status:reply.status,json:async()=>reply.body};}};
+ const sandbox={console,URLSearchParams,setTimeout,clearTimeout,localStorage:{getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,v),removeItem:k=>stored.delete(k)},document:{getElementById:get,createElement:element,head:element()},window:{location:{search},scrollTo(){},google:{accounts:{id:{initialize:o=>{callback=o.callback},renderButton(){}}}}},fetch:async(url,options)=>{requests.push({url,options});const reply=await respond(url,options);return {ok:reply.status<400,status:reply.status,json:async()=>{if(reply.invalidJson)throw new SyntaxError('non-JSON response');return reply.body}};}};
  vm.createContext(sandbox);vm.runInContext(source,sandbox);
  return {requests,stored,get,run:code=>vm.runInContext(code,sandbox),google:async response=>{await vm.runInContext('initializeGoogleSignIn()',sandbox);return callback(response)},sandbox};
 }
@@ -68,4 +68,46 @@ test('Google linking requests explicit password retry without persisting provide
 });
 test('cancel linking clears transient password and next Google attempt omits it',async()=>{
  const p=page(async()=>({status:409,body:{code:'GOOGLE_ACCOUNT_LINK_REQUIRED',message:'Link required'}}));await p.google({credential:'synthetic'});p.get('password').value='existing-password';p.run('cancelGoogleLinking()');assert.equal(p.run('state.googleLinkRequired'),false);assert.equal(p.get('password').value,'');await p.google({credential:'new-synthetic'});assert.deepEqual(JSON.parse(p.requests[1].options.body),{credential:'new-synthetic'});assert.equal(p.stored.size,0);
+});
+
+for(const failure of [{status:503,body:{}},{status:200,invalidJson:true},{status:200,body:{}},{status:200,body:{entitled:'false'}},{status:200,body:null}]){
+ test('unverified access does not offer checkout: '+JSON.stringify(failure),async()=>{
+  let response=failure;
+  const p=page(async()=>response);
+  p.run("state.token='current-session'");p.stored.set('freedomAuditToken','current-session');
+  await p.run('startFlow()');
+  assert.equal(p.get('checkoutButton').classList.contains('hidden'),true);
+  assert.equal(p.get('retryAccess').classList.contains('hidden'),false);
+  assert.match(p.get('gateMessage').innerHTML,/could not check your paid access/);
+  assert.equal(p.stored.get('freedomAuditToken'),'current-session');
+  await p.run('checkout()');assert.equal(p.requests.filter(r=>r.url.endsWith('/checkout/session')).length,0);
+  response={status:200,body:{entitled:false}};
+  await p.run('startFlow()');assert.equal(p.get('checkoutButton').classList.contains('hidden'),false);
+ });
+}
+test('a real 401 clears the session and keeps payment hidden',async()=>{
+ const p=page(async()=>({status:401,body:{}}));
+ p.run("state.token='expired-session'");p.stored.set('freedomAuditToken','expired-session');
+ await p.run('startFlow()');
+ assert.equal(p.stored.has('freedomAuditToken'),false);
+ assert.equal(p.get('checkoutButton').classList.contains('hidden'),true);
+ assert.equal(p.get('retryAccess').classList.contains('hidden'),true);
+ assert.match(p.get('gateMessage').innerHTML,/sign in again/);
+});
+
+test('checkout return cannot offer a new purchase or claim an unverified payment',async()=>{
+ const p=page(async(url)=>url.endsWith('/checkout/verify')?{status:200,invalidJson:true}:{status:200,body:{entitled:false}},'?checkout=success&session_id=cs_fixture');
+ p.run("state.token='session'");await p.run('startFlow()');await p.run('verifyCheckout()');
+ assert.equal(p.run('state.entitled'),false);
+ assert.equal(p.get('checkoutButton').classList.contains('hidden'),true);
+ assert.match(p.get('gateMessage').innerHTML,/not verified yet/);
+ await p.run('checkout()');assert.equal(p.requests.filter(r=>r.url.endsWith('/checkout/session')).length,0);
+});
+test('same-account access responses may not overwrite a newer confirmation',async()=>{
+ let release;let calls=0;
+ const p=page(async()=>++calls===1?new Promise(r=>{release=r}):{status:200,body:{entitled:true}});
+ p.run("state.token='same-account'");const stale=p.run('refreshEntitlement()');await p.run('refreshEntitlement()');
+ release({status:200,body:{entitled:false}});await stale;
+ assert.equal(p.run('state.entitled'),true);
+ assert.equal(p.get('checkoutButton').classList.contains('hidden'),true);
 });

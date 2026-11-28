@@ -6,13 +6,13 @@ async function main(){
  const root=path.resolve(__dirname,'../..'),cache=path.join(root,'.cache','audit-browser');fs.mkdirSync(cache,{recursive:true});
  const profile=fs.mkdtempSync(path.join(cache,'chrome-'));
  const mongoose=require('mongoose'),express=require('express'),{MongoMemoryReplSet}=require('mongodb-memory-server');
- let db,server,browser,socket,base,session,providerFailure=false;let seq=0;const pending=new Map(),errors=[];
+ let db,server,browser,socket,base,session,providerFailure=false,checkoutStarts=0;let seq=0;const pending=new Map(),errors=[];
  const originalFetch=global.fetch;
  try {
   db=await MongoMemoryReplSet.create({replSet:{count:1,dbName:'audit_browser'}});await mongoose.connect(db.getUri());
   const stripe=require('stripe')('sk_test_fixture');
   const price={id:'price_fixture',active:true,unit_amount:3700,currency:'usd',product:{id:'prod_fixture',active:true,name:'Freedom Audit'}};
-  require.cache[require.resolve('stripe')].exports=()=>({webhooks:stripe.webhooks,prices:{retrieve:async()=>price},checkout:{sessions:{create:async input=>{session={id:'cs_browser',mode:'payment',status:'complete',payment_status:'paid',client_reference_id:input.client_reference_id};return {url:base+'/?checkout=success&session_id=cs_browser'};},retrieve:async()=>session,listLineItems:async()=>({data:[{price,amount_total:3700,currency:'usd'}]})}}});
+  require.cache[require.resolve('stripe')].exports=()=>({webhooks:stripe.webhooks,prices:{retrieve:async()=>price},checkout:{sessions:{create:async input=>{checkoutStarts+=1;session={id:'cs_browser',mode:'payment',status:'complete',payment_status:'paid',client_reference_id:input.client_reference_id};return {url:base+'/?checkout=success&session_id=cs_browser'};},retrieve:async()=>session,listLineItems:async()=>({data:[{price,amount_total:3700,currency:'usd'}]})}}});
   global.fetch=async(url,options)=>{
    if(String(url).startsWith('https://generativelanguage.googleapis.com/')){
     if(providerFailure)return new Response('{}',{status:503});
@@ -35,7 +35,7 @@ async function main(){
   const target=await send('Target.createTarget',{url:'about:blank'});const {sessionId}=await send('Target.attachToTarget',{targetId:target.targetId,flatten:true});const call=(m,p)=>send(m,p,sessionId);
   await call('Runtime.enable');await call('Page.enable');
   const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw new Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
-  async function waitFor(expression){const until=Date.now()+15000;while(Date.now()<until){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}throw new Error('Browser assertion timed out: '+expression+'; body='+await evaluate('document.body.innerText'));}
+  async function waitFor(expression){const until=Date.now()+15000;while(Date.now()<until){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}throw new Error('Browser assertion timed out: '+expression+'; body='+await evaluate("document.body?.innerText || '(page not ready)'"));}
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
   await call('Page.navigate',{url:base});await waitFor("!!document.getElementById('heroStart')");
   await evaluate("document.getElementById('heroStart').click();document.getElementById('signupTab').click();document.getElementById('name').value='Audit Buyer';document.getElementById('email').value='auditbuyer@example.test';document.getElementById('password').value='Disposable-password-123';document.getElementById('authSubmit').click()");
@@ -43,7 +43,20 @@ async function main(){
   assert.equal(await evaluate("state.entitled"),false);
   await evaluate("document.getElementById('checkoutButton').click()");
   await waitFor("!document.getElementById('audit').classList.contains('hidden')");
+  providerFailure=true;
   await evaluate("document.querySelectorAll('input[type=radio]').forEach(e=>e.checked=e.value==='2');document.getElementById('win').value='Publish a design portfolio';document.getElementById('drag').value='Repeated scheduling';document.getElementById('asset').value='Design templates';document.getElementById('generateButton').click()");
+  await waitFor("document.getElementById('auditError').textContent.includes('no new result was saved') && !document.getElementById('generateButton').disabled");
+  assert.equal(await evaluate("document.querySelectorAll('input[type=radio]:checked').length"),20);
+  assert.equal(await evaluate("document.getElementById('win').value"),'Publish a design portfolio');
+  const firstProfile=await require('../models/UserProfile').findOne({});
+  assert.equal(firstProfile.freedomAudit?.results?.length||0,0);
+  assert.equal(firstProfile.purchasedProducts.length,1);
+  await evaluate("document.getElementById('heroResults').click()");
+  await waitFor("!document.getElementById('audit').classList.contains('hidden') && document.getElementById('auditError').textContent.includes('do not need to pay again')");
+  assert.equal(await evaluate("document.getElementById('checkoutButton').getClientRects().length"),0);
+  assert.equal(checkoutStarts,1);
+  providerFailure=false;
+  await evaluate("document.getElementById('generateButton').click()");
   await waitFor("!document.getElementById('result').classList.contains('hidden')");
   assert.equal(await evaluate("document.querySelectorAll('#plan li').length"),6);
   assert.match(await evaluate("document.getElementById('plan').textContent"),/Design templates/);
@@ -63,6 +76,9 @@ async function main(){
   await evaluate("localStorage.removeItem('freedomAuditToken')");await call('Network.clearBrowserCookies');await call('Page.navigate',{url:base});await waitFor("!!document.getElementById('heroStart')");
   await evaluate("document.getElementById('heroStart').click();document.getElementById('email').value='auditbuyer@example.test';document.getElementById('password').value='Disposable-password-123';document.getElementById('authSubmit').click()");await waitFor("state.entitled===true");
   assert.equal(await evaluate("state.latestResult.inputs.win"),'Organize receipts');
+  assert.equal(checkoutStarts,1);
+  await evaluate("document.getElementById('heroResults').click()");
+  await waitFor("!document.getElementById('result').classList.contains('hidden') && document.getElementById('plan').textContent.includes('Organize receipts')");
   assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',providers:'FAKE Stripe and Gemini, real auth/HTTP/MongoDB',checks:['signup','unpaid gate','checkout return verification','20 ratings','six evidence-backed phases','desktop/mobile','reload retrieval','provider failure preserves inputs','retry','retake history','returning password login']}));
  } finally {global.fetch=originalFetch;if(socket)socket.close();if(browser)browser.kill();if(server)await new Promise(r=>server.close(r));await mongoose.disconnect();if(db)await db.stop();}
 }

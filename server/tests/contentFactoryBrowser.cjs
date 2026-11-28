@@ -26,33 +26,32 @@ async function main(){
   const target=await send('Target.createTarget',{url:'about:blank'});const {sessionId}=await send('Target.attachToTarget',{targetId:target.targetId,flatten:true});const call=(m,p)=>send(m,p,sessionId);
   await call('Runtime.enable');await call('Page.enable');
   const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw new Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
-  async function waitFor(expression){const until=Date.now()+15000;while(Date.now()<until){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}throw new Error('Browser assertion timed out: '+expression+'; body='+await evaluate('document.body.innerText'));}
+  async function waitFor(expression){const until=Date.now()+15000;while(Date.now()<until){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}throw new Error('Browser assertion timed out: '+expression+'; body='+await evaluate('document.body?.innerText ?? "<body not ready>"'));}
 
   await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
-  await call('Page.navigate',{url:fixture.base});await waitFor("document.body.innerText.includes('PACKAGE_READY_MEDIA_PENDING')");
+  await call('Page.navigate',{url:fixture.base});await waitFor("document.body?.innerText.includes('PACKAGE_READY_MEDIA_PENDING')");
   assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
   assert.equal(await evaluate("document.body.innerText.includes('TOI_VOICE_V1')"),true);
   await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false}).then(r=>fs.writeFileSync(path.join(cache,'content-mobile.png'),Buffer.from(r.data,'base64')));
   assert.equal(await evaluate("[...document.querySelectorAll('button')].find(b=>b.textContent==='APPROVE').disabled"),true);
   await evaluate("document.querySelector('[data-content-id=variant-b-facebook]').scrollIntoView()");
-  await waitFor("document.querySelector('[data-content-id=variant-b-facebook] img').naturalWidth>0");
+  await waitFor("document.querySelector('[data-content-id=variant-b-facebook] img')?.naturalWidth>0");
   assert.equal(await evaluate("document.querySelector('[data-content-id=variant-b-facebook] .content-lineage').textContent.includes('TOI_BRAND')"),true);
   await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false}).then(r=>fs.writeFileSync(path.join(cache,'content-artwork-mobile.png'),Buffer.from(r.data,'base64')));
   await evaluate("[...document.querySelector('[data-content-id=variant-b-facebook]').querySelectorAll('button')].find(b=>b.textContent==='HOLD').click()");
-  await waitFor("document.querySelector('[data-content-id=variant-b-facebook] .content-card-top').textContent.includes('HOLD')");
+  await waitFor("document.querySelector('[data-content-id=variant-b-facebook] .content-card-top')?.textContent.includes('HOLD')");
   await evaluate("[...document.querySelector('[data-content-id=variant-b-facebook]').querySelectorAll('button')].find(b=>b.textContent==='Voice feedback').click()");
   assert.equal(await evaluate("document.querySelector('[data-content-id=variant-b-facebook] option[value=authentic_preserve_pattern]')!==null"),true);
   for(let tries=0;tries<30;tries++){const d=await fixture.mongoose.connection.db.collection('enterprisestates').findOne({itemId:'variant-b-facebook'});if(d.status==='HOLD')break;await new Promise(r=>setTimeout(r,50));}
   assert.equal((await fixture.mongoose.connection.db.collection('enterprisestates').findOne({itemId:'variant-b-facebook'})).status,'HOLD');
   assert.equal(await fixture.mongoose.connection.db.collection('socialcampaigns').countDocuments({}),0);
-  await call('Page.reload');await waitFor("document.body.innerText.includes('PACKAGE_READY_MEDIA_PENDING')");
+  await call('Page.reload');await waitFor("document.body?.innerText.includes('PACKAGE_READY_MEDIA_PENDING')");
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false}).then(r=>fs.writeFileSync(path.join(cache,'content-desktop.png'),Buffer.from(r.data,'base64')));
-  await call('Page.navigate',{url:fixture.base+'/?other=1'});await waitFor("document.body.innerText.includes('Content Factory is not enabled for this account.')");
+  await call('Page.navigate',{url:fixture.base+'/?other=1'});await waitFor("document.body?.innerText.includes('Content Factory is not enabled for this account.')");
   assert.equal(await evaluate("document.body.innerText.includes('What Keeps Getting in the Way')"),false);
   assert.equal(await fixture.mongoose.connection.db.collection('tasks').countDocuments({}),0);
   assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',checks:['390px mobile no overflow','1440px desktop','real HTTP owner isolation','reload persistence','blocked unfinished-media approval', 'hold persistence', 'zero Social drafts/publishing','no browser exceptions','zero Task effects']}));
  }finally{if(fs.existsSync(html))fs.unlinkSync(html);if(socket)socket.close();if(browser)browser.kill();if(fixture)await fixture.close();}
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
-
