@@ -259,7 +259,8 @@
             <p class="muted">Your $37 purchase unlocks your assessment, saved results and retakes. If payment confirmation is delayed, use Verify Payment to check again.</p>
           </div>
           <div id="gateMessage"></div>
-          <button id="checkoutButton">Buy The Freedom Audit - $37</button>
+          <button id="checkoutButton" class="hidden">Buy The Freedom Audit - $37</button>
+          <button class="ghost hidden" id="retryAccess">Check Paid Access</button>
           <button class="ghost" id="verifyButton">Verify Checkout Session</button>
         </aside>
 
@@ -420,6 +421,8 @@
       token: localStorage.getItem('freedomAuditToken') || '',
       authMode: 'login',
       entitled: false,
+      unpaidToken: '',
+      entitlementRequest: 0,
       latestResult: null,
       authBusy: false,
       auditBusy: false,
@@ -435,10 +438,19 @@
       if (sectionId === 'audit') window.freedomBusinessEvent?.('product_start');
       ['hero', 'gate', 'audit', 'result'].forEach((id) => $(id).classList.toggle('hidden', id !== sectionId));
       if (sectionId === 'gate') {
-        $('checkoutButton').classList.toggle('hidden', state.entitled);
+        syncAccessButtons();
         initializeGoogleSignIn();
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function canCheckout() {
+      return Boolean(state.token) && state.unpaidToken === state.token && !state.entitled && !sessionId;
+    }
+
+    function syncAccessButtons() {
+      $('checkoutButton').classList.toggle('hidden', !canCheckout());
+      $('retryAccess').classList.toggle('hidden', !state.token || canCheckout() || state.entitled);
     }
 
     function message(target, text, type = 'error') {
@@ -464,9 +476,9 @@
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const error = new Error(payload.error || payload.message || 'The Freedom Audit API request failed.');
+        const error = new Error(payload?.error || payload?.message || 'The Freedom Audit API request failed.');
         error.status = response.status;
-        error.code = payload.code || '';
+        error.code = payload?.code || '';
         throw error;
       }
       if (['/auth/google', '/auth/login', '/auth/register'].includes(path)) window.freedomBusinessEvent?.('sign_in_success');
@@ -516,28 +528,41 @@
 
     async function refreshEntitlement() {
       state.entitled = false;
+      state.unpaidToken = '';
       state.latestResult = null;
       state.results = [];
       const requestedToken = state.token;
+      const request = ++state.entitlementRequest;
+      syncAccessButtons();
       if (!state.token) {
         setStatus('Sign in to check paid access');
         return false;
       }
       try {
         const data = await api('/freedom-audit/entitlement');
-        if (state.token !== requestedToken) return false;
-        state.entitled = Boolean(data.entitled);
-        state.latestResult = data.latestResult || null;
-        setStatus(state.entitled ? 'Paid Freedom Audit access verified' : 'Signed in. Payment required.');
+        if (state.token !== requestedToken || request !== state.entitlementRequest) return false;
+        if (typeof data?.entitled !== 'boolean') throw new Error('Invalid access response.');
+        state.entitled = data.entitled;
+        state.unpaidToken = data.entitled ? '' : requestedToken;
+        state.latestResult = data.entitled ? data.latestResult || null : null;
+        setStatus(state.entitled ? 'Paid Freedom Audit access verified' :
+          sessionId ? 'Check your existing checkout before paying again.' : 'Signed in. Payment required.');
+        message($('gateMessage'), '');
         return state.entitled;
       } catch (error) {
-        if (state.token !== requestedToken) return false;
-        setStatus('Session needs sign in');
+        if (state.token !== requestedToken || request !== state.entitlementRequest) return false;
         if (error.status === 401) {
           state.token = '';
           localStorage.removeItem('freedomAuditToken');
+          setStatus('Session needs sign in');
+          message($('gateMessage'), 'Please sign in again to check your Freedom Audit access.');
+        } else {
+          setStatus('Paid access could not be checked');
+          message($('gateMessage'), 'We could not check your paid access. Select Check Paid Access to try again. Do not pay again for an existing purchase.');
         }
         return false;
+      } finally {
+        if (request === state.entitlementRequest) syncAccessButtons();
       }
     }
 
@@ -554,7 +579,10 @@
           body: JSON.stringify({ sessionId })
         });
         if (state.token !== requestedToken) return;
-        state.entitled = Boolean(data.entitled);
+        if (data?.entitled !== true) throw new Error('Payment is not verified yet. Retry Verify Checkout Session; do not pay again.');
+        state.entitled = true;
+        state.unpaidToken = '';
+        syncAccessButtons();
         state.latestResult = data.latestResult || null;
         message($('gateMessage'), 'Payment verified. Your audit is unlocked.', 'success');
         setStatus('Paid Freedom Audit access verified');
@@ -610,6 +638,7 @@
       if (typeof data.token !== 'string' || !data.token.trim()) throw new Error('Sign-in did not return a session. Please try again.');
       state.token = data.token;
       state.entitled = false;
+      state.unpaidToken = '';
       state.latestResult = null;
       state.results = [];
       state.googleLinkRequired = false;
@@ -698,9 +727,15 @@
         message($('gateMessage'), 'Sign in or create an account before checkout so your purchase can be attached to your profile.');
         return;
       }
+      if (!canCheckout()) {
+        message($('gateMessage'), 'Check paid access before starting another checkout.');
+        return;
+      }
+      const requestedToken = state.token;
       try {
         $('checkoutButton').disabled = true;
         const data = await api('/freedom-audit/checkout/session', { method: 'POST', body: '{}' });
+        if (state.token !== requestedToken) return;
         if (!data.url) throw new Error('Stripe did not return a checkout URL.');
         window.location.assign(data.url);
       } catch (error) {
@@ -798,6 +833,7 @@
     $('heroResults').addEventListener('click', async () => {
       if (!state.token) return show('gate');
       const entitled = await refreshEntitlement();
+      if (!entitled && !canCheckout()) { show('gate'); return; }
       if (entitled && !state.latestResult) {
         show('audit');
         message($('auditError'), 'Your purchase is active. No report has been saved yet. Complete the assessment to generate it. You do not need to pay again.', 'success');
@@ -811,6 +847,7 @@
     $('signupTab').addEventListener('click', () => setAuthMode('signup'));
     $('checkoutButton').addEventListener('click', checkout);
     $('verifyButton').addEventListener('click', verifyCheckout);
+    $('retryAccess').addEventListener('click', startFlow);
     $('auditForm').addEventListener('submit', submitAudit);
     $('copyPrompt').addEventListener('click', async () => {
       await navigator.clipboard.writeText($('prompt').value);
